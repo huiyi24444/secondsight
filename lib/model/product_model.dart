@@ -31,6 +31,27 @@ class Product {
     required this.images,
   });
 
+  // In product_model.dart
+  String? get tryOnImageUrl {
+    if (virtualTryOn.isEmpty) return null;
+    // Get the Firebase Storage URL from tryOnData
+    return virtualTryOn['tryOnData'] as String?;
+  }
+
+  String? get tryOnType {
+    return virtualTryOn['type'] as String? ?? 'upper'; // Default to upper
+  }
+
+  bool get hasVirtualTryOn {
+    return virtualTryOn.isNotEmpty &&
+        virtualTryOn['tryOnData'] != null &&
+        (virtualTryOn['enabled'] ?? true); // Default to true if not specified
+  }
+
+  String? get tryOnId {
+    return virtualTryOn['tryOnID'] as String?;
+  }
+
   factory Product.fromDocument(Map<String, dynamic> data, String id) {
     return Product(
       id: id,
