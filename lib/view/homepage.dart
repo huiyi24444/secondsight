@@ -6,6 +6,10 @@ import 'package:secondsight/view/search_view.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/view/widgets/searchBar.dart';
+import 'package:secondsight/view/profile_view.dart';
+
+
+
 
 
 class MyHomePage extends StatefulWidget {
@@ -85,14 +89,50 @@ class _MyHomePageState extends State<MyHomePage> {
           leading: Padding(
             padding: const EdgeInsets.only(left: 12.0, top: 10.0),
             child: GestureDetector(
-              onTap: () {},
-              child: const CircleAvatar(
-                radius: 20,
-                backgroundImage: NetworkImage('https://via.placeholder.com/150'),
-                backgroundColor: Colors.grey,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileView()),
+                );
+              },
+              child: FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc('sBblLZO4yToH2lCJjw4N')
+                    .get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  }
+
+                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                    return const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey,
+                      child: Icon(Icons.error),
+                    );
+                  }
+
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final imageUrl = data['profilePic'] ?? '';
+
+                  return CircleAvatar(
+                    radius: 20,
+                    backgroundImage: imageUrl.isNotEmpty
+                        ? NetworkImage(imageUrl)
+                        : const AssetImage('assets/images/default_avatar.png')
+                    as ImageProvider,
+                    backgroundColor: Colors.grey,
+                  );
+                },
               ),
             ),
           ),
+
           title: Padding(
             padding: const EdgeInsets.only(top: 10),
             child: SizedBox(

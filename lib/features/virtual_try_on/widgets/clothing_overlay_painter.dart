@@ -33,7 +33,7 @@ class ClothingOverlayPainter extends CustomPainter {
   });
 
   Offset transformLandmarkForDisplay(double x, double y, Size size) {
-    final verticalOffset = size.height * 0.20;
+    final verticalOffset = size.height * 0.14;
     return Offset(
         (1.0 - y) * size.width,
         (1.0 - x) * size.height - verticalOffset
@@ -98,7 +98,7 @@ class ClothingOverlayPainter extends CustomPainter {
       return hipCenterY - centerY;
     }
     final torsoLength = calculateTorsoLength();
-    final adjustedY = centerY - (torsoLength * 0.1);
+    final adjustedY = centerY - (torsoLength * 0.2);  //adjust height of shirt
 
     final shoulderAngle = atan2(
       rightShoulder.dy - leftShoulder.dy,
@@ -146,8 +146,8 @@ class ClothingOverlayPainter extends CustomPainter {
       rightHip.dx - leftHip.dx,
     );
 
-    // Adjust Y position slightly below hips
-    final adjustedY = centerY + (hipWidth * 0.05);
+    // Adjust Y position slightly ABOVE hips
+    final adjustedY = centerY - (hipWidth * 0.75);
 
     canvas.save();
     canvas.translate(centerX, adjustedY);
@@ -177,7 +177,7 @@ class ClothingOverlayPainter extends CustomPainter {
     final torsoLength = hipCenterY - shoulderCenterY;
 
     // Scale based on torso length for full body coverage
-    final baseScale = torsoLength / clothingImage!.height * 1.8;
+    final baseScale = torsoLength / clothingImage!.height * 10.8;
 
     final centerX = (leftShoulder.dx + rightShoulder.dx) / 2;
     final centerY = shoulderCenterY;
@@ -216,7 +216,6 @@ class ClothingOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Debug red rectangle
     canvas.drawRect(Rect.fromLTWH(10, 10, 100, 100), Paint()..color = Colors.red);
 
     if (pose == null) return;

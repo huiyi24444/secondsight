@@ -48,9 +48,7 @@ class Product {
         (virtualTryOn['enabled'] ?? true); // Default to true if not specified
   }
 
-  String? get tryOnId {
-    return virtualTryOn['tryOnID'] as String?;
-  }
+
 
   factory Product.fromDocument(Map<String, dynamic> data, String id) {
     return Product(

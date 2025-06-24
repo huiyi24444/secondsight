@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
+import 'dart:async';
 import '../models/pose_landmarks.dart';
 import '../services/pose_detection_service.dart';
 import 'clothing_overlay_painter.dart';
@@ -29,6 +30,7 @@ class VirtualTryOnView extends StatefulWidget {
 class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   static const MethodChannel _methodChannel =
   MethodChannel('edu.tar.my.secondsight/pose_methods');
+
   final PoseDetectionService _poseService = PoseDetectionService();
   PoseLandmarks? _currentPose;
   ui.Image? _clothingImage;
@@ -36,17 +38,71 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   bool _isLoadingImage = true;
   int _frameCount = 0;
 
+  // Add these for proper cleanup
+  StreamSubscription? _poseSubscription;
+  bool _isImageStreamActive = false;
+  bool _isDisposed = false;
+
   @override
   void initState() {
     super.initState();
-    _loadClothingImage();
-    _listenToPoseUpdates();
-    _startImageStream(widget.cameraController);
+    _initializeVirtualTryOn();
+  }
+
+  Future<void> _initializeVirtualTryOn() async {
+    print('Initializing Virtual Try-On...');
+
+    // Stop any existing image stream first
+    await _stopImageStream();
+
+    // Load clothing image
+    await _loadClothingImage();
+
+    // Set up pose detection
+    _setupPoseDetection();
+
+    // Start image stream with delay to ensure everything is ready
+    await Future.delayed(Duration(milliseconds: 500));
+    await _startImageStream();
+  }
+
+  void _setupPoseDetection() {
+    // Cancel any existing subscription
+    _poseSubscription?.cancel();
+
+    _poseSubscription = _poseService.poseStream.listen((poseData) {
+      if (_isDisposed) return;
+
+      if (poseData.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _currentPose = null;
+          });
+        }
+        return;
+      }
+
+      final mapped = poseData.map((k, v) {
+        final point = Point3D(
+          (v['x'] ?? 0).toDouble(),
+          (v['y'] ?? 0).toDouble(),
+          (v['z'] ?? 0).toDouble(),
+        );
+        return MapEntry(k, point);
+      });
+
+      if (mounted) {
+        setState(() {
+          _currentPose = PoseLandmarks(mapped);
+        });
+      }
+    });
   }
 
   Future<void> _loadClothingImage() async {
-    setState(() => _isLoadingImage = true);
+    if (_isDisposed) return;
 
+    setState(() => _isLoadingImage = true);
     try {
       // Check if it's a network URL or asset path
       if (widget.clothingImageUrl.startsWith('http')) {
@@ -64,28 +120,29 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
         );
       }
     } finally {
-      setState(() => _isLoadingImage = false);
+      if (mounted) {
+        setState(() => _isLoadingImage = false);
+      }
     }
   }
 
   Future<void> _loadNetworkImage() async {
     try {
       print('Loading network image from: ${widget.clothingImageUrl}');
-
       // Download image from Firebase Storage URL
       final response = await http.get(Uri.parse(widget.clothingImageUrl));
-
       if (response.statusCode == 200) {
         final Uint8List bytes = response.bodyBytes;
-
         // Decode image
         final ui.Codec codec = await ui.instantiateImageCodec(bytes);
         final ui.FrameInfo frameInfo = await codec.getNextFrame();
 
-        setState(() {
-          _clothingImage = frameInfo.image;
-          print('Network image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
-        });
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _clothingImage = frameInfo.image;
+            print('Network image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
+          });
+        }
       } else {
         throw Exception('Failed to load image: ${response.statusCode}');
       }
@@ -98,66 +155,73 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   Future<void> _loadAssetImage() async {
     try {
       print('Loading asset image from: ${widget.clothingImageUrl}');
-
       final ByteData data = await rootBundle.load(widget.clothingImageUrl);
       final Uint8List bytes = data.buffer.asUint8List();
-
       final ui.Codec codec = await ui.instantiateImageCodec(bytes);
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
 
-      setState(() {
-        _clothingImage = frameInfo.image;
-        print('Asset image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
-      });
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _clothingImage = frameInfo.image;
+          print('Asset image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
+        });
+      }
     } catch (e) {
       print('Error loading asset image: $e');
       rethrow;
     }
   }
 
-  void _listenToPoseUpdates() {
-    _poseService.poseStream.listen((poseData) {
-      if (poseData.isEmpty) {
-        setState(() {
-          _currentPose = null;
-        });
-        return;
-      }
+  Future<void> _startImageStream() async {
+    if (_isDisposed || _isImageStreamActive) return;
 
-      final mapped = poseData.map((k, v) {
-        final point = Point3D(
-          (v['x'] ?? 0).toDouble(),
-          (v['y'] ?? 0).toDouble(),
-          (v['z'] ?? 0).toDouble(),
-        );
-        return MapEntry(k, point);
-      });
+    try {
+      print('Starting image stream...');
+      _isImageStreamActive = true;
+      _frameCount = 0;
 
-      setState(() {
-        _currentPose = PoseLandmarks(mapped);
+      await widget.cameraController.startImageStream((CameraImage image) async {
+        if (_isDisposed || !_isImageStreamActive) return;
+
+        if (!_isProcessing) {
+          _isProcessing = true;
+          try {
+            // Process every 10th frame to reduce load
+            if (_frameCount % 10 == 0) {
+              await _processFrame(image);
+            }
+            _frameCount++;
+          } finally {
+            _isProcessing = false;
+          }
+        }
       });
-    });
+      print('Image stream started successfully');
+    } catch (e) {
+      print('Error starting image stream: $e');
+      _isImageStreamActive = false;
+    }
   }
 
-  void _startImageStream(CameraController controller) {
-    controller.startImageStream((CameraImage image) async {
-      if (!_isProcessing) {
-        _isProcessing = true;
+  Future<void> _stopImageStream() async {
+    if (!_isImageStreamActive) return;
 
-        if (_frameCount % 10 == 0) {
-          await _processFrame(image);
-        }
-        _frameCount++;
-
-        _isProcessing = false;
-      }
-    });
+    try {
+      print('Stopping image stream...');
+      await widget.cameraController.stopImageStream();
+      _isImageStreamActive = false;
+      print('Image stream stopped');
+    } catch (e) {
+      print('Error stopping image stream: $e');
+      _isImageStreamActive = false;
+    }
   }
 
   Future<void> _processFrame(CameraImage image) async {
+    if (_isDisposed) return;
+
     try {
       final Uint8List yuv = _convertCameraImageToYuv(image);
-
       await _methodChannel.invokeMethod('processFrame', {
         'imageBytes': yuv,
         'width': image.width,
@@ -182,7 +246,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
       children: [
         // Camera preview
         CameraPreview(widget.cameraController),
-
         // Clothing overlay
         SizedBox.expand(
             child: CustomPaint(
@@ -194,7 +257,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
               ),
             )
         ),
-
         // Loading indicator for image
         if (_isLoadingImage)
           Center(
@@ -217,7 +279,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
               ),
             ),
           ),
-
         // Debug overlay
         Positioned(
           top: 0,
@@ -229,7 +290,8 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
               'Pose: ${_currentPose != null ? "Detected" : "Not detected"}\n'
                   'Landmarks: ${_currentPose?.landmarks.length ?? 0}\n'
                   'Type: ${widget.clothingType}\n'
-                  'Image: ${_clothingImage != null ? "Loaded" : _isLoadingImage ? "Loading..." : "Failed"}',
+                  'Image: ${_clothingImage != null ? "Loaded" : _isLoadingImage ? "Loading..." : "Failed"}\n'
+                  'Stream: ${_isImageStreamActive ? "Active" : "Inactive"}',
               style: TextStyle(color: Colors.white, fontSize: 12),
             ),
           ),
@@ -240,6 +302,18 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
 
   @override
   void dispose() {
+    print('Disposing VirtualTryOnView...');
+    _isDisposed = true;
+
+    // Cancel pose subscription
+    _poseSubscription?.cancel();
+
+    // Stop image stream
+    _stopImageStream();
+
+    // Dispose clothing image
+    _clothingImage?.dispose();
+
     super.dispose();
   }
 }
