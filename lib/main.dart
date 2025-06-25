@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
 import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:secondsight/view/products/product_view.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:provider/provider.dart';
 
-// main file
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   Stripe.publishableKey = 'pk_test_51RdqXPQSp3H55udZMewh3I9eilxrid02WSapRFKsq2hvoogenAFbSa5TnMbU4IOcRUZemfqBXPCvS1Rd4izRF2wf00KZr3wv10';
-  runApp(MyApp());
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -28,7 +37,7 @@ class MyApp extends StatelessWidget {
           seedColor: const Color(0xFF8E6CEF),
           brightness: Brightness.light,
         ).copyWith(
-          primary: const Color(0xFF8E6CEF), // explicitly define primary color
+          primary: const Color(0xFF8E6CEF),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -48,14 +57,10 @@ class MyApp extends StatelessWidget {
             borderSide: BorderSide.none,
           ),
         ),
-        fontFamily: 'Gabarito', // 👈 Your custom font name
+        fontFamily: 'Gabarito',
         useMaterial3: true,
       ),
-
-
       home: const MyHomePage(),
-
-
     );
   }
 }

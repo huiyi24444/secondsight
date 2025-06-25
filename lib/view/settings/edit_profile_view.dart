@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../../model/profile_model.dart';
 import '../widgets/custom_back_button.dart';
@@ -33,7 +33,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   void initState() {
     super.initState();
     _nameController.text = widget.profile.fullName;
-    _phoneController.text = widget.profile.phoneNum.toString() ?? '';
+    _phoneController.text = widget.profile.phoneNum > 0 ? widget.profile.phoneNum.toString() : '';
     _profilePicUrl = widget.profile.profilePic;
   }
 
@@ -174,14 +174,25 @@ class _EditProfileViewState extends State<EditProfileView> {
       String? newProfilePicUrl = await _uploadImage();
 
       // Update Firestore
+      final phoneText = _phoneController.text.trim();
+      final Map<String, dynamic> updateData = {
+        'fullName': _nameController.text.trim(),
+      };
+
+      // Parse phone number, default to 0 if empty or invalid
+      final phoneInt = phoneText.isNotEmpty
+          ? (int.tryParse(phoneText.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0)
+          : 0;
+      updateData['phoneNum'] = phoneInt; // Always store as int
+
+      if (newProfilePicUrl != null) {
+        updateData['profilePic'] = newProfilePicUrl;
+      }
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userId)
-          .update({
-        'fullName': _nameController.text.trim(),
-        'phoneNum': _phoneController.text.trim(),
-        if (newProfilePicUrl != null) 'profilePic': newProfilePicUrl,
-      });
+          .update(updateData);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

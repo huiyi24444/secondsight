@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:secondsight/view/widgets/shipping_address_selection.dart';
 import 'order_success_view.dart';
 
 class CheckoutView extends StatefulWidget {
@@ -226,7 +227,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddressSelectionSheet(
+      builder: (context) => ShippingAddressSelection(
         onAddressSelected: (address) {
           setState(() {
             selectedAddress = address;
@@ -235,6 +236,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       ),
     );
   }
+
 
   void _showPaymentMethodSelection() {
     showModalBottomSheet(
@@ -303,79 +305,7 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 }
 
-class AddressSelectionSheet extends StatelessWidget {
-  final Function(String) onAddressSelected;
 
-  AddressSelectionSheet({required this.onAddressSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Select Shipping Address',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildAddressOption(
-                  '2715 Ash Dr, San Jose, South Dakota...',
-                  true,
-                      () {
-                    onAddressSelected('2715 Ash Dr, San Jose, South Dakota');
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddressOption(String address, bool isSelected, VoidCallback onTap) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isSelected ? Color(0xFF8B5CF6) : Colors.grey[300]!,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        title: Text(address),
-        trailing: isSelected
-            ? Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
-            : null,
-        onTap: onTap,
-      ),
-    );
-  }
-}
 
 class PaymentMethodSheet extends StatelessWidget {
   final Function(String) onPaymentMethodSelected;

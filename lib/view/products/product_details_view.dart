@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../model/product_model.dart'; // Add this import
 import '../../features/virtual_try_on/screens/virtual_try_on_screen.dart'; // Add this import
+import '../../services/auth_provider.dart';
 import '../checkout/cart_view.dart';
 
 class ProductDetailsView extends StatelessWidget {
@@ -11,6 +13,7 @@ class ProductDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userId = Provider.of<AuthProvider>(context).userId;
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('products').doc(productId).get(),
       builder: (context, snapshot) {
@@ -125,15 +128,14 @@ class ProductDetailsView extends StatelessWidget {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () async {
-                      final user = "sBblLZO4yToH2lCJjw4N";
-                      if (user == null) {
+                      if (userId == null || userId.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Please log in first.')),
                         );
                         return;
                       }
 
-                      final userId = user;
+
                       final cartRef = FirebaseFirestore.instance
                           .collection('users')
                           .doc(userId)

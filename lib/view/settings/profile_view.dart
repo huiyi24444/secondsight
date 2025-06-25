@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/view/products/wishlist_view.dart';
 import '../../model/profile_model.dart';
+import '../../services/auth_provider.dart';
 import '../widgets/custom_back_button.dart';
 import 'address_list_view.dart';
 import 'payment_method_view.dart';
-import 'edit_profile_view.dart'; // Add this import
+import 'edit_profile_view.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -16,16 +18,26 @@ class ProfileView extends StatefulWidget {
 
 class _ProfileViewState extends State<ProfileView> {
   late Future<ProfileModel> _profileFuture;
+  String? userId;
 
   @override
-  void initState() {
-    super.initState();
-    _profileFuture = _loadUserProfile();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (userId == null) {
+      userId = Provider.of<AuthProvider>(context, listen: false).userId;
+      if (userId != null) {
+        _profileFuture = _loadUserProfile();
+      }
+    }
   }
 
   Future<ProfileModel> _loadUserProfile() async {
-    final userId = "sBblLZO4yToH2lCJjw4N"; // Replace with FirebaseAuth.instance.currentUser!.uid
-    final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (userId == null) throw Exception("User ID not found");
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId!)
+        .get();
 
     if (!doc.exists) {
       throw Exception("User not found");
@@ -35,13 +47,42 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _refreshProfile() {
-    setState(() {
-      _profileFuture = _loadUserProfile();
-    });
+    if (userId != null) {
+      setState(() {
+        _profileFuture = _loadUserProfile();
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Check if userId is null
+    if (userId == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFAFAFA),
+        appBar: AppBar(
+          leading: const CustomBackButton(),
+          title: const Text(
+            "Settings",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: const Color(0xFFFAFAFA),
+          elevation: 0,
+          foregroundColor: Colors.black87,
+        ),
+        body: const Center(
+          child: Text(
+            "Please log in to view your profile",
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
@@ -69,9 +110,37 @@ class _ProfileViewState extends State<ProfileView> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                style: TextStyle(color: Colors.grey[600]),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Error loading profile",
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "${snapshot.error}",
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _refreshProfile,
+                    child: const Text("Retry"),
+                  ),
+                ],
               ),
             );
           }
@@ -82,7 +151,7 @@ class _ProfileViewState extends State<ProfileView> {
             children: [
               // Profile Header Section
               Container(
-                color: Colors.white,
+                color: Colors.transparent,
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
                   children: [
@@ -144,7 +213,7 @@ class _ProfileViewState extends State<ProfileView> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => EditProfileView(
-                              userId: "sBblLZO4yToH2lCJjw4N",
+                              userId: userId!,
                               profile: profile,
                             ),
                           ),
@@ -196,7 +265,8 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   Widget _buildMenuList() {
-    final userId = "sBblLZO4yToH2lCJjw4N";
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
@@ -207,7 +277,7 @@ class _ProfileViewState extends State<ProfileView> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => AddressListView(userId: userId),
+                builder: (_) => AddressListView(userId: userId!),
               ),
             );
           },
@@ -219,7 +289,7 @@ class _ProfileViewState extends State<ProfileView> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => WishlistView(userId: userId),
+                builder: (_) => WishlistView(userId: userId!),
               ),
             );
           },
@@ -242,19 +312,42 @@ class _ProfileViewState extends State<ProfileView> {
         _buildListTile(
           Icons.help_outline,
           "Help",
-              () {},
+              () {
+            // Add help functionality
+          },
         ),
         _buildListTile(
           Icons.support_agent_outlined,
           "Support",
-              () {},
+              () {
+            // Add support functionality
+          },
         ),
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextButton(
-            onPressed: () {
-              // Add sign out logic here
+            onPressed: () async {
+              // Sign out logic
+              try {
+                await authProvider.signOut();
+                if (mounted) {
+                  // Navigate to login screen or home
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/login', // Replace with your login route
+                        (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error signing out: $e'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,

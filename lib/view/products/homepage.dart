@@ -9,9 +9,8 @@ import 'package:secondsight/view/widgets/searchBar.dart';
 import 'package:secondsight/view/settings/profile_view.dart';
 
 import '../checkout/cart_view.dart';
-
-
-
+import 'package:provider/provider.dart';
+import '../../services/auth_provider.dart';
 
 
 class MyHomePage extends StatefulWidget {
@@ -23,7 +22,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _current = 0;
-
+  late Future<DocumentSnapshot> _profileFuture;
   final List<String> imageList = [
 //TODO: ADD IAMGES
   ];
@@ -44,6 +43,15 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
+    // Delay access to context by scheduling it after initState completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+      setState(() {
+        _profileFuture = FirebaseFirestore.instance.collection('users').doc(userId).get();
+      });
+    });
+
     _categoriesFuture = fetchCategories();
 
     _searchController.addListener(() {
@@ -59,8 +67,8 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       });
     });
-
   }
+
 
   // search function
   Stream<QuerySnapshot> _getSearchResults() {
@@ -80,6 +88,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final userId = Provider.of<AuthProvider>(context).userId;
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
@@ -98,10 +108,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
               child: FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc('sBblLZO4yToH2lCJjw4N')
-                    .get(),
+                future: _profileFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const CircleAvatar(
@@ -170,10 +177,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => CartView(userId: 'sBblLZO4yToH2lCJjw4N'),
+                        builder: (_) => CartView(userId: userId),
                       ),
                     );
                   },
+
 
                 ),
               ),

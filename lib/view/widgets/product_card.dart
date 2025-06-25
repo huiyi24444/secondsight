@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/model/product_model.dart';
-import 'package:secondsight/view/products/product_details_view.dart'; // Adjust path if needed
+import 'package:secondsight/view/products/product_details_view.dart';
+
+import '../../services/auth_provider.dart'; // Adjust path if needed
 
 class ProductCard extends StatefulWidget {
   final Product product;
@@ -64,15 +67,15 @@ class _ProductCardState extends State<ProductCard> {
                           isFavorite = !isFavorite;
                         });
 
-                        final user = "sBblLZO4yToH2lCJjw4N";
-                        if (user == null) {
+                        final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
+                        if (userId.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('You need to be logged in to add to wishlist')),
+                            const SnackBar(content: Text('You need to be logged in to add to wishlist')),
                           );
                           return;
                         }
 
-                        final userId = user;
                         final wishlistRef = FirebaseFirestore.instance
                             .collection('users')
                             .doc(userId)
