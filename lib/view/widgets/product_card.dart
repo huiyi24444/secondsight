@@ -1,6 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/model/product_model.dart';
-import 'package:secondsight/view/product_details_view.dart'; // Adjust path if needed
+import 'package:secondsight/view/products/product_details_view.dart'; // Adjust path if needed
 
 class ProductCard extends StatefulWidget {
   final Product product;
@@ -58,11 +59,48 @@ class _ProductCardState extends State<ProductCard> {
                     top: 8,
                     right: 8,
                     child: GestureDetector(
-                      onTap: () {
+                      onTap: () async {
                         setState(() {
                           isFavorite = !isFavorite;
                         });
+
+                        final user = "sBblLZO4yToH2lCJjw4N";
+                        if (user == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('You need to be logged in to add to wishlist')),
+                          );
+                          return;
+                        }
+
+                        final userId = user;
+                        final wishlistRef = FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(userId)
+                            .collection('wishlist');
+
+                        final productRef = FirebaseFirestore.instance
+                            .collection('products')
+                            .doc(widget.product.id);
+
+                        try {
+                          if (isFavorite) {
+                            // Add to wishlist
+                            await wishlistRef.doc(widget.product.id).set({
+                              'productRef': productRef,
+                              'addedAt': FieldValue.serverTimestamp(),
+                            });
+                          } else {
+                            // Remove from wishlist
+                            await wishlistRef.doc(widget.product.id).delete();
+                          }
+                        } catch (e) {
+                          print('Error updating wishlist: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error updating wishlist')),
+                          );
+                        }
                       },
+
                       child: CircleAvatar(
                         backgroundColor: Colors.white70,
                         child: Icon(

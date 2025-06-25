@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'view/homepage.dart';
+import 'package:secondsight/view/checkout/order_success_view.dart';
+import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:secondsight/view/product_view.dart';
+import 'package:secondsight/view/products/product_view.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 // main file
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  Stripe.publishableKey = 'pk_test_51RdqXPQSp3H55udZMewh3I9eilxrid02WSapRFKsq2hvoogenAFbSa5TnMbU4IOcRUZemfqBXPCvS1Rd4izRF2wf00KZr3wv10';
   runApp(MyApp());
 }
 
@@ -51,6 +54,8 @@ class MyApp extends StatelessWidget {
 
 
       home: const MyHomePage(),
+
+
     );
   }
 }

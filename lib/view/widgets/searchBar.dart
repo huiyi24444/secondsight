@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:secondsight/view/search_view.dart';
-import 'package:secondsight/view/search_results_view.dart';
+import 'package:secondsight/view/search/search_view.dart';
+import 'package:secondsight/view/search/search_results_view.dart';
 
 class CustomSearchBar extends StatelessWidget {
   final TextEditingController controller;
