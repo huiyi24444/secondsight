@@ -11,6 +11,10 @@ import 'package:secondsight/view/settings/profile_view.dart';
 import '../checkout/cart_view.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
+import '../order/notifications_view.dart';
+import '../order/order_tracking_view.dart';
+import '../order/orders_view.dart';
+import '../widgets/bottom_nav_bar.dart';
 
 
 class MyHomePage extends StatefulWidget {
@@ -385,10 +389,38 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ],
             ),
+
           ],
         ),
-      ),
+
+
     ),
+    ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: 0,
+        onItemTapped: (index) {
+          if (index == 0) return;
+          Widget target;
+          switch (index) {
+            case 1:
+              target = NotificationsView();
+              break;
+            case 2:
+              target = OrdersView();
+              break;
+            case 3:
+              target = ProfileView();
+              break;
+            default:
+              return;
+          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
+          );
+        },
+      ),
+
     );
   }
 }

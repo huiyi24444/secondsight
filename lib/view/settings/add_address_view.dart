@@ -34,14 +34,15 @@ final List<String> _malaysianStates = [
 
 String? _selectedState = 'Penang';
 
-
 class _AddAddressViewState extends State<AddAddressView> {
   final _formKey = GlobalKey<FormState>();
+  final _fullName = TextEditingController();
+  final _phoneNum = TextEditingController();
   final _streetOne = TextEditingController();
   final _streetTwo = TextEditingController();
   final _city = TextEditingController();
-  final _state = TextEditingController();
   final _zipCode = TextEditingController();
+  bool _isDefault = false;
 
   void _saveAddress() async {
     if (_formKey.currentState!.validate()) {
@@ -50,11 +51,14 @@ class _AddAddressViewState extends State<AddAddressView> {
           .doc(widget.userId)
           .collection('address')
           .add({
+        'fullName': _fullName.text,
+        'phoneNum': int.tryParse(_phoneNum.text) ?? 0,
+        'isDefault': _isDefault,
         'streetone': _streetOne.text,
         'streettwo': _streetTwo.text,
         'city': _city.text,
         'state': _selectedState,
-        'zipCode': int.parse(_zipCode.text),
+        'zipCode': int.tryParse(_zipCode.text) ?? 0,
       });
 
       Navigator.pop(context);
@@ -65,7 +69,7 @@ class _AddAddressViewState extends State<AddAddressView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const CustomBackButton(), // Use your custom back button here
+        leading: const CustomBackButton(),
         title: const Text("Add address"),
         backgroundColor: Colors.transparent,
         centerTitle: true,
@@ -76,52 +80,106 @@ class _AddAddressViewState extends State<AddAddressView> {
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(controller: _streetOne, decoration: const InputDecoration(hintText: "Address Line 1"), validator: (v) => v!.isEmpty ? 'Required' : null),
+              const Text("Full Name", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              TextFormField(
+                controller: _fullName,
+                decoration: const InputDecoration(hintText: "Full Name"),
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
               const SizedBox(height: 12),
-              TextFormField(controller: _streetTwo, decoration: const InputDecoration(hintText: "Address Line 2")),
+              const Text("Phone Number", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              TextFormField(
+                controller: _phoneNum,
+                decoration: const InputDecoration(hintText: "Phone Number"),
+                keyboardType: TextInputType.phone,
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 25),
+              const Text("Address Line 1", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              TextFormField(
+                controller: _streetOne,
+                decoration: const InputDecoration(hintText: "Address Line 1"),
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
               const SizedBox(height: 12),
-              TextFormField(controller: _city, decoration: const InputDecoration(hintText: "City"), validator: (v) => v!.isEmpty ? 'Required' : null),
+              const Text("Address Line 2", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              TextFormField(
+                controller: _streetTwo,
+                decoration: const InputDecoration(hintText: "Address Line 2"),
+              ),
+              const SizedBox(height: 12),
+              const Text("City", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              TextFormField(
+                controller: _city,
+                decoration: const InputDecoration(hintText: "City"),
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _selectedState,
-                      decoration: const InputDecoration(hintText: "State"),
-                      items: _malaysianStates
-                          .map((state) => DropdownMenuItem(value: state, child: Text(state)))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedState = value;
-                        });
-                      },
-                      validator: (value) => value == null ? 'Required' : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("State", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: _selectedState,
+                          decoration: const InputDecoration(hintText: "State"),
+                          items: _malaysianStates
+                              .map((state) => DropdownMenuItem(value: state, child: Text(state)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedState = value;
+                            });
+                          },
+                          validator: (value) => value == null ? 'Required' : null,
+                        ),
+                      ],
                     ),
                   ),
-
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextFormField(
-                      controller: _zipCode,
-                      decoration: const InputDecoration(hintText: "Zip Code"),
-                      keyboardType: TextInputType.number,
-                      validator: (v) => v!.isEmpty ? 'Required' : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Zip Code", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        TextFormField(
+                          controller: _zipCode,
+                          decoration: const InputDecoration(hintText: "Zip Code"),
+                          keyboardType: TextInputType.number,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _isDefault,
+                    onChanged: (value) {
+                      setState(() {
+                        _isDefault = value ?? false;
+                      });
+                    },
+                  ),
+                  const Text("Set as default address"),
+                ],
+              ),
               const Spacer(),
-
               LongButton(
                 label: "Save",
                 onPressed: _saveAddress,
               ),
-
             ],
           ),
+
         ),
       ),
     );
