@@ -1,28 +1,22 @@
-// lib/widgets/order_card.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
+import '../../model/order_model.dart';
 import '../order/order_details_view.dart';
 
 class OrderCard extends StatelessWidget {
-  final String orderId;
-  final Map<String, dynamic> orderData;
+  final OrdersModel order;
   final String userId;
 
   const OrderCard({
     super.key,
-    required this.orderId,
-    required this.orderData,
+    required this.order,
     required this.userId,
   });
 
   @override
   Widget build(BuildContext context) {
-    final orderDate = (orderData['orderDate'] as Timestamp?)?.toDate() ?? DateTime.now();
-    final formattedDate = DateFormat('MMM dd, yyyy').format(orderDate);
-    final totalAmount = (orderData['totalAmount'] ?? 0).toDouble();
-    final orderStatus = orderData['orderStatus'] ?? 'processing';
+    final formattedDate = DateFormat('MMM dd, yyyy').format(order.orderDate);
 
     return GestureDetector(
       onTap: () {
@@ -30,7 +24,7 @@ class OrderCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => OrderDetailsView(
-              orderId: orderId,
+              orderId: order.id,
               userId: userId,
             ),
           ),
@@ -55,9 +49,9 @@ class OrderCard extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildHeader(formattedDate, orderStatus),
+                  _buildHeader(formattedDate, order.orderStatus),
                   const SizedBox(height: 12),
-                  _buildAmountRow(context, totalAmount),
+                  _buildAmountRow(context, order.totalAmount),
                 ],
               ),
             ),
@@ -67,6 +61,7 @@ class OrderCard extends StatelessWidget {
       ),
     );
   }
+
   Widget _buildHeader(String formattedDate, String orderStatus) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -75,7 +70,7 @@ class OrderCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Order #${orderId.substring(0, 6).toUpperCase()}',
+              'Order #${order.id.substring(0, 6).toUpperCase()}',
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
             const SizedBox(height: 4),
@@ -109,7 +104,7 @@ class OrderCard extends StatelessWidget {
         .collection('users')
         .doc(userId)
         .collection('order')
-        .doc(orderId)
+        .doc(order.id)
         .collection('orderProducts')
         .get();
 
@@ -143,13 +138,12 @@ class OrderCard extends StatelessWidget {
     );
   }
 
-
   Future<List<Map<String, dynamic>>> _fetchProductPreviews() async {
     final orderProductsSnapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
-        .collection('order') // 🔁 singular
-        .doc(orderId)
+        .collection('order')
+        .doc(order.id)
         .collection('orderProducts')
         .limit(3)
         .get();
@@ -171,7 +165,6 @@ class OrderCard extends StatelessWidget {
                 : '',
             'quantity': data['productQuantity'] ?? 1,
           });
-
         }
       } catch (e) {
         previews.add({
@@ -183,10 +176,6 @@ class OrderCard extends StatelessWidget {
 
     return previews;
   }
-
-
-
-
 
   Widget _buildProductPreview(BuildContext context) {
     return Container(
@@ -260,7 +249,6 @@ class OrderCard extends StatelessWidget {
                               child: const Icon(Icons.image_not_supported, color: Colors.grey),
                             ),
                           ),
-
                           if (quantity > 1)
                             Positioned(
                               right: 4,
@@ -297,7 +285,6 @@ class OrderCard extends StatelessWidget {
       ),
     );
   }
-
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {

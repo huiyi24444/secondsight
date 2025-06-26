@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../../model/order_model.dart';
+import '../../model/order_product_model.dart';
 import '../widgets/custom_back_button.dart';
 
 class OrderDetailsView extends StatelessWidget {
@@ -47,10 +49,9 @@ class OrderDetailsView extends StatelessWidget {
             );
           }
 
-          final orderData = orderSnapshot.data!.data() as Map<String, dynamic>;
-          final orderDate = (orderData['orderDate'] as Timestamp?)?.toDate() ?? DateTime.now();
-          final totalAmount = (orderData['totalAmount'] ?? 0).toDouble();
-          final orderStatus = orderData['orderStatus'] ?? 'processing';
+          final data = orderSnapshot.data!;
+          final order = OrdersModel.fromJson(data.data() as Map<String, dynamic>, data.id);
+
 
           return SingleChildScrollView(
             child: Column(
@@ -90,13 +91,13 @@ class OrderDetailsView extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(orderStatus).withOpacity(0.1),
+                              color: _getStatusColor(order.orderStatus).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              _getStatusText(orderStatus),
+                              _getStatusText(order.orderStatus),
                               style: TextStyle(
-                                color: _getStatusColor(orderStatus),
+                                color: _getStatusColor(order.orderStatus),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -114,7 +115,7 @@ class OrderDetailsView extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            DateFormat('MMMM dd, yyyy at HH:mm').format(orderDate),
+                            DateFormat('MMMM dd, yyyy at HH:mm').format(order.orderDate),
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[700],
@@ -178,12 +179,9 @@ class OrderDetailsView extends StatelessWidget {
                               child: Divider(color: Colors.grey[200]),
                             ),
                             itemBuilder: (context, index) {
-                              final productData = products[index].data() as Map<String, dynamic>;
-                              final productRef = productData['productID'] as DocumentReference?;
-                              final quantity = productData['productQuantity'] ?? 1;
-                              final price = (productData['price'] ?? 0).toDouble();
-                              final totalPrice = (productData['totalPrice'] ?? 0).toDouble();
-                              final eligibleForReturn = productData['eligibilityForReturn'] ?? false;
+                              final data = products[index].data() as Map<String, dynamic>;
+                              final orderProduct = OrderProductModel.fromJson(data);
+                              final productRef = orderProduct.productID;
 
                               return FutureBuilder<DocumentSnapshot>(
                                 future: productRef?.get(),
@@ -255,7 +253,7 @@ class OrderDetailsView extends StatelessWidget {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              'Quantity: $quantity',
+                                              'Quantity: ${orderProduct.productQuantity}',
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: Colors.grey[700],
@@ -266,14 +264,14 @@ class OrderDetailsView extends StatelessWidget {
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
                                                 Text(
-                                                  'RM ${price.toStringAsFixed(2)} each',
+                                                  'RM ${orderProduct.price.toStringAsFixed(2)} each',
                                                   style: TextStyle(
                                                     fontSize: 13,
-                                                    color: Colors.grey[700],
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                                 Text(
-                                                  'RM ${totalPrice.toStringAsFixed(2)}',
+                                                  'RM ${orderProduct.totalPrice.toStringAsFixed(2)}',
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w600,
@@ -281,7 +279,7 @@ class OrderDetailsView extends StatelessWidget {
                                                 ),
                                               ],
                                             ),
-                                            if (eligibleForReturn && orderStatus == 'completed')
+                                            if (orderProduct.eligibilityForReturn && order.orderStatus == 'Completed')
                                               Padding(
                                                 padding: const EdgeInsets.only(top: 8),
                                                 child: Container(
@@ -346,7 +344,7 @@ class OrderDetailsView extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'RM ${totalAmount.toStringAsFixed(2)}',
+                            'RM ${order.totalAmount.toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,

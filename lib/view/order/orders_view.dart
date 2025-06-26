@@ -235,15 +235,15 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
           itemCount: orders.length,
           itemBuilder: (context, index) {
             final orderDoc = orders[index];
-            final orderData = orderDoc.data() as Map<String, dynamic>;
+            final order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
 
             return OrderCard(
-              orderId: orderDoc.id,
-              orderData: orderData,
+              order: order,
               userId: userId,
             );
           },
         );
+
       },
     );
   }
