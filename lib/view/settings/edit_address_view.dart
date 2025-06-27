@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
-import '../widgets/custom_back_button.dart';
-import '../widgets/long_button.dart';
+import 'package:secondsight/view/widgets/custom_back_button.dart';
+import 'package:secondsight/view/widgets/long_button.dart';
+import '../../controller/settings/edit_address_controller.dart';
 
 class EditAddressView extends StatefulWidget {
   final String userId;
@@ -19,50 +18,24 @@ class EditAddressView extends StatefulWidget {
   @override
   State<EditAddressView> createState() => _EditAddressViewState();
 }
+
 class _EditAddressViewState extends State<EditAddressView> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _fullName;
-  late TextEditingController _phoneNum;
-  late TextEditingController _streetOne;
-  late TextEditingController _streetTwo;
-  late TextEditingController _city;
-  late TextEditingController _state;
-  late TextEditingController _zipCode;
-  bool _isDefault = false;
+  late EditAddressController controller;
 
   @override
   void initState() {
     super.initState();
-    _fullName = TextEditingController(text: widget.initialData['fullName'] ?? '');
-    _phoneNum = TextEditingController(text: widget.initialData['phoneNum']?.toString() ?? '');
-    _streetOne = TextEditingController(text: widget.initialData['streetone'] ?? '');
-    _streetTwo = TextEditingController(text: widget.initialData['streettwo'] ?? '');
-    _city = TextEditingController(text: widget.initialData['city'] ?? '');
-    _state = TextEditingController(text: widget.initialData['state'] ?? '');
-    _zipCode = TextEditingController(text: widget.initialData['zipCode']?.toString() ?? '');
-    _isDefault = widget.initialData['isDefault'] ?? false;
+    controller = EditAddressController(
+      userId: widget.userId,
+      addressId: widget.addressId,
+      initialData: widget.initialData,
+    );
   }
 
-  void _updateAddress() async {
-    if (_formKey.currentState!.validate()) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('address')
-          .doc(widget.addressId)
-          .update({
-        'fullName': _fullName.text,
-        'phoneNum': int.tryParse(_phoneNum.text) ?? 0,
-        'isDefault': _isDefault,
-        'streetone': _streetOne.text,
-        'streettwo': _streetTwo.text,
-        'city': _city.text,
-        'state': _state.text,
-        'zipCode': int.tryParse(_zipCode.text) ?? 0,
-      });
-
-      Navigator.pop(context);
-    }
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -78,13 +51,13 @@ class _EditAddressViewState extends State<EditAddressView> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
-          key: _formKey,
+          key: controller.formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text("Full Name", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               TextFormField(
-                controller: _fullName,
+                controller: controller.fullName,
                 decoration: const InputDecoration(hintText: "Full Name"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -92,7 +65,7 @@ class _EditAddressViewState extends State<EditAddressView> {
 
               const Text("Phone Number", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               TextFormField(
-                controller: _phoneNum,
+                controller: controller.phoneNum,
                 decoration: const InputDecoration(hintText: "Phone Number"),
                 keyboardType: TextInputType.phone,
                 validator: (v) => v!.isEmpty ? 'Required' : null,
@@ -101,7 +74,7 @@ class _EditAddressViewState extends State<EditAddressView> {
 
               const Text("Street Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               TextFormField(
-                controller: _streetOne,
+                controller: controller.streetOne,
                 decoration: const InputDecoration(hintText: "Street Address"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -109,14 +82,14 @@ class _EditAddressViewState extends State<EditAddressView> {
 
               const Text("Address Line 2", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               TextFormField(
-                controller: _streetTwo,
+                controller: controller.streetTwo,
                 decoration: const InputDecoration(hintText: "Address Line 2"),
               ),
               const SizedBox(height: 12),
 
               const Text("City", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               TextFormField(
-                controller: _city,
+                controller: controller.city,
                 decoration: const InputDecoration(hintText: "City"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -130,7 +103,7 @@ class _EditAddressViewState extends State<EditAddressView> {
                       children: [
                         const Text("State", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                         TextFormField(
-                          controller: _state,
+                          controller: controller.state,
                           decoration: const InputDecoration(hintText: "State"),
                           validator: (v) => v!.isEmpty ? 'Required' : null,
                         ),
@@ -144,7 +117,7 @@ class _EditAddressViewState extends State<EditAddressView> {
                       children: [
                         const Text("Zip Code", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                         TextFormField(
-                          controller: _zipCode,
+                          controller: controller.zipCode,
                           decoration: const InputDecoration(hintText: "Zip Code"),
                           keyboardType: TextInputType.number,
                           validator: (v) => v!.isEmpty ? 'Required' : null,
@@ -159,10 +132,10 @@ class _EditAddressViewState extends State<EditAddressView> {
               Row(
                 children: [
                   Checkbox(
-                    value: _isDefault,
+                    value: controller.isDefault,
                     onChanged: (value) {
                       setState(() {
-                        _isDefault = value ?? false;
+                        controller.isDefault = value ?? false;
                       });
                     },
                   ),
@@ -172,11 +145,10 @@ class _EditAddressViewState extends State<EditAddressView> {
               const Spacer(),
               LongButton(
                 label: "Save",
-                onPressed: _updateAddress,
+                onPressed: () => controller.updateAddress(context),
               ),
             ],
           ),
-
         ),
       ),
     );

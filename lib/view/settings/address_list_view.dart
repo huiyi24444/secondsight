@@ -1,14 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
-
+import '../../controller/settings/address_list_controller.dart';
 import 'add_address_view.dart';
 import 'edit_address_view.dart';
 
+
 class AddressListView extends StatelessWidget {
   final String userId;
+  final AddressListController controller;
 
-  const AddressListView({super.key, required this.userId});
+  AddressListView({super.key, required this.userId})
+      : controller = AddressListController(userId: userId);
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +32,7 @@ class AddressListView extends StatelessWidget {
         foregroundColor: Colors.black87,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('address')
-            .orderBy('isDefault', descending: true)
-            .snapshots(),
+        stream: controller.getAddresses(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -269,10 +267,10 @@ class AddressListView extends StatelessWidget {
                                         ),
                                       );
                                     } else if (value == 'delete') {
-                                      _showDeleteConfirmation(
-                                        context,
-                                        doc.id,
-                                        fullName,
+                                      controller.deleteAddress(
+                                        context: context,
+                                        addressId: doc.id,
+                                        addressName: fullName,
                                       );
                                     }
                                   },
@@ -353,16 +351,17 @@ class AddressListView extends StatelessWidget {
                                           ),
                                         if (city.isNotEmpty ||
                                             state.isNotEmpty ||
-                                            zipCode.isNotEmpty)Text(
-                                          '${city.toString().isNotEmpty ? '$city, ' : ''}'
-                                              '${state.toString().isNotEmpty ? '$state ' : ''}'
-                                              '${zipCode.toString().isNotEmpty ? zipCode.toString() : ''}'.trim(),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            height: 1.4,
-                                            letterSpacing: -0.2,
+                                            zipCode.toString().isNotEmpty)
+                                          Text(
+                                            '${city.toString().isNotEmpty ? '$city, ' : ''}'
+                                                '${state.toString().isNotEmpty ? '$state ' : ''}'
+                                                '${zipCode.toString().isNotEmpty ? zipCode.toString() : ''}'.trim(),
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              height: 1.4,
+                                              letterSpacing: -0.2,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -389,7 +388,7 @@ class AddressListView extends StatelessWidget {
                   },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF8E6CEF), width: 2),
-                    foregroundColor: Color(0xFF8E6CEF), // text and icon color
+                    foregroundColor: Color(0xFF8E6CEF),
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -405,97 +404,10 @@ class AddressListView extends StatelessWidget {
                   ),
                 ),
               ),
-
             ],
           );
         },
       ),
-
-    );
-  }
-
-  void _showDeleteConfirmation(
-      BuildContext context,
-      String addressId,
-      String addressName,
-      ) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Delete Address',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to delete the address for "$addressName"?',
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(userId)
-                      .collection('address')
-                      .doc(addressId)
-                      .delete();
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Address deleted successfully'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Color(0xFF8E6CEF),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error deleting address: $e'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text(
-                'Delete',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }
