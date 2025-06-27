@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../model/order_model.dart';
 import '../order/order_details_view.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 
 class OrderCard extends StatelessWidget {
   final OrdersModel order;
@@ -214,28 +216,19 @@ class OrderCard extends StatelessWidget {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: productURL != null && productURL.isNotEmpty
-                                ? Image.network(
-                              productURL,
+                                ? CachedNetworkImage(
+                              imageUrl: productURL,
                               fit: BoxFit.cover,
                               width: 56,
                               height: 56,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      value: loadingProgress.expectedTotalBytes != null
-                                          ? loadingProgress.cumulativeBytesLoaded /
-                                          (loadingProgress.expectedTotalBytes ?? 1)
-                                          : null,
-                                    ),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) => Container(
+                              placeholder: (context, url) => const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 width: 56,
                                 height: 56,
                                 color: Colors.grey[200],
@@ -285,6 +278,7 @@ class OrderCard extends StatelessWidget {
       ),
     );
   }
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {

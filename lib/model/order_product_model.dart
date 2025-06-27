@@ -2,14 +2,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrderProductModel {
-  final bool eligibilityForReturn;
   final double price;
   final DocumentReference productID;
   final int productQuantity;
   final double totalPrice;
 
   OrderProductModel({
-    required this.eligibilityForReturn,
     required this.price,
     required this.productID,
     required this.productQuantity,
@@ -18,7 +16,6 @@ class OrderProductModel {
 
   factory OrderProductModel.fromJson(Map<String, dynamic> json) {
     return OrderProductModel(
-      eligibilityForReturn: json['eligibilityForReturn'] ?? false,
       price: (json['price'] ?? 0).toDouble(),
       productID: json['productID'] as DocumentReference,
       productQuantity: json['productQuantity'] ?? 1,
@@ -28,7 +25,6 @@ class OrderProductModel {
 
   Map<String, dynamic> toJson() {
     return {
-      'eligibilityForReturn': eligibilityForReturn,
       'price': price,
       'productID': productID,
       'productQuantity': productQuantity,

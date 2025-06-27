@@ -9,6 +9,7 @@ class OrdersModel {
   final String? shippingAddress;
   final String? paymentMethod;
   final String? trackingNumber;
+  final bool eligibilityForReturn;
 
   OrdersModel({
     required this.id,
@@ -18,6 +19,7 @@ class OrdersModel {
     this.shippingAddress,
     this.paymentMethod,
     this.trackingNumber,
+    required this.eligibilityForReturn,
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -29,6 +31,7 @@ class OrdersModel {
       shippingAddress: json['shippingAddress'],
       paymentMethod: json['paymentMethod'],
       trackingNumber: json['trackingNumber'],
+      eligibilityForReturn: json['eligibilityForReturn'] ?? false,
     );
   }
 
@@ -40,6 +43,7 @@ class OrdersModel {
       'shippingAddress': shippingAddress,
       'paymentMethod': paymentMethod,
       'trackingNumber': trackingNumber,
+      'eligibilityForReturn': eligibilityForReturn,
     };
   }
 }

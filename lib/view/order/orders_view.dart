@@ -1,12 +1,17 @@
+// Updated orders_view.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:secondsight/services/lazy_loading.dart';
 import '../../services/auth_provider.dart';
 import '../../model/order_model.dart';
+import '../../model/return_request_model.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/order_card.dart';
+import '../widgets/return_request_card.dart';
 import 'order_details_view.dart';
+
 
 class OrdersView extends StatefulWidget {
   const OrdersView({super.key});
@@ -19,13 +24,33 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
   late TabController _tabController;
   late String userId;
 
+  String _getEmptyMessage(String? status) {
+    if (status == null) return 'You haven\'t placed any orders yet.';
+    switch (status) {
+      case 'pending_payment':
+        return 'You have no pending payments.';
+      case 'processing':
+        return 'No orders are being prepared for shipping.';
+      case 'shipped':
+        return 'No orders are currently in transit.';
+      case 'completed':
+        return 'You haven\'t completed any orders yet.';
+      case 'returns':
+        return 'You haven\'t submitted any return requests.';
+      case 'cancelled':
+        return 'No cancelled orders found.';
+      default:
+        return 'No orders found for this status.';
+    }
+  }
+
   final List<String> _tabTitles = [
     'All Orders',
     'To Pay',
     'To Ship',
     'To Receive',
     'Completed',
-    'Returned',
+    'Returns',
     'Cancelled',
   ];
 
@@ -35,7 +60,7 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
     'processing',
     'shipped',
     'completed',
-    'returned',
+    'returns',
     'cancelled',
   ];
 
@@ -71,7 +96,7 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
           ),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFFFAFAFA),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.black87,
         bottom: PreferredSize(
@@ -103,7 +128,9 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
         controller: _tabController,
         children: List.generate(
           _tabTitles.length,
-              (index) => _buildOrdersList(_tabStatuses[index]),
+              (index) => _tabStatuses[index] == 'returns'
+              ? _buildReturnRequestsList()
+              : _buildOrdersList(_tabStatuses[index]),
         ),
       ),
     );
@@ -113,138 +140,43 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
     Query<Map<String, dynamic>> query = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
-        .collection('order');
+        .collection('order')
+        .orderBy('orderDate', descending: true);
 
-    // Apply status filter if not "All Orders"
     if (statusFilter != null) {
       query = query.where('orderStatus', isEqualTo: statusFilter);
     }
 
-    // Order by date (newest first)
-    // Note: Remove the orderBy if you get index errors, or create the index
-    query = query.orderBy('orderDate', descending: true);
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: query.snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        }
-
-        if (snapshot.hasError) {
-          // Check if it's an index error
-          if (snapshot.error.toString().contains('index')) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 48,
-                      color: Colors.orange[400],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Database Index Required',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Please create a Firestore index for this query.\nCheck the console for the index creation link.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Fallback: Show orders without filtering
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          // This will trigger a rebuild without the orderBy
-                        });
-                      },
-                      child: const Text('Show Orders Without Sorting'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return Center(
-            child: Text('Error: ${snapshot.error}'),
-          );
-        }
-
-        final orders = snapshot.data?.docs ?? [];
-
-        if (orders.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8E6CEF).withOpacity(0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.shopping_bag_outlined,
-                    size: 48,
-                    color: const Color(0xFF8E6CEF).withOpacity(0.6),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  statusFilter == null
-                      ? 'No orders yet'
-                      : 'No ${_getStatusDisplayText(statusFilter)} orders',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  statusFilter == null
-                      ? 'Your orders will appear here'
-                      : 'Orders with this status will appear here',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          itemCount: orders.length,
-          itemBuilder: (context, index) {
-            final orderDoc = orders[index];
-            final order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
-
-            return OrderCard(
-              order: order,
-              userId: userId,
-            );
-          },
-        );
-
+    return LazyLoadingList(
+      query: query,
+      itemBuilder: (doc) {
+        final order = OrdersModel.fromJson(doc.data() as Map<String, dynamic>, doc.id);
+        return OrderCard(order: order, userId: userId);
       },
+        emptyMessage: _getEmptyMessage(statusFilter),
+    );
+  }
+
+
+
+  Widget _buildReturnRequestsList() {
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('returnRequests')
+        .orderBy('returnDate', descending: true);
+
+
+    return LazyLoadingList(
+      query: query,
+      itemBuilder: (doc) {
+        final returnRequest = ReturnRequestModel.fromDocument(doc);
+        return ReturnRequestCard(
+          returnRequest: returnRequest,
+          userId: userId,
+        );
+      },
+      emptyMessage: "No return requests found",
     );
   }
 
@@ -258,8 +190,8 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
         return 'to receive';
       case 'completed':
         return 'completed';
-      case 'returned':
-        return 'returned';
+      case 'returns':
+        return 'returns';
       case 'cancelled':
         return 'cancelled';
       default:
