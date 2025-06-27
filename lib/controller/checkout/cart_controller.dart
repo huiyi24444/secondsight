@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../model/cart_item_model.dart';
-import '../model/product_model.dart';
+import '../../model/cart_item_model.dart';
+import '../../model/product_model.dart';
 
 
 class CartController {

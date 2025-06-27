@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../controller/cart_controller.dart';
+import '../../controller/checkout/cart_controller.dart';
 import '../../model/cart_item_model.dart';
 
 import '../widgets/custom_back_button.dart';

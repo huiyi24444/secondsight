@@ -1,72 +1,32 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../controller/settings/add_address_controller.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/long_button.dart';
 
-class AddAddressView extends StatefulWidget {
+class AddAddressView extends StatelessWidget {
   final String userId;
 
   const AddAddressView({super.key, required this.userId});
 
   @override
-  State<AddAddressView> createState() => _AddAddressViewState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<AddAddressController>(
+      create: (_) => AddAddressController(userId: userId),
+      child: const _AddAddressForm(),
+    );
+
+  }
 }
 
-final List<String> _malaysianStates = [
-  'Johor',
-  'Kedah',
-  'Kelantan',
-  'Melaka',
-  'Negeri Sembilan',
-  'Pahang',
-  'Penang',
-  'Perak',
-  'Perlis',
-  'Sabah',
-  'Sarawak',
-  'Selangor',
-  'Terengganu',
-  'Kuala Lumpur',
-  'Labuan',
-  'Putrajaya',
-];
-
-String? _selectedState = 'Penang';
-
-class _AddAddressViewState extends State<AddAddressView> {
-  final _formKey = GlobalKey<FormState>();
-  final _fullName = TextEditingController();
-  final _phoneNum = TextEditingController();
-  final _streetOne = TextEditingController();
-  final _streetTwo = TextEditingController();
-  final _city = TextEditingController();
-  final _zipCode = TextEditingController();
-  bool _isDefault = false;
-
-  void _saveAddress() async {
-    if (_formKey.currentState!.validate()) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('address')
-          .add({
-        'fullName': _fullName.text,
-        'phoneNum': int.tryParse(_phoneNum.text) ?? 0,
-        'isDefault': _isDefault,
-        'streetone': _streetOne.text,
-        'streettwo': _streetTwo.text,
-        'city': _city.text,
-        'state': _selectedState,
-        'zipCode': int.tryParse(_zipCode.text) ?? 0,
-      });
-
-      Navigator.pop(context);
-    }
-  }
+class _AddAddressForm extends StatelessWidget {
+  const _AddAddressForm();
 
   @override
   Widget build(BuildContext context) {
+    final controller = Provider.of<AddAddressController>(context);
+
     return Scaffold(
       appBar: AppBar(
         leading: const CustomBackButton(),
@@ -76,43 +36,43 @@ class _AddAddressViewState extends State<AddAddressView> {
         elevation: 0,
       ),
       body: Padding(
-        padding: const EdgeInsets.only(top: 16, left: 19, right: 19, bottom: 20),
+        padding: const EdgeInsets.all(20),
         child: Form(
-          key: _formKey,
+          key: controller.formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Full Name", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              _buildLabel("Full Name"),
               TextFormField(
-                controller: _fullName,
+                controller: controller.fullNameController,
                 decoration: const InputDecoration(hintText: "Full Name"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
-              const Text("Phone Number", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              _buildLabel("Phone Number"),
               TextFormField(
-                controller: _phoneNum,
+                controller: controller.phoneNumController,
                 decoration: const InputDecoration(hintText: "Phone Number"),
                 keyboardType: TextInputType.phone,
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 25),
-              const Text("Address Line 1", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              _buildLabel("Address Line 1"),
               TextFormField(
-                controller: _streetOne,
+                controller: controller.streetOneController,
                 decoration: const InputDecoration(hintText: "Address Line 1"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
-              const Text("Address Line 2", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              _buildLabel("Address Line 2"),
               TextFormField(
-                controller: _streetTwo,
+                controller: controller.streetTwoController,
                 decoration: const InputDecoration(hintText: "Address Line 2"),
               ),
               const SizedBox(height: 12),
-              const Text("City", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              _buildLabel("City"),
               TextFormField(
-                controller: _city,
+                controller: controller.cityController,
                 decoration: const InputDecoration(hintText: "City"),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -123,20 +83,20 @@ class _AddAddressViewState extends State<AddAddressView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("State", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        _buildLabel("State"),
                         DropdownButtonFormField<String>(
                           isExpanded: true,
-                          value: _selectedState,
+                          value: controller.selectedState,
                           decoration: const InputDecoration(hintText: "State"),
-                          items: _malaysianStates
-                              .map((state) => DropdownMenuItem(value: state, child: Text(state)))
+                          items: controller.malaysianStates
+                              .map((state) => DropdownMenuItem(
+                            value: state,
+                            child: Text(state),
+                          ))
                               .toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedState = value;
-                            });
-                          },
-                          validator: (value) => value == null ? 'Required' : null,
+                          onChanged: controller.updateSelectedState,
+                          validator: (value) =>
+                          value == null ? 'Required' : null,
                         ),
                       ],
                     ),
@@ -146,10 +106,11 @@ class _AddAddressViewState extends State<AddAddressView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Zip Code", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        _buildLabel("Zip Code"),
                         TextFormField(
-                          controller: _zipCode,
-                          decoration: const InputDecoration(hintText: "Zip Code"),
+                          controller: controller.zipCodeController,
+                          decoration:
+                          const InputDecoration(hintText: "Zip Code"),
                           keyboardType: TextInputType.number,
                           validator: (v) => v!.isEmpty ? 'Required' : null,
                         ),
@@ -162,12 +123,8 @@ class _AddAddressViewState extends State<AddAddressView> {
               Row(
                 children: [
                   Checkbox(
-                    value: _isDefault,
-                    onChanged: (value) {
-                      setState(() {
-                        _isDefault = value ?? false;
-                      });
-                    },
+                    value: controller.isDefault,
+                    onChanged: controller.updateDefault,
                   ),
                   const Text("Set as default address"),
                 ],
@@ -175,13 +132,17 @@ class _AddAddressViewState extends State<AddAddressView> {
               const Spacer(),
               LongButton(
                 label: "Save",
-                onPressed: _saveAddress,
+                onPressed: () => controller.saveAddress(context),
               ),
             ],
           ),
-
         ),
       ),
     );
   }
+
+  Widget _buildLabel(String text) => Text(
+    text,
+    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+  );
 }
