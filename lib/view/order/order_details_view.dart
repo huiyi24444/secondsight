@@ -7,6 +7,7 @@ import '../../model/order_model.dart';
 import '../../model/order_product_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
+import '../widgets/progress_stepper.dart';
 
 class OrderDetailsView extends StatefulWidget {
   final String orderId;
@@ -123,35 +124,16 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Order Status',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: _controller.getStatusColor(order.orderStatus).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _controller.getStatusText(order.orderStatus),
-                  style: TextStyle(
-                    color: _controller.getStatusColor(order.orderStatus),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          Builder(
+            builder: (context) {
+              final config = _controller.getOrderStatusConfig(order.orderStatus);
+              return ProgressStepper(
+                title: config['title'],
+                steps: config['steps'],
+                currentStep: config['currentStep'],
+
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(
@@ -712,7 +694,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
   }
 
   void _showRatingDialog(OrdersModel order) {
-    final controller = Provider.of<OrderDetailsController>(context, listen: false);
+    final controller = _controller;
+
     controller.resetRatingState();
 
     showDialog(

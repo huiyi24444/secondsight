@@ -121,6 +121,38 @@ class OrderDetailsController extends ChangeNotifier {
     }
   }
 
+  // Get order status step configuration
+  Map<String, dynamic> getOrderStatusConfig(String orderStatus) {
+    final steps = [
+      'Confirmed',
+      'Preparing',
+      'Shipping',
+      'Completed'
+    ];
+
+    return {
+      'title': 'Order Status',
+      'steps': steps,
+      'currentStep': _getOrderStep(orderStatus),
+
+    };
+  }
+  int _getOrderStep(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 0;
+      case 'preparing':
+        return 1;
+      case 'shipping':
+        return 2;
+      case 'completed':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+  
+
   /// Check if order is eligible for return/refund
   bool isEligibleForReturn(OrdersModel order) {
     return order.eligibilityForReturn &&
@@ -245,4 +277,6 @@ class OrderDetailsController extends ChangeNotifier {
     _reviewController.dispose();
     super.dispose();
   }
+
+
 }

@@ -52,17 +52,14 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   Future<void> _initializeVirtualTryOn() async {
     print('Initializing Virtual Try-On...');
 
-    // Stop any existing image stream first
-    await _stopImageStream();
-
-    // Load clothing image
+    // Load clothing image first
     await _loadClothingImage();
 
     // Set up pose detection
     _setupPoseDetection();
 
     // Start image stream with delay to ensure everything is ready
-    await Future.delayed(Duration(milliseconds: 500));
+    await Future.delayed(Duration(milliseconds: 1000)); // Increased delay
     await _startImageStream();
   }
 
@@ -97,6 +94,70 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
         });
       }
     });
+  }
+
+  Future<void> _startImageStream() async {
+    if (_isDisposed || _isImageStreamActive) return;
+
+    try {
+      print('Starting image stream...');
+      _frameCount = 0;
+
+      await widget.cameraController.startImageStream((CameraImage image) async {
+        if (_isDisposed || !_isImageStreamActive) return;
+
+        if (!_isProcessing) {
+          _isProcessing = true;
+          try {
+            // Process every 5th frame to reduce load
+            if (_frameCount % 5 == 0) {
+              await _processFrame(image);
+            }
+            _frameCount++;
+          } finally {
+            _isProcessing = false;
+          }
+        }
+      });
+
+      _isImageStreamActive = true;
+      print('Image stream started successfully');
+    } catch (e) {
+      print('Error starting image stream: $e');
+      _isImageStreamActive = false;
+    }
+  }
+
+  Future<void> _stopImageStream() async {
+    if (!_isImageStreamActive || widget.cameraController == null) return;
+
+    try {
+      print('Stopping image stream...');
+      _isImageStreamActive = false;
+      await widget.cameraController.stopImageStream();
+      print('Image stream stopped');
+    } catch (e) {
+      print('Error stopping image stream: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    print('Disposing VirtualTryOnView...');
+    _isDisposed = true;
+
+    // Cancel pose subscription
+    _poseSubscription?.cancel();
+    _poseSubscription = null;
+
+    // Stop image stream
+    _stopImageStream();
+
+    // Dispose clothing image
+    _clothingImage?.dispose();
+    _clothingImage = null;
+
+    super.dispose();
   }
 
   Future<void> _loadClothingImage() async {
@@ -172,50 +233,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
     }
   }
 
-  Future<void> _startImageStream() async {
-    if (_isDisposed || _isImageStreamActive) return;
 
-    try {
-      print('Starting image stream...');
-      _isImageStreamActive = true;
-      _frameCount = 0;
-
-      await widget.cameraController.startImageStream((CameraImage image) async {
-        if (_isDisposed || !_isImageStreamActive) return;
-
-        if (!_isProcessing) {
-          _isProcessing = true;
-          try {
-            // Process every 10th frame to reduce load
-            if (_frameCount % 10 == 0) {
-              await _processFrame(image);
-            }
-            _frameCount++;
-          } finally {
-            _isProcessing = false;
-          }
-        }
-      });
-      print('Image stream started successfully');
-    } catch (e) {
-      print('Error starting image stream: $e');
-      _isImageStreamActive = false;
-    }
-  }
-
-  Future<void> _stopImageStream() async {
-    if (!_isImageStreamActive) return;
-
-    try {
-      print('Stopping image stream...');
-      await widget.cameraController.stopImageStream();
-      _isImageStreamActive = false;
-      print('Image stream stopped');
-    } catch (e) {
-      print('Error stopping image stream: $e');
-      _isImageStreamActive = false;
-    }
-  }
 
   Future<void> _processFrame(CameraImage image) async {
     if (_isDisposed) return;
@@ -300,20 +318,5 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
     );
   }
 
-  @override
-  void dispose() {
-    print('Disposing VirtualTryOnView...');
-    _isDisposed = true;
 
-    // Cancel pose subscription
-    _poseSubscription?.cancel();
-
-    // Stop image stream
-    _stopImageStream();
-
-    // Dispose clothing image
-    _clothingImage?.dispose();
-
-    super.dispose();
-  }
 }

@@ -1,6 +1,5 @@
 package edu.tar.my.secondsight
 
-
 import android.content.Context
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,10 +19,8 @@ import android.graphics.Rect
 import android.graphics.YuvImage
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.*
-
 import android.os.Handler
 import android.os.Looper
-
 
 class PoseDetectionPlugin(
     private val context: Context,
@@ -39,6 +36,7 @@ class PoseDetectionPlugin(
     private var eventSink: EventChannel.EventSink? = null
     private var poseLandmarker: PoseLandmarker? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
+    private var isProcessing = false
 
     fun registerWith(flutterEngine: FlutterEngine) {
         Log.d(TAG, "Registering PoseDetectionPlugin")
@@ -58,11 +56,11 @@ class PoseDetectionPlugin(
 
                         Log.d(TAG, "processFrame called - width: $width, height: $height, bytes: ${imageBytes?.size}")
 
-                        if (imageBytes != null) {
+                        if (imageBytes != null && eventSink != null) {
                             processFrame(imageBytes, width, height)
                             result.success(null)
                         } else {
-                            result.error("INVALID_ARGS", "Image bytes are null", null)
+                            result.error("INVALID_ARGS", "Image bytes are null or event sink not ready", null)
                         }
                     }
                     else -> result.notImplemented()
@@ -80,12 +78,15 @@ class PoseDetectionPlugin(
         Log.d(TAG, "onCancel called")
         eventSink = null
         poseLandmarker?.close()
-        coroutineScope.cancel()
+        poseLandmarker = null
     }
 
     private fun initializePoseLandmarker() {
         try {
             Log.d(TAG, "Initializing PoseLandmarker")
+
+            // Close existing pose landmarker if any
+            poseLandmarker?.close()
 
             val baseOptions = BaseOptions.builder()
                 .setModelAssetPath("pose_landmarker_lite.task")
@@ -103,12 +104,19 @@ class PoseDetectionPlugin(
 
             poseLandmarker = PoseLandmarker.createFromOptions(context, options)
             Log.d(TAG, "PoseLandmarker initialized successfully")
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize PoseLandmarker", e)
         }
     }
 
     private fun processFrame(imageBytes: ByteArray, width: Int, height: Int) {
+        if (isProcessing || poseLandmarker == null) {
+            return
+        }
+
+        isProcessing = true
+
         coroutineScope.launch(Dispatchers.Default) {
             try {
                 // Convert YUV to JPEG first, then to Bitmap
@@ -131,13 +139,23 @@ class PoseDetectionPlugin(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing frame", e)
+            } finally {
+                isProcessing = false
             }
         }
     }
 
     private fun processPoseResult(result: PoseLandmarkerResult) {
+        if (eventSink == null) {
+            Log.w(TAG, "EventSink is null, cannot send results")
+            return
+        }
+
         if (result.landmarks().isEmpty()) {
             Log.d(TAG, "No landmarks detected")
+            Handler(Looper.getMainLooper()).post {
+                eventSink?.success(emptyMap<String, Any>())
+            }
             return
         }
 
@@ -157,10 +175,8 @@ class PoseDetectionPlugin(
 
         Log.d(TAG, "Sending pose data with ${poseData.size} landmarks")
         Handler(Looper.getMainLooper()).post {
-            eventSink?.success(poseData)  // ✅ This sends the structured data map
+            eventSink?.success(poseData)
         }
-
-
     }
 
     private fun getLandmarkName(index: Int): String {

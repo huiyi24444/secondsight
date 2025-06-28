@@ -33,7 +33,7 @@ class ClothingOverlayPainter extends CustomPainter {
   });
 
   Offset transformLandmarkForDisplay(double x, double y, Size size) {
-    final verticalOffset = size.height * 0.14;
+    final verticalOffset = size.height * 0.12;  // adjust height of pose landmark
     return Offset(
         (1.0 - y) * size.width,
         (1.0 - x) * size.height - verticalOffset
@@ -98,7 +98,7 @@ class ClothingOverlayPainter extends CustomPainter {
       return hipCenterY - centerY;
     }
     final torsoLength = calculateTorsoLength();
-    final adjustedY = centerY - (torsoLength * 0.2);  //adjust height of shirt
+    final adjustedY = centerY - (torsoLength * 0.15);  //adjust height of shirt
 
     final shoulderAngle = atan2(
       rightShoulder.dy - leftShoulder.dy,
@@ -135,7 +135,11 @@ class ClothingOverlayPainter extends CustomPainter {
         : null;
 
     final hipWidth = (rightHip.dx - leftHip.dx).abs();
-    final baseScale = hipWidth / clothingImage!.width * 2.0; // Adjust scale for pants
+
+    // IMPORTANT: Increase the scale factor to make bottoms appear wider
+    // Instead of 2.0, use 2.5 or 3.0 to extend beyond hip landmarks
+    final widthMultiplier = 6.5; // Adjust this value to control how much wider the bottoms appear
+    final baseScale = hipWidth / clothingImage!.width * widthMultiplier;
 
     final centerX = (leftHip.dx + rightHip.dx) / 2;
     final centerY = (leftHip.dy + rightHip.dy) / 2;
@@ -146,19 +150,37 @@ class ClothingOverlayPainter extends CustomPainter {
       rightHip.dx - leftHip.dx,
     );
 
-    // Adjust Y position slightly ABOVE hips
-    final adjustedY = centerY - (hipWidth * 0.75);
+    // Adjust Y position - you can tweak this multiplier too
+    final adjustedY = centerY - (hipWidth * 1.5); // Reduced from 0.75 to position it better
 
     canvas.save();
     canvas.translate(centerX, adjustedY);
     canvas.rotate(hipAngle);
     canvas.scale(baseScale);
+
     canvas.drawImage(
       clothingImage!,
       Offset(-clothingImage!.width / 2, 0),
       Paint()..color = Colors.white.withOpacity(0.9),
     );
+
     canvas.restore();
+
+    // Optional: Add debug info for bottoms
+    if (true) { // Set to true to see debug info
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: 'Bottom Debug:\n'
+              'Hip Width: ${hipWidth.toStringAsFixed(1)}\n'
+              'Scale: ${baseScale.toStringAsFixed(2)}\n'
+              'Width Multiplier: $widthMultiplier',
+          style: TextStyle(color: Colors.orange, fontSize: 12, backgroundColor: Colors.black54),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(10, 200));
+    }
   }
 
   // New method for full body clothing (dresses, jumpsuits)

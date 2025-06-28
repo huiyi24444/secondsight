@@ -8,6 +8,7 @@ class ReturnRequestModel {
   final String returnReason;
   final String returnStatus;
   final String returnComment;
+  final String? rejectReason;
 
   ReturnRequestModel({
     required this.id,
@@ -17,6 +18,7 @@ class ReturnRequestModel {
     required this.returnReason,
     required this.returnStatus,
     required this.returnComment,
+    this.rejectReason,
   });
 
   factory ReturnRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -30,11 +32,12 @@ class ReturnRequestModel {
       returnReason: data['returnReason'] as String,
       returnStatus: data['returnStatus'] as String,
       returnComment: data['returnComment'] as String,
+      rejectReason: data['rejectReason'],
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'orderProductID': orderProductID,
       'returnDate': returnDate,
       'returnImages': returnImages,
@@ -42,5 +45,14 @@ class ReturnRequestModel {
       'returnStatus': returnStatus,
       'returnComment': returnComment,
     };
+
+    // Only include rejectReason if it's not null, cast to Object
+    if (rejectReason != null) {
+      map['rejectReason'] = rejectReason as Object;
+    }
+
+    return map;
   }
+
+
 }
