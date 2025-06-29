@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
@@ -7,13 +10,18 @@ import 'firebase_options.dart';
 import 'package:secondsight/view/products/product_view.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/web/admin/dashboard/admin_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  Stripe.publishableKey = 'pk_test_51RdqXPQSp3H55udZMewh3I9eilxrid02WSapRFKsq2hvoogenAFbSa5TnMbU4IOcRUZemfqBXPCvS1Rd4izRF2wf00KZr3wv10';
+
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    Stripe.publishableKey = 'pk_test_51RdqXPQSp3H55udZMewh3I9eilxrid02WSapRFKsq2hvoogenAFbSa5TnMbU4IOcRUZemfqBXPCvS1Rd4izRF2wf00KZr3wv10';
+  }
+
 
   runApp(
     ChangeNotifierProvider(
@@ -60,7 +68,11 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Gabarito',
         useMaterial3: true,
       ),
-      home: const MyHomePage(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const MyHomePage(),
+        '/admin': (context) => const AdminDashboardPage(),
+      },
     );
   }
 }
