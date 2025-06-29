@@ -105,12 +105,15 @@ class _ProductCardState extends State<ProductCard> {
                       },
 
                       child: CircleAvatar(
+                        radius: 14, // smaller than the default (~20)
                         backgroundColor: Colors.white70,
                         child: Icon(
                           isFavorite ? Icons.favorite : Icons.favorite_border,
+                          size: 16, // smaller icon
                           color: isFavorite ? Colors.red : Colors.grey,
                         ),
                       ),
+
                     ),
                   ),
                 ],

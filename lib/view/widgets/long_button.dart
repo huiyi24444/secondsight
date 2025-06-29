@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 class LongButton extends StatelessWidget {
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const LongButton({
     super.key,

@@ -13,8 +13,8 @@ class Product {
   final Map<String, dynamic> measurements;
   final DocumentReference category;
   final List<String> images;
-
-
+  final Timestamp? createdAt;
+  final Timestamp? updatedAt;
 
   Product({
     required this.id,
@@ -29,26 +29,24 @@ class Product {
     required this.measurements,
     required this.category,
     required this.images,
+    this.createdAt,
+    this.updatedAt,
   });
 
-  // In product_model.dart
   String? get tryOnImageUrl {
     if (virtualTryOn.isEmpty) return null;
-    // Get the Firebase Storage URL from tryOnData
     return virtualTryOn['tryOnData'] as String?;
   }
 
   String? get tryOnType {
-    return virtualTryOn['type'] as String? ?? 'upper'; // Default to upper
+    return virtualTryOn['type'] as String? ?? 'upper';
   }
 
   bool get hasVirtualTryOn {
     return virtualTryOn.isNotEmpty &&
         virtualTryOn['tryOnData'] != null &&
-        (virtualTryOn['enabled'] ?? true); // Default to true if not specified
+        (virtualTryOn['enabled'] ?? true);
   }
-
-
 
   factory Product.fromDocument(Map<String, dynamic> data, String id) {
     return Product(
@@ -68,6 +66,8 @@ class Product {
           : {},
       category: data['category'] as DocumentReference<Object?>,
       images: List<String>.from(data['productURL'] ?? []),
+      createdAt: data['createdAt'] as Timestamp?,
+      updatedAt: data['updatedAt'] as Timestamp?,
     );
   }
 
@@ -83,8 +83,14 @@ class Product {
       description: data['productDesc'] ?? '',
       virtualTryOn: Map<String, dynamic>.from(data['virtualTryOn'] ?? {}),
       measurements: Map<String, dynamic>.from(data['measurements'] ?? {}),
-      category: FirebaseFirestore.instance.doc(data['category']), // 🔁 convert string to ref
+      category: FirebaseFirestore.instance.doc(data['category']),
       images: List<String>.from(data['productURL'] ?? []),
+      createdAt: data['createdAt'] is int
+          ? Timestamp.fromMillisecondsSinceEpoch(data['createdAt'])
+          : null,
+      updatedAt: data['updatedAt'] is int
+          ? Timestamp.fromMillisecondsSinceEpoch(data['updatedAt'])
+          : null,
     );
   }
 
@@ -107,8 +113,8 @@ class Product {
           : {},
       category: data['category'] as DocumentReference<Object?>,
       images: List<String>.from(data['productURL'] ?? []),
+      createdAt: data['createdAt'] as Timestamp?,
+      updatedAt: data['updatedAt'] as Timestamp?,
     );
   }
-
-
 }

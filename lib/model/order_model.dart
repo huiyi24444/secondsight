@@ -1,25 +1,21 @@
-// orders_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class OrdersModel {
   final String id;
   final DateTime orderDate;
   final String orderStatus;
   final double totalAmount;
-  final String? shippingAddress;
-  final String? paymentMethod;
-  final String? trackingNumber;
   final bool eligibilityForReturn;
+  final String? shipmentID; // link to shipment subdoc
 
   OrdersModel({
     required this.id,
     required this.orderDate,
     required this.orderStatus,
     required this.totalAmount,
-    this.shippingAddress,
-    this.paymentMethod,
-    this.trackingNumber,
     required this.eligibilityForReturn,
+    this.shipmentID,
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -28,10 +24,8 @@ class OrdersModel {
       orderDate: (json['orderDate'] as Timestamp).toDate(),
       orderStatus: json['orderStatus'] ?? 'processing',
       totalAmount: (json['totalAmount'] ?? 0).toDouble(),
-      shippingAddress: json['shippingAddress'],
-      paymentMethod: json['paymentMethod'],
-      trackingNumber: json['trackingNumber'],
       eligibilityForReturn: json['eligibilityForReturn'] ?? false,
+      shipmentID: json['shipmentID'],
     );
   }
 
@@ -40,10 +34,10 @@ class OrdersModel {
       'orderDate': Timestamp.fromDate(orderDate),
       'orderStatus': orderStatus,
       'totalAmount': totalAmount,
-      'shippingAddress': shippingAddress,
-      'paymentMethod': paymentMethod,
-      'trackingNumber': trackingNumber,
       'eligibilityForReturn': eligibilityForReturn,
+      'shipmentID': shipmentID,
     };
   }
+  String get shortOrderId =>
+      (id.length >= 6 ? id.substring(0, 6) : id).toUpperCase();
 }

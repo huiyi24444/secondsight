@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../../model/shipment_model.dart';
 
 class OrderDetailsController extends ChangeNotifier {
   final String orderId;
@@ -47,6 +48,33 @@ class OrderDetailsController extends ChangeNotifier {
         .collection('orderProducts')
         .snapshots();
   }
+
+  Future<ShipmentModel?> fetchShipment(String userId, String orderId, String? shipmentId) async {
+    if (shipmentId == null) {
+      print("Shipment ID is null.");
+      return null;
+    }
+
+    print("Fetching shipment for userId: $userId, orderId: $orderId, shipmentId: $shipmentId");
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('order')
+        .doc(orderId)
+        .collection('shipment')
+        .doc(shipmentId)
+        .get();
+
+    if (doc.exists) {
+      print("Shipment document FOUND: ${doc.data()}");
+      return ShipmentModel.fromJson(doc.data()!, doc.id);
+    } else {
+      print("Shipment document NOT found at path: users/$userId/order/$orderId/shipment/$shipmentId");
+      return null;
+    }
+  }
+
 
   /// Create OrdersModel from document data
   OrdersModel createOrderFromDocument(DocumentSnapshot doc) {
@@ -139,19 +167,26 @@ class OrderDetailsController extends ChangeNotifier {
   }
   int _getOrderStep(String status) {
     switch (status.toLowerCase()) {
-      case 'confirmed':
+      case 'pending_payment':
         return 0;
-      case 'preparing':
+      case 'processing':
         return 1;
-      case 'shipping':
+      case 'shipped':
         return 2;
       case 'completed':
         return 3;
+      case 'returned':
+        return 3;
       default:
-        return 0;
+        return 3;
     }
   }
-  
+
+  String getFormattedDate(DateTime date) {
+    return DateFormat('MMMM d, y').format(date); // e.g., June 29, 2025
+  }
+
+
 
   /// Check if order is eligible for return/refund
   bool isEligibleForReturn(OrdersModel order) {

@@ -8,18 +8,23 @@ import 'package:secondsight/view/widgets/product_card.dart';
 // Main screen
 class ProductView extends StatelessWidget {
   final DocumentReference? categoryRef;
+  final bool isNewIn;
 
-  const ProductView({Key? key, this.categoryRef}) : super(key: key);
+  const ProductView({Key? key, this.categoryRef, this.isNewIn = false}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final productStream =
-        categoryRef == null
-            ? FirebaseFirestore.instance.collection('products').snapshots()
-            : FirebaseFirestore.instance
-                .collection('products')
-                .where('category', isEqualTo: categoryRef)
-                .snapshots();
+    final productStream = isNewIn
+        ? FirebaseFirestore.instance
+        .collection('products')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        : categoryRef == null
+        ? FirebaseFirestore.instance.collection('products').snapshots()
+        : FirebaseFirestore.instance
+        .collection('products')
+        .where('category', isEqualTo: categoryRef)
+        .snapshots();
 
     return Scaffold(
       appBar: AppBar(
@@ -39,43 +44,42 @@ class ProductView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Show category title
-            if (categoryRef != null)
-              FutureBuilder<DocumentSnapshot>(
-                future: categoryRef!.get(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
+            if (categoryRef != null && !isNewIn)
+          FutureBuilder<DocumentSnapshot>(
+      future: categoryRef!.get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(),
+          );
+        }
 
-                  if (snapshot.hasError ||
-                      !snapshot.hasData ||
-                      !snapshot.data!.exists) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Category'),
-                    );
-                  }
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Category'),
+          );
+        }
 
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final categoryName = data['catName'] ?? 'Category';
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final categoryName = data['catName'] ?? 'Category';
 
-                  return Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      categoryName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  );
-                },
-              ),
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            categoryName,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      },
+    ),
 
-            // Products Grid
+
+    // Products Grid
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: productStream,

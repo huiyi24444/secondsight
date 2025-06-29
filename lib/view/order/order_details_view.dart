@@ -5,9 +5,13 @@ import 'package:provider/provider.dart';
 import '../../controller/order/order_details_controller.dart';
 import '../../model/order_model.dart';
 import '../../model/order_product_model.dart';
+import '../../model/shipment_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/progress_stepper.dart';
+import 'order_notice.dart';
+import 'order_rating_dialog.dart';
+import 'package:intl/intl.dart';
 
 class OrderDetailsView extends StatefulWidget {
   final String orderId;
@@ -33,6 +37,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       orderId: widget.orderId,
       userId: widget.userId,
     );
+
+
   }
 
   @override
@@ -40,6 +46,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     _controller.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -76,19 +83,40 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
             final data = orderSnapshot.data!;
             final order = _controller.createOrderFromDocument(data);
 
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildOrderStatusCard(order),
-                  _buildProductsSection(),
-                  _buildTotalSummary(order),
-                  const SizedBox(height: 100),
-                ],
-              ),
+            return FutureBuilder<ShipmentModel?>(
+              future: _controller.fetchShipment(widget.userId, order.id, order.shipmentID),
+
+              builder: (context, shipmentSnapshot) {
+                if (shipmentSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF8E6CEF),
+                    ),
+                  );
+                }
+
+                final shipment = shipmentSnapshot.data;
+
+                print('Fetched shipment: ${shipment?.shipAddress}, ${shipment?.shippedDate}, ${shipment?.trackingNumber}');
+
+
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildOrderStatusCard(order),
+                      _buildProductsSection(),
+                      _buildTotalSummary(order, shipment),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                );
+              },
             );
           },
         ),
+
         bottomNavigationBar: StreamBuilder<DocumentSnapshot>(
           stream: _controller.getOrderStream(),
           builder: (context, orderSnapshot) {
@@ -124,17 +152,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Builder(
-            builder: (context) {
-              final config = _controller.getOrderStatusConfig(order.orderStatus);
-              return ProgressStepper(
-                title: config['title'],
-                steps: config['steps'],
-                currentStep: config['currentStep'],
-
-              );
-            },
-          ),
+          // Check order status and show appropriate widget
+          _buildStatusContent(order),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -157,6 +176,92 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       ),
     );
   }
+
+  Widget _buildStatusContent(OrdersModel order) {
+    final String status = order.orderStatus.toLowerCase();
+
+    switch (status) {
+      case 'cancelled':
+        return OrderStatusNotice(
+          type: OrderNoticeType.cancelled,
+          customMessage: 'This order has been cancelled. If you have any questions, please contact our support team.',
+        );
+
+      case 'pending payment':
+      case 'pending_payment':
+      case 'payment pending':
+        return OrderStatusNotice(
+          type: OrderNoticeType.pendingPayment,
+          customMessage: 'Your order is waiting for payment confirmation. Please complete the payment to proceed.',
+          onPaymentPressed: () => _handlePaymentAction(order),
+        );
+
+      default:
+      // Show normal progress stepper for other statuses
+        final config = _controller.getOrderStatusConfig(order.orderStatus);
+        return ProgressStepper(
+          title: config['title'],
+          steps: config['steps'],
+          currentStep: config['currentStep'],
+        );
+    }
+  }
+
+  void _handlePaymentAction(OrdersModel order) {
+    // Handle payment action - you can implement navigation to payment screen
+    // or show payment options dialog here
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Complete Payment',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Redirecting to payment gateway for order #${_controller.shortOrderId}...',
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[600],
+              ),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // TODO: Navigate to payment screen
+                // Navigator.push(context, MaterialPageRoute(
+                //   builder: (context) => PaymentScreen(orderId: order.orderID),
+                // ));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8E6CEF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Proceed'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   Widget _buildProductsSection() {
     return Container(
@@ -316,7 +421,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-  Widget _buildTotalSummary(OrdersModel order) {
+  Widget _buildTotalSummary(OrdersModel order, ShipmentModel? shipment) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -332,6 +437,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,10 +459,55 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          if (shipment != null)
+            ...[
+              _buildSummaryRow('Shipping Address', shipment.shipAddress),
+              _buildSummaryRow(
+                'Shipped Date',
+                _controller.getFormattedDate(shipment.shippedDate),
+              ),
+              _buildSummaryRow('Tracking Number', shipment.trackingNumber),
+            ],
+          _buildSummaryRow(
+            'Eligible for Return',
+            order.eligibilityForReturn ? 'Yes' : 'No',
+          ),
         ],
       ),
     );
   }
+
+
+  Widget _buildSummaryRow(String label, String value, {bool isHighlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
+                color: isHighlight ? const Color(0xFF8E6CEF) : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildBottomButtons(OrdersModel order) {
     return Container(
@@ -456,7 +607,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
   }
 
   void _handleRate(OrdersModel order) {
-    _showRatingDialog(order);
+    showRatingDialog(context: context, order: order);
   }
 
   void _showProductSelectionDialog(OrdersModel order) {
@@ -693,158 +844,5 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-  void _showRatingDialog(OrdersModel order) {
-    final controller = _controller;
 
-    controller.resetRatingState();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Consumer<OrderDetailsController>(
-          builder: (context, controller, child) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Rate Your Order',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'How was your experience with this order?',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return GestureDetector(
-                        onTap: () => controller.updateRating(index + 1),
-                        child: Icon(
-                          index < controller.rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: controller.reviewController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Share your experience (optional)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF8E6CEF)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: controller.isRatingValid()
-                      ? () async {
-                    Navigator.of(context).pop();
-                    final success = await controller.submitRating();
-                    if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(controller.getRatingSuccessMessage()),
-                          backgroundColor: const Color(0xFF8E6CEF),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Failed to submit rating.'),
-                          backgroundColor: Colors.redAccent,
-                        ),
-                      );
-                    }
-                  }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8E6CEF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Submit',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'processing':
-        return const Color(0xFF8E6CEF);
-      case 'completed':
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      case 'shipped':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'processing':
-        return 'Processing';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'shipped':
-        return 'Shipped';
-      case 'delivered':
-        return 'Delivered';
-      default:
-        return status;
-    }
-  }
 }
