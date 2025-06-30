@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
+
 import '../../../model/order_model.dart';
+import '../../../model/order_product_model.dart';
 import 'admin_dashboard_controller.dart';
 import 'chart_painter.dart';
 
@@ -104,6 +108,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(width: 20),
           _buildStatCard('Completed', '${data.completedOrders}', '0', Icons.check_circle, Colors.green),
           const SizedBox(width: 20),
+          _buildStatCard('Cancelled', '${data.cancelledOrders}', '0', Icons.cancel, Colors.red),
+          const SizedBox(width: 20),
           const Expanded(child: SizedBox()),
         ],
       )
@@ -164,7 +170,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Summar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   DropdownButton<String>(
                     value: 'Sales',
                     items: ['Sales', 'Revenue', 'Orders']
@@ -206,7 +212,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   itemCount: data.recentOrders.length,
                   itemBuilder: (context, index) {
                     final order = data.recentOrders[index];
-                    return _buildOrderItem(order);
+                    final orderDoc = data.rawOrderDocs[index];
+                    return _buildOrderItem(order, orderDoc);
                   },
                 ),
               ),
@@ -217,65 +224,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     ],
   );
 
-  Widget _buildOrderItem(OrdersModel order) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
-          child: const Icon(Icons.image, color: Colors.grey),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Vintage Denim Jacket', style: TextStyle(fontWeight: FontWeight.w500)),
-              Text('#${order.shortOrderId}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              _formatDate(order.orderDate),
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: _getStatusColor(order.orderStatus),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(order.orderStatus, style: const TextStyle(color: Colors.white, fontSize: 10)),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'completed':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'processing':
-        return Colors.blue;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  Widget _buildOrderItem(OrdersModel order, DocumentSnapshot orderDoc) {
+    final controller = AdminDashboardController();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: SmallOrderCard(
+        order: order,
+        orderDoc: orderDoc,
+        controller: controller,
+      ),
+    );
   }
 
-  String _formatDate(DateTime dt) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
+
+
 }

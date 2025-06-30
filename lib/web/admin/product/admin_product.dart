@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../model/product_model.dart';
 import 'admin_product_addition.dart';
 
 class ProductManagementPage extends StatefulWidget {
@@ -13,8 +14,8 @@ class ProductManagementPage extends StatefulWidget {
 class _ProductManagementPageState extends State<ProductManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> products = [];
-  List<Map<String, dynamic>> filteredProducts = [];
+  List<Product> products = [];
+  List<Product> filteredProducts = [];
   bool isLoading = true;
   int currentPage = 1;
   int itemsPerPage = 10;
@@ -27,22 +28,17 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   Future<void> _loadProducts() async {
     setState(() => isLoading = true);
+
     try {
       final snapshot = await _firestore.collection('Product').get();
-      List<Map<String, dynamic>> loadedProducts = [];
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        loadedProducts.add({
-          'id': doc.id,
-          'name': data['productName'] ?? '',
-          'sku': data['sku'] ?? doc.id.substring(0, 8),
-          'category': data['category'] ?? '',
-          'condition': data['condition'] ?? '',
-          'price': data['price'] ?? 0,
-          'status': data['status'] ?? 'draft',
-          'addedDate': data['addedDate'] ?? DateTime.now().millisecondsSinceEpoch,
-        });
+      final loadedProducts = snapshot.docs
+          .map((doc) => Product.fromDocumentSnapshot(doc))
+          .toList();
+
+      print('✅ Products fetched: ${loadedProducts.length}');
+      for (var product in loadedProducts) {
+        print('🧾 ${product.name} | RM${product.price} | ${product.status}');
       }
 
       setState(() {
@@ -51,10 +47,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading products: $e');
+      print('❌ Error loading products: $e');
       setState(() => isLoading = false);
     }
   }
+
+
 
   void _filterProducts(String query) {
     setState(() {
@@ -62,14 +60,15 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         filteredProducts = products;
       } else {
         filteredProducts = products.where((product) {
-          return product['name'].toLowerCase().contains(query.toLowerCase()) ||
-              product['sku'].toLowerCase().contains(query.toLowerCase()) ||
-              product['category'].toLowerCase().contains(query.toLowerCase());
+          return product.name.toLowerCase().contains(query.toLowerCase()) ||
+              product.id.toLowerCase().contains(query.toLowerCase()) ||
+              product.condition.toLowerCase().contains(query.toLowerCase());
         }).toList();
       }
       currentPage = 1;
     });
   }
+
 
   Future<void> _deleteProduct(String productId) async {
     try {
@@ -87,6 +86,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    List<Product> paginatedProducts = filteredProducts
+        .skip((currentPage - 1) * itemsPerPage)
+        .take(itemsPerPage)
+        .toList();
+
     final totalPages = (filteredProducts.length / itemsPerPage).ceil();
     final startIndex = (currentPage - 1) * itemsPerPage;
     final endIndex = startIndex + itemsPerPage;
@@ -180,15 +184,17 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           ),
                         ),
                         SizedBox(height: 20),
+
                         // Product table
                         Expanded(
                           child: isLoading
-                              ? Center(child: CircularProgressIndicator())
+                              ? const Center(child: CircularProgressIndicator())
                               : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
+
                             child: DataTable(
-                              columns: [
-                                DataColumn(label: Container(width: 30, child: Checkbox(value: false, onChanged: (v) {}))),
+                              columns: const [
+                                DataColumn(label: SizedBox(width: 30, child: Checkbox(value: false, onChanged: null))),
                                 DataColumn(label: Text('Product')),
                                 DataColumn(label: Text('SKU')),
                                 DataColumn(label: Text('Category')),
@@ -198,7 +204,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 DataColumn(label: Text('Added')),
                                 DataColumn(label: Text('Action')),
                               ],
-                              rows: currentProducts.map((product) {
+                              rows: paginatedProducts.map((product) {
                                 return DataRow(
                                   cells: [
                                     DataCell(Checkbox(value: false, onChanged: (v) {})),
@@ -212,65 +218,65 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                               color: Colors.grey[300],
                                               borderRadius: BorderRadius.circular(8),
                                             ),
-                                            child: Icon(Icons.image, color: Colors.grey[600]),
+                                            child: product.images.isNotEmpty
+                                                ? Image.network(product.images.first, fit: BoxFit.cover)
+                                                : const Icon(Icons.image, color: Colors.grey),
                                           ),
-                                          SizedBox(width: 10),
-                                          Text(product['name']),
+                                          const SizedBox(width: 10),
+                                          Text(product.name),
                                         ],
                                       ),
                                     ),
-                                    DataCell(Text(product['sku'])),
-                                    DataCell(Text(product['category'])),
-                                    DataCell(Text(product['condition'])),
-                                    DataCell(Text('\$${product['price'].toStringAsFixed(2)}')),
+                                    DataCell(Text(product.id.substring(0, 8))), // assuming SKU fallback
+                                    DataCell(Text(product.category.id)), // Optional: Resolve to category name if needed
+                                    DataCell(Text(product.condition)),
+                                    DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor(product['status']).withOpacity(0.2),
+                                          color: _getStatusColor(product.status).withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          product['status'],
+                                          product.status,
                                           style: TextStyle(
-                                            color: _getStatusColor(product['status']),
+                                            color: _getStatusColor(product.status),
                                             fontSize: 12,
                                           ),
                                         ),
                                       ),
                                     ),
-                                    DataCell(Text(_formatDate(product['addedDate']))),
+                                    DataCell(Text(_formatDate(product.createdAt))),
                                     DataCell(
                                       Row(
                                         children: [
                                           IconButton(
-                                            icon: Icon(Icons.edit, size: 18),
+                                            icon: const Icon(Icons.edit, size: 18),
                                             onPressed: () {
                                               // Navigate to edit page
                                             },
                                           ),
                                           IconButton(
-                                            icon: Icon(Icons.delete, size: 18, color: Colors.red),
+                                            icon: const Icon(Icons.delete, size: 18, color: Colors.red),
                                             onPressed: () {
                                               showDialog(
                                                 context: context,
                                                 builder: (context) => AlertDialog(
-                                                  title: Text('Delete Product'),
-                                                  content: Text('Are you sure you want to delete this product?'),
+                                                  title: const Text('Delete Product'),
+                                                  content: const Text('Are you sure you want to delete this product?'),
                                                   actions: [
                                                     TextButton(
                                                       onPressed: () => Navigator.pop(context),
-                                                      child: Text('Cancel'),
+                                                      child: const Text('Cancel'),
                                                     ),
                                                     ElevatedButton(
                                                       onPressed: () {
                                                         Navigator.pop(context);
-                                                        _deleteProduct(product['id']);
+                                                        _deleteProduct(product.id);
                                                       },
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: Colors.red,
-                                                      ),
-                                                      child: Text('Delete'),
+                                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                                      child: const Text('Delete'),
                                                     ),
                                                   ],
                                                 ),
@@ -286,6 +292,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                             ),
                           ),
                         ),
+
+// Pagination widget remains the same
+
+
                         // Pagination
                         Container(
                           padding: EdgeInsets.all(20),
@@ -296,9 +306,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                               Row(
                                 children: [
                                   IconButton(
-                                    onPressed: currentPage > 1
-                                        ? () => setState(() => currentPage--)
-                                        : null,
+                                    onPressed: currentPage > 1 ? () => setState(() => currentPage--) : null,
                                     icon: Icon(Icons.chevron_left),
                                   ),
                                   ...List.generate(
@@ -310,17 +318,13 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                         child: ElevatedButton(
                                           onPressed: () => setState(() => currentPage = pageNum),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: currentPage == pageNum
-                                                ? Color(0xFF7C3AED)
-                                                : Colors.grey[300],
+                                            backgroundColor: currentPage == pageNum ? Color(0xFF7C3AED) : Colors.grey[300],
                                             minimumSize: Size(40, 40),
                                           ),
                                           child: Text(
                                             '$pageNum',
                                             style: TextStyle(
-                                              color: currentPage == pageNum
-                                                  ? Colors.white
-                                                  : Colors.black,
+                                              color: currentPage == pageNum ? Colors.white : Colors.black,
                                             ),
                                           ),
                                         ),
@@ -328,9 +332,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     },
                                   ),
                                   IconButton(
-                                    onPressed: currentPage < totalPages
-                                        ? () => setState(() => currentPage++)
-                                        : null,
+                                    onPressed: currentPage < totalPages ? () => setState(() => currentPage++) : null,
                                     icon: Icon(Icons.chevron_right),
                                   ),
                                 ],
@@ -462,9 +464,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     }
   }
 
-  String _formatDate(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return '${date.day} ${_getMonth(date.month)} ${date.year}';
+  String _formatDate(Timestamp? timestamp) {
+    if (timestamp == null) return '-';
+    final date = timestamp.toDate();
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   String _getMonth(int month) {
