@@ -29,6 +29,8 @@ class OrdersModel {
     );
   }
 
+
+
   Map<String, dynamic> toJson() {
     return {
       'orderDate': Timestamp.fromDate(orderDate),
@@ -41,3 +43,5 @@ class OrdersModel {
   String get shortOrderId =>
       (id.length >= 6 ? id.substring(0, 6) : id).toUpperCase();
 }
+
+

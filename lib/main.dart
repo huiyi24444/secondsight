@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
+import 'package:secondsight/admin_main.dart';
 import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -69,9 +70,26 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       initialRoute: '/',
-      routes: {
-        '/': (context) => const MyHomePage(),
-        '/admin': (context) => const AdminDashboardPage(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const MyHomePage());
+          case '/admin':
+            if (kIsWeb) {
+              return MaterialPageRoute(builder: (_) => AdminApp());
+            } else {
+              // Redirect to home or show error for mobile
+              return MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  body: Center(
+                    child: Text('Admin panel is only available on web'),
+                  ),
+                ),
+              );
+            }
+          default:
+            return MaterialPageRoute(builder: (_) => const MyHomePage());
+        }
       },
     );
   }

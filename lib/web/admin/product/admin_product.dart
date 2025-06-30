@@ -381,38 +381,13 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
               ],
             ),
           ),
-          _buildMenuItem(Icons.dashboard, 'Dashboard', false),
-          _buildMenuItem(Icons.shopping_cart, 'Product Management', true),
-          _buildMenuItem(Icons.list_alt, 'Order Management', false),
-          _buildMenuItem(Icons.people, 'Customer Management', false),
-          _buildMenuItem(Icons.report, 'Reports', false),
+
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, bool isActive) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.white.withOpacity(0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.white, size: 20),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-          ),
-        ),
-        onTap: () {
-          // Navigation logic here
-        },
-      ),
-    );
-  }
+
 
   Widget _buildTopBar() {
     return Container(
