@@ -92,6 +92,19 @@ class ProductDetailsView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
+
+                // Tags Section - Display all tags from the array
+                if (product.tags != null && product.tags!.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: product.tags!.map((tag) =>
+                        _buildTag(context, tag)
+                    ).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // Try On Button - Updated with actual navigation
                 SizedBox(
                   width: double.infinity,

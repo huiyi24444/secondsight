@@ -4,6 +4,7 @@ import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
 
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../widget/topbar.dart';
 import 'admin_dashboard_controller.dart';
 import 'chart_painter.dart';
 
@@ -44,7 +45,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(),
+                const CustomTopBar(
+                  title: 'Dashboard',
+                ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
@@ -65,26 +68,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildTopBar() => Container(
-    height: 60,
-    color: Colors.white,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Row(
-      children: [
-        const Text('Dashboard', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-          decoration: BoxDecoration(color: Colors.orange[100], borderRadius: BorderRadius.circular(5)),
-          child: Text('All Shop', style: TextStyle(color: Colors.orange[800])),
-        ),
-        const SizedBox(width: 10),
-        const Icon(Icons.notifications_outlined),
-        const SizedBox(width: 10),
-        CircleAvatar(radius: 20, backgroundColor: Colors.grey[300], child: const Icon(Icons.person, color: Colors.grey)),
-      ],
-    ),
-  );
 
   Widget _buildStats() => Column(
     children: [

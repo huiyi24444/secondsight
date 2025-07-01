@@ -400,12 +400,12 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
 
                     const SizedBox(height: 32),
 
-                    // Submit Button
+                    // Submit Button - Pass orderProduct to _submitRequest
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: isSubmitting ? null : _submitRequest,
+                        onPressed: isSubmitting ? null : () => _submitRequest(orderProduct),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF8E6CEF),
                           shape: RoundedRectangleBorder(
@@ -619,8 +619,8 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
                               Divider(color: Colors.grey[200]),
                               const SizedBox(height: 16),
 
-                              // Return Details
-                              _buildDetailRow('Refund Amount', 'RM ${orderProduct.totalPrice.toStringAsFixed(2)}'),
+                              // Return Details - Updated to use returnPrice
+                              _buildDetailRow('Refund Amount', 'RM ${returnRequest.returnPrice.toStringAsFixed(2)}'),
                               _buildDetailRow('Refund Reason', returnRequest.returnReason),
                               _buildDetailRow('Refund To', 'Original Payment Method'),
                               _buildDetailRow('Request ID', returnRequest.id.substring(0, 12).toUpperCase()),
@@ -648,13 +648,51 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
                                   border: Border.all(color: Colors.grey[200]!),
                                 ),
                                 child: Text(
-                                  'Return request submitted for ${returnRequest.returnReason.toLowerCase()}',
+                                  returnRequest.returnComment.isNotEmpty
+                                      ? returnRequest.returnComment
+                                      : 'Return request submitted for ${returnRequest.returnReason.toLowerCase()}',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],
                                   ),
                                 ),
                               ),
+
+                              // Show reject reason if status is rejected
+                              if (returnRequest.returnStatus.toLowerCase() == 'rejected' &&
+                                  returnRequest.rejectReason != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.red[200]!),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Rejection Reason',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        returnRequest.rejectReason!,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.red[700],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
 
                               // Show uploaded images if any
                               if (returnRequest.returnImages.isNotEmpty) ...[
@@ -867,8 +905,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
     }
   }
 
-
-  Future<void> _submitRequest() async {
+  Future<void> _submitRequest(OrderProductModel orderProduct) async {
     if (_descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -881,7 +918,6 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
 
     final confirmed = await _showReturnPolicyConfirmation();
     if (confirmed != true) return;
-
 
     setState(() {
       isSubmitting = true;
@@ -900,7 +936,12 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
           .collection('orderProducts')
           .doc(widget.orderProductId);
 
-      // Create return request with uploaded image URLs
+      // Convert totalPrice (double) to returnPrice (int)
+      // Multiply by 100 to convert to cents if your prices are in dollars/ringgit format
+      // Or just round to int if already in smallest unit
+      final returnPrice = orderProduct.totalPrice.round();
+
+      // Create return request with uploaded image URLs and returnPrice
       final returnRequest = ReturnRequestModel(
         id: '', // Firestore will assign this
         orderProductID: orderProductRef,
@@ -909,6 +950,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
         returnReason: selectedReason,
         returnStatus: 'submitted',
         returnComment: _descriptionController.text,
+        returnPrice: returnPrice,
       );
 
       // Save to Firestore

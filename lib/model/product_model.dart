@@ -12,6 +12,7 @@ class Product {
   final Map<String, dynamic> virtualTryOn;
   final Map<String, dynamic> measurements;
   final DocumentReference category;
+  final List<String> tags;
   final List<String> images;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
@@ -29,6 +30,7 @@ class Product {
     required this.measurements,
     required this.category,
     required this.images,
+    required this.tags,
     this.createdAt,
     this.updatedAt,
   });
@@ -68,6 +70,7 @@ class Product {
       images: List<String>.from(data['productURL'] ?? []),
       createdAt: data['createdAt'] as Timestamp?,
       updatedAt: data['updatedAt'] as Timestamp?,
+      tags: List<String>.from(data['tags'] ?? []),
     );
   }
 
@@ -91,6 +94,7 @@ class Product {
       updatedAt: data['updatedAt'] is int
           ? Timestamp.fromMillisecondsSinceEpoch(data['updatedAt'])
           : null,
+      tags: List<String>.from(data['tags'] ?? []),
     );
   }
 
@@ -115,6 +119,7 @@ class Product {
       images: List<String>.from(data['productURL'] ?? []),
       createdAt: data['createdAt'] as Timestamp?,
       updatedAt: data['updatedAt'] as Timestamp?,
+      tags: List<String>.from(data['tags'] ?? []),
     );
   }
 }

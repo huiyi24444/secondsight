@@ -3,6 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:html' as html;
 
+import '../../../model/category_model.dart';
+import '../widget/topbar.dart';
+
 class ProductAdditionPage extends StatefulWidget {
   const ProductAdditionPage({Key? key}) : super(key: key);
 
@@ -25,20 +28,53 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
   final TextEditingController _quantityController = TextEditingController();
 
   // Selected values
-  String? selectedCategory;
-  String? selectedStatus = 'Draft';
-  String selectedCondition = 'Good';
+  String? selectedStatus = 'available';
+  String selectedCondition = 'good';
   List<String> selectedTags = [];
   List<html.File> selectedImages = [];
   List<String> uploadedImageUrls = [];
+  List<Category> categories = []; // Loaded from Firestore
+  Category? selectedCategory;
 
-  // Options
-  final List<String> categories = ['Hoodies', 'Jackets', 'T-Shirts', 'Pants', 'Accessories'];
-  final List<String> conditions = ['Good', 'Like New', 'Excellent', 'Fair'];
-  final List<String> statuses = ['Draft', 'Published'];
-  final List<String> availableTags = ['Vintage', 'Designer', 'Limited Edition', 'Rare', 'Trending'];
+  final List<String> conditions = ['good', 'like_new', 'excellent', 'fair'];
+  final List<String> statuses = ['available', 'sold', 'inactive'];
+  final List<String> availableTags = ['vintage', 'designer', 'limited_edition', 'rare', 'trending'];
 
   bool isLoading = false;
+  bool isCategoriesLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    try {
+      setState(() {
+        isCategoriesLoading = true;
+      });
+
+      final snapshot = await _firestore.collection('category').get();
+      setState(() {
+        categories = snapshot.docs.map((doc) => Category.fromDocument(doc)).toList();
+        isCategoriesLoading = false;
+      });
+
+      print('Loaded ${categories.length} categories');
+      for (var cat in categories) {
+        print('Category: ${cat.catName} (${cat.id})');
+      }
+    } catch (e) {
+      print('Error loading categories: $e');
+      setState(() {
+        isCategoriesLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading categories: $e')),
+      );
+    }
+  }
 
   Future<void> _pickImages() async {
     final input = html.FileUploadInputElement()..accept = 'image/*'..multiple = true;
@@ -99,7 +135,8 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
         'price': price,
         'originalPrice': originalPrice,
         'discount': discount,
-        'category': selectedCategory,
+        'category': selectedCategory?.toMap(),
+        'categoryId': selectedCategory?.id, // Also store the ID for easier queries
         'condition': selectedCondition,
         'status': selectedStatus,
         'tags': selectedTags,
@@ -114,10 +151,10 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      await _firestore.collection('Product').add(productData);
+      await _firestore.collection('products').add(productData);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Product added successfully!')),
+        const SnackBar(content: Text('Product added successfully!')),
       );
 
       Navigator.pop(context);
@@ -143,11 +180,15 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
             child: Column(
               children: [
                 // Top Bar
-                _buildTopBar(),
+                CustomTopBar(
+                  title: 'Product',
+                  subtitle: 'Add Product',
+                  badgeText: 'All Shop',
+                ),
                 // Content Area
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Form(
                       key: _formKey,
                       child: Container(
@@ -162,19 +203,19 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                             ),
                           ],
                         ),
-                        padding: EdgeInsets.all(30),
+                        padding: const EdgeInsets.all(30),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // General Information Section
-                            Text(
+                            const Text(
                               'General Information',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             TextFormField(
                               controller: _nameController,
                               decoration: InputDecoration(
@@ -191,7 +232,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 return null;
                               },
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             TextFormField(
                               controller: _descriptionController,
                               maxLines: 4,
@@ -203,7 +244,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
                             // Category Section
                             Row(
@@ -212,15 +253,19 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
+                                      const Text(
                                         'Category',
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      SizedBox(height: 10),
-                                      DropdownButtonFormField<String>(
+                                      const SizedBox(height: 10),
+                                      isCategoriesLoading
+                                          ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                          : DropdownButtonFormField<Category>(
                                         value: selectedCategory,
                                         decoration: InputDecoration(
                                           hintText: 'Select a category',
@@ -228,16 +273,18 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                         ),
-                                        items: categories.map((category) {
-                                          return DropdownMenuItem(
+                                        isExpanded: true,
+                                        items: categories.map((Category category) {
+                                          return DropdownMenuItem<Category>(
                                             value: category,
-                                            child: Text(category),
+                                            child: Text(category.catName),
                                           );
                                         }).toList(),
-                                        onChanged: (value) {
+                                        onChanged: (Category? newValue) {
                                           setState(() {
-                                            selectedCategory = value;
+                                            selectedCategory = newValue;
                                           });
+                                          print('Selected category: ${newValue?.catName} (${newValue?.id})');
                                         },
                                         validator: (value) {
                                           if (value == null) {
@@ -245,25 +292,31 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                           }
                                           return null;
                                         },
+                                        // Use catId for comparison
+                                        selectedItemBuilder: (BuildContext context) {
+                                          return categories.map<Widget>((Category category) {
+                                            return Text(category.catName);
+                                          }).toList();
+                                        },
                                       ),
                                     ],
                                   ),
                                 ),
-                                SizedBox(width: 20),
+                                const SizedBox(width: 20),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
+                                      const Text(
                                         'Product Tags',
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
-                                      SizedBox(height: 10),
+                                      const SizedBox(height: 10),
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         decoration: BoxDecoration(
                                           border: Border.all(color: Colors.grey[300]!),
                                           borderRadius: BorderRadius.circular(8),
@@ -293,20 +346,20 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
 
                             // Status Section
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'Status',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                SizedBox(height: 10),
+                                const SizedBox(height: 10),
                                 DropdownButtonFormField<String>(
                                   value: selectedStatus,
                                   decoration: InputDecoration(
@@ -328,22 +381,22 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
                             // Media Section
-                            Text(
+                            const Text(
                               'Media',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             Text(
                               'Product Photo',
                               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             InkWell(
                               onTap: _pickImages,
                               child: Container(
@@ -360,18 +413,18 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(Icons.cloud_upload_outlined, size: 40, color: Colors.grey),
-                                      SizedBox(height: 10),
+                                      const SizedBox(height: 10),
                                       Text(
                                         'Drag and drop image here, or click add image',
                                         style: TextStyle(color: Colors.grey[600]),
                                       ),
-                                      SizedBox(height: 5),
+                                      const SizedBox(height: 5),
                                       ElevatedButton(
                                         onPressed: _pickImages,
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Color(0xFF7C3AED),
+                                          backgroundColor: const Color(0xFF7C3AED),
                                         ),
-                                        child: Text('Add Image'),
+                                        child: const Text('Add Image'),
                                       ),
                                     ],
                                   ),
@@ -379,7 +432,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                               ),
                             ),
                             if (selectedImages.isNotEmpty) ...[
-                              SizedBox(height: 10),
+                              const SizedBox(height: 10),
                               Wrap(
                                 spacing: 10,
                                 children: selectedImages.map((file) {
@@ -394,17 +447,17 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 }).toList(),
                               ),
                             ],
-                            SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
                             // Pricing Section
-                            Text(
+                            const Text(
                               'Pricing',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             Row(
                               children: [
                                 Expanded(
@@ -430,7 +483,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                     },
                                   ),
                                 ),
-                                SizedBox(width: 20),
+                                const SizedBox(width: 20),
                                 Expanded(
                                   child: TextFormField(
                                     controller: _originalPriceController,
@@ -447,17 +500,17 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
                             // Inventory Section
-                            Text(
+                            const Text(
                               'Inventory',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             Row(
                               children: [
                                 Expanded(
@@ -482,7 +535,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                     },
                                   ),
                                 ),
-                                SizedBox(width: 20),
+                                const SizedBox(width: 20),
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
                                     value: selectedCondition,
@@ -507,36 +560,36 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
                             // Shipping Section
-                            Text(
+                            const Text(
                               'Shipping',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 10),
+                            const SizedBox(height: 10),
                             Row(
                               children: [
                                 Checkbox(
                                   value: true,
                                   onChanged: (value) {},
-                                  activeColor: Color(0xFF7C3AED),
+                                  activeColor: const Color(0xFF7C3AED),
                                 ),
-                                Text('This is a physical product'),
+                                const Text('This is a physical product'),
                               ],
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             Row(
                               children: [
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Height', style: TextStyle(fontSize: 14)),
-                                      SizedBox(height: 5),
+                                      const Text('Height', style: TextStyle(fontSize: 14)),
+                                      const SizedBox(height: 5),
                                       TextFormField(
                                         controller: _lengthController,
                                         keyboardType: TextInputType.number,
@@ -550,13 +603,13 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                     ],
                                   ),
                                 ),
-                                SizedBox(width: 20),
+                                const SizedBox(width: 20),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Width', style: TextStyle(fontSize: 14)),
-                                      SizedBox(height: 5),
+                                      const Text('Width', style: TextStyle(fontSize: 14)),
+                                      const SizedBox(height: 5),
                                       TextFormField(
                                         controller: _widthController,
                                         keyboardType: TextInputType.number,
@@ -572,7 +625,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                 ),
                               ],
                             ),
-                            SizedBox(height: 40),
+                            const SizedBox(height: 40),
 
                             // Action Buttons
                             Row(
@@ -580,20 +633,20 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                               children: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(context),
-                                  child: Text('Cancel'),
                                   style: TextButton.styleFrom(
                                     foregroundColor: Colors.grey[600],
                                   ),
+                                  child: const Text('Cancel'),
                                 ),
-                                SizedBox(width: 10),
+                                const SizedBox(width: 10),
                                 ElevatedButton(
                                   onPressed: isLoading ? null : _saveProduct,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF7C3AED),
-                                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                                    backgroundColor: const Color(0xFF7C3AED),
+                                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                                   ),
                                   child: isLoading
-                                      ? SizedBox(
+                                      ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -601,7 +654,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                      : Text('Add Product'),
+                                      : const Text('Add Product'),
                                 ),
                               ],
                             ),
@@ -622,24 +675,24 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
   Widget _buildSidebar() {
     return Container(
       width: 250,
-      color: Color(0xFF7C3AED),
+      color: const Color(0xFF7C3AED),
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
+                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
                 ),
-                SizedBox(width: 10),
-                Text(
+                const SizedBox(width: 10),
+                const Text(
                   'Logo',
                   style: TextStyle(
                     color: Colors.white,
@@ -649,61 +702,6 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 60,
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Row(
-            children: [
-              Text(
-                'Product',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(width: 10),
-              Icon(Icons.chevron_right),
-              SizedBox(width: 10),
-              Text(
-                'Add Product',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-          Spacer(),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange[100],
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              'All Shop',
-              style: TextStyle(color: Colors.orange[800]),
-            ),
-          ),
-          SizedBox(width: 10),
-          Icon(Icons.notifications_outlined),
-          SizedBox(width: 10),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.grey[300],
-            child: Icon(Icons.person, color: Colors.grey[600]),
           ),
         ],
       ),

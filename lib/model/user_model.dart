@@ -8,6 +8,7 @@ class CustomerModel {
   final int phoneNum;
   final String profilePic;
   final String username;
+  final String status;
 
   CustomerModel({
     required this.id,
@@ -17,6 +18,7 @@ class CustomerModel {
     required this.phoneNum,
     required this.profilePic,
     required this.username,
+    required this.status,
   });
 
   factory CustomerModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -28,6 +30,7 @@ class CustomerModel {
       phoneNum: json['phoneNum'] ?? 0,
       profilePic: json['profilePic'] ?? '',
       username: json['username'] ?? '',
+      status: json['status'] ?? 'active',
     );
   }
 
@@ -39,6 +42,7 @@ class CustomerModel {
       'phoneNum': phoneNum,
       'profilePic': profilePic,
       'username': username,
+      'status': status,
     };
   }
 }

@@ -1,0 +1,372 @@
+// FILE: views/customer_details_page.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../../../model/user_model.dart';
+import '../widget/topbar.dart';
+
+class CustomerDetailsPage extends StatefulWidget {
+  final String userId;
+
+  const CustomerDetailsPage({Key? key, required this.userId}) : super(key: key);
+
+  @override
+  State<CustomerDetailsPage> createState() => _CustomerDetailsPageState();
+}
+
+class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  CustomerModel? customer;
+  List<Map<String, dynamic>> customerOrders = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomerDetails();
+  }
+
+  Future<void> _loadCustomerDetails() async {
+    try {
+      final customerDoc = await _firestore.collection('users').doc(widget.userId).get();
+      final ordersSnapshot = await _firestore.collection('order')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      List<Map<String, dynamic>> orders = [];
+      double totalSpent = 0;
+
+      for (var doc in ordersSnapshot.docs) {
+        final data = doc.data();
+        orders.add({
+          'id': doc.id,
+          'orderId': data['orderId'] ?? doc.id.substring(0, 8),
+          'date': data['date'],
+          'total': data['total'] ?? 0.0,
+          'status': data['orderStatus'] ?? 'pending',
+          'items': data['items'] ?? [],
+        });
+        totalSpent += data['total'] ?? 0.0;
+      }
+
+      setState(() {
+        customer = CustomerModel.fromJson(customerDoc.data()!, customerDoc.id);
+        customerOrders = orders;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading customer details: $e');
+      setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (customer == null) {
+      return const Scaffold(
+        body: Center(child: Text('Customer not found')),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                const CustomTopBar(
+                  title: 'Customer',
+                  subtitle: 'Add Customer',
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Customer Info Card
+                        Container(
+                          width: 350,
+                          padding: const EdgeInsets.all(30),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundImage: customer!.profilePic.isNotEmpty
+                                    ? NetworkImage(customer!.profilePic)
+                                    : null,
+                                backgroundColor: Colors.grey[300],
+                                child: customer!.profilePic.isEmpty
+                                    ? Text(
+                                  customer!.fullName.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                                )
+                                    : null,
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                customer!.fullName,
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[100],
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Icon(Icons.verified_user,
+                                        size: 16, color: customer!.isVerified ? Colors.green : Colors.grey),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text('User ID: ${widget.userId.substring(0, 8)}'),
+                                ],
+                              ),
+                              const SizedBox(height: 30),
+                              _buildInfoRow('Username', customer!.username),
+                              _buildInfoRow('Email', customer!.email),
+                              _buildInfoRow('Phone', customer!.phoneNum.toString()),
+                              _buildInfoRow(
+                                'Last Transaction',
+                                customerOrders.isNotEmpty
+                                    ? _formatDate(customerOrders.first['date'])
+                                    : 'No transactions',
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
+                                onPressed: () {
+                                  // Delete functionality
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red[100],
+                                  foregroundColor: Colors.red[700],
+                                  minimumSize: const Size(double.infinity, 45),
+                                ),
+                                child: const Text('Delete Account'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // Order Summary and History
+                        Expanded(
+                          child: Column(
+                            children: [
+                              // Summary Cards
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      'Total Orders',
+                                      customerOrders.length.toString(),
+                                      Icons.receipt_long,
+                                      Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: _buildSummaryCard(
+                                      'Total Spent',
+                                      'RM ${customerOrders.fold(0.0, (prev, o) => prev + o['total']).toStringAsFixed(2)}',
+                                      Icons.attach_money,
+                                      Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  _buildOrderCountCard('Pending', 'pending', Colors.orange),
+                                  _buildOrderCountCard('Completed', 'completed', Colors.purple),
+                                  _buildOrderCountCard('Cancelled', 'cancelled', Colors.red),
+                                  _buildSummaryCard('Returned', '0', Icons.assignment_return, Colors.grey),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              // Transaction History
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.1),
+                                      spreadRadius: 1,
+                                      blurRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Transaction History',
+                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                        ),
+                                        Row(
+                                          children: [
+                                            TextButton(onPressed: () {}, child: const Text('View All')),
+                                            const SizedBox(width: 10),
+                                            TextButton(onPressed: () {}, child: const Text('Filters')),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 20),
+                                    ...customerOrders.take(5).map(_buildTransactionItem).toList(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600])),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(title, style: TextStyle(color: Colors.grey[600])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderCountCard(String label, String status, Color color) {
+    final count = customerOrders.where((o) => o['status'] == status).length;
+    return _buildSummaryCard(label, count.toString(), Icons.circle, color);
+  }
+
+  Widget _buildTransactionItem(Map<String, dynamic> order) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text('#${order['orderId']}'),
+          const SizedBox(width: 20),
+          Text(
+            'Vintage Denim Jacket + ${order['items'].length - 1} more',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const Spacer(),
+          Text('RM ${order['total'].toStringAsFixed(2)}'),
+          const SizedBox(width: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: _getStatusColor(order['status']).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              order['status'],
+              style: TextStyle(color: _getStatusColor(order['status']), fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Text(_formatDate(order['date'])),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDate(int? timestamp) {
+    if (timestamp == null) return 'N/A';
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return '${date.day} ${_getMonth(date.month)} ${date.year}';
+  }
+
+  String _getMonth(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
+  }
+
+}

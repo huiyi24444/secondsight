@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../model/order_model.dart';
+import '../widget/topbar.dart';
+
 class OrderManagementPage extends StatefulWidget {
   const OrderManagementPage({Key? key}) : super(key: key);
 
@@ -12,12 +15,14 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
 
-  List<Map<String, dynamic>> orders = [];
-  List<Map<String, dynamic>> filteredOrders = [];
+  List<OrdersModel> orders = [];
+  List<OrdersModel> filteredOrders = [];
   bool isLoading = true;
   String selectedTab = 'All';
   int currentPage = 1;
   int itemsPerPage = 10;
+
+  Map<String, String> customerNames = {};
 
   @override
   void initState() {
@@ -28,36 +33,28 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   Future<void> _loadOrders() async {
     setState(() => isLoading = true);
     try {
-      final ordersSnapshot = await _firestore.collection('Order').get();
-      final customersSnapshot = await _firestore.collection('Customer').get();
+      final usersSnapshot = await _firestore.collection('users').get();
 
-      // Create customer map for quick lookup
-      Map<String, Map<String, dynamic>> customerMap = {};
-      for (var doc in customersSnapshot.docs) {
-        customerMap[doc.id] = doc.data();
-      }
+      List<OrdersModel> loadedOrders = [];
+      Map<String, String> customerNameMap = {};
 
-      List<Map<String, dynamic>> loadedOrders = [];
+      for (final userDoc in usersSnapshot.docs) {
+        final userId = userDoc.id;
+        customerNameMap[userId] = userId;
 
-      for (var doc in ordersSnapshot.docs) {
-        final data = doc.data();
-        final customerData = customerMap[data['customerId']] ?? {};
+        final ordersSnapshot = await userDoc.reference.collection('order').get();
 
-        loadedOrders.add({
-          'id': doc.id,
-          'orderId': data['orderId'] ?? doc.id.substring(0, 8).toUpperCase(),
-          'date': data['date'] ?? DateTime.now().millisecondsSinceEpoch,
-          'customer': customerData['name'] ?? 'Unknown Customer',
-          'customerId': data['customerId'],
-          'total': data['total'] ?? 0.0,
-          'payment': data['paymentMethod'] ?? 'Mastercard',
-          'status': data['orderStatus'] ?? 'pending',
-          'items': data['items'] ?? [],
-        });
+        for (final orderDoc in ordersSnapshot.docs) {
+          final orderData = orderDoc.data();
+          final order = OrdersModel.fromJson(orderData, orderDoc.id);
+          loadedOrders.add(order.copyWith(customerId: userId));
+        }
+
       }
 
       setState(() {
         orders = loadedOrders;
+        customerNames = customerNameMap;
         _filterOrders();
         isLoading = false;
       });
@@ -67,34 +64,34 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     }
   }
 
-  void _filterOrders() {
-    List<Map<String, dynamic>> filtered = orders;
 
-    // Filter by tab
+
+  void _filterOrders() {
+    List<OrdersModel> filtered = orders;
+
     if (selectedTab != 'All') {
       filtered = filtered.where((order) {
         switch (selectedTab) {
           case 'Pending':
-            return order['status'] == 'pending';
+            return order.orderStatus.toLowerCase() == 'pending';
           case 'Processing':
-            return order['status'] == 'processing';
+            return order.orderStatus.toLowerCase() == 'processing';
           case 'Delivered':
-            return order['status'] == 'delivered';
+            return order.orderStatus.toLowerCase() == 'delivered';
           case 'Cancelled':
-            return order['status'] == 'cancelled';
+            return order.orderStatus.toLowerCase() == 'cancelled';
           default:
             return true;
         }
       }).toList();
     }
 
-    // Filter by search
     if (_searchController.text.isNotEmpty) {
-      filtered = filtered.where((order) {
-        final search = _searchController.text.toLowerCase();
-        return order['orderId'].toLowerCase().contains(search) ||
-            order['customer'].toLowerCase().contains(search);
-      }).toList();
+      final search = _searchController.text.toLowerCase();
+      filtered = filtered.where((order) =>
+          order.shortOrderId.toLowerCase().contains(search)
+        // you can also add customer name if it's linked
+      ).toList();
     }
 
     setState(() {
@@ -103,11 +100,17 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     });
   }
 
+
   Future<void> _updateOrderStatus(String orderId, String newStatus) async {
     try {
-      await _firestore.collection('Order').doc(orderId).update({
-        'orderStatus': newStatus,
-      });
+      final order = orders.firstWhere((o) => o.id == orderId);
+      await _firestore
+          .collection('users')
+          .doc(order.customerId)
+          .collection('order')
+          .doc(order.id)
+          .update({'orderStatus': newStatus});
+
       _loadOrders();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Order status updated successfully')),
@@ -118,6 +121,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       );
     }
   }
+
 
   void _showCreateOrderDialog() {
     showDialog(
@@ -142,14 +146,14 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       backgroundColor: Colors.grey[100],
       body: Row(
         children: [
-          // Sidebar
-          _buildSidebar(),
           // Main Content
           Expanded(
             child: Column(
               children: [
                 // Top Bar
-                _buildTopBar(),
+                const CustomTopBar(
+                  title: 'Order Management',
+                ),
                 // Content Area
                 Expanded(
                   child: Container(
@@ -240,33 +244,24 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                                 return DataRow(
                                   cells: [
                                     DataCell(Checkbox(value: false, onChanged: (v) {})),
-                                    DataCell(Text('#${order['orderId']}')),
+                                    DataCell(Text('#${order.shortOrderId}')),
+                                    DataCell(Text(order.shipmentID ?? 'No shipment')),
+                                    DataCell(Text(_formatDate(order.orderDate))),
+                                    DataCell(Text(customerNames[order.customerId] ?? 'Unknown')),
+
+                                    DataCell(Text('RM ${order.totalAmount.toStringAsFixed(2)}')),
+                                    DataCell(Text('Mastercard')), // Placeholder for now
                                     DataCell(
                                       Container(
-                                        width: 200,
-                                        child: Text(
-                                          order['items'].isEmpty
-                                              ? 'No items'
-                                              : 'Vintage Denim Jacket + ${order['items'].length - 1} Products',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(Text(_formatDate(order['date']))),
-                                    DataCell(Text(order['customer'])),
-                                    DataCell(Text('RM ${order['total'].toStringAsFixed(2)}')),
-                                    DataCell(Text(order['payment'])),
-                                    DataCell(
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor(order['status']).withOpacity(0.2),
+                                          color: _getStatusColor(order.orderStatus).withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          _formatStatus(order['status']),
+                                          _formatStatus(order.orderStatus),
                                           style: TextStyle(
-                                            color: _getStatusColor(order['status']),
+                                            color: _getStatusColor(order.orderStatus),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -292,7 +287,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                                                   ElevatedButton(
                                                     onPressed: () async {
                                                       Navigator.pop(context);
-                                                      await _firestore.collection('Order').doc(order['id']).delete();
+                                                      await _firestore.collection('order').doc(order.id).delete();
                                                       _loadOrders();
                                                     },
                                                     style: ElevatedButton.styleFrom(
@@ -304,7 +299,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                                               ),
                                             );
                                           } else {
-                                            _updateOrderStatus(order['id'], value);
+                                            _updateOrderStatus(order.id, value);
                                           }
                                         },
                                         itemBuilder: (BuildContext context) => [
@@ -389,83 +384,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 250,
-      color: Color(0xFF7C3AED),
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
-                ),
-                SizedBox(width: 10),
-                Text(
-                  'Logo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 60,
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Text(
-            'Order Management',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Spacer(),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange[100],
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              'All Shop',
-              style: TextStyle(color: Colors.orange[800]),
-            ),
-          ),
-          SizedBox(width: 10),
-          Icon(Icons.notifications_outlined),
-          SizedBox(width: 10),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.grey[300],
-            child: Icon(Icons.person, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFilterTab(String title, bool isActive) {
     return InkWell(
       onTap: () {
@@ -514,10 +432,10 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     return status[0].toUpperCase() + status.substring(1);
   }
 
-  String _formatDate(int timestamp) {
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+  String _formatDate(DateTime date) {
     return '${date.day} ${_getMonth(date.month)} ${date.year}';
   }
+
 
   String _getMonth(int month) {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -559,8 +477,8 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
 
   Future<void> _loadData() async {
     try {
-      final customersSnapshot = await _firestore.collection('Customer').get();
-      final productsSnapshot = await _firestore.collection('Product').get();
+      final customersSnapshot = await _firestore.collection('users').get();
+      final productsSnapshot = await _firestore.collection('products').get();
 
       setState(() {
         customers = customersSnapshot.docs.map((doc) => {
@@ -609,7 +527,14 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      await _firestore.collection('Order').add(orderData);
+      await _firestore
+          .collection('users')
+          .doc(selectedCustomerId)
+          .collection('order')
+          .add(orderData);
+
+
+
 
       Navigator.pop(context);
       widget.onOrderCreated();

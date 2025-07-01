@@ -15,5 +15,12 @@ class Category {
       catURL: data['catURL'],
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'catName': catName,
+      'catURL': catURL,
+    };
+  }
 }
 

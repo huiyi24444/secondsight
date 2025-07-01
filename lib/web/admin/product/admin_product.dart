@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/string_extensions.dart';
 
 import '../../../model/product_model.dart';
+import '../widget/topbar.dart';
 import 'admin_product_addition.dart';
+import 'admin_product_controller.dart';
 
 class ProductManagementPage extends StatefulWidget {
   const ProductManagementPage({Key? key}) : super(key: key);
@@ -20,69 +23,15 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  final controller = ProductManagementController();
+
   @override
   void initState() {
     super.initState();
-    _loadProducts();
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() => isLoading = true);
-
-    try {
-      final snapshot = await _firestore.collection('Product').get();
-
-      final loadedProducts = snapshot.docs
-          .map((doc) => Product.fromDocumentSnapshot(doc))
-          .toList();
-
-      print('✅ Products fetched: ${loadedProducts.length}');
-      for (var product in loadedProducts) {
-        print('🧾 ${product.name} | RM${product.price} | ${product.status}');
-      }
-
-      setState(() {
-        products = loadedProducts;
-        filteredProducts = loadedProducts;
-        isLoading = false;
-      });
-    } catch (e) {
-      print('❌ Error loading products: $e');
-      setState(() => isLoading = false);
-    }
+    controller.loadProducts(() => setState(() {}));
   }
 
 
-
-  void _filterProducts(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        filteredProducts = products;
-      } else {
-        filteredProducts = products.where((product) {
-          return product.name.toLowerCase().contains(query.toLowerCase()) ||
-              product.id.toLowerCase().contains(query.toLowerCase()) ||
-              product.condition.toLowerCase().contains(query.toLowerCase());
-        }).toList();
-      }
-      currentPage = 1;
-    });
-  }
-
-
-  Future<void> _deleteProduct(String productId) async {
-    try {
-      await _firestore.collection('Product').doc(productId).delete();
-      _loadProducts();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Product deleted successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting product: $e')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,14 +52,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       backgroundColor: Colors.grey[100],
       body: Row(
         children: [
-          // Sidebar
-          _buildSidebar(),
           // Main Content
           Expanded(
             child: Column(
               children: [
                 // Top Bar
-                _buildTopBar(),
+                const CustomTopBar(
+                  title: 'Product',
+                ),
                 // Content Area
                 Expanded(
                   child: Container(
@@ -145,7 +94,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     ),
                                     contentPadding: EdgeInsets.symmetric(vertical: 12),
                                   ),
-                                  onChanged: _filterProducts,
+                                  onChanged: (query) {
+                                    controller.searchQuery = query;
+                                    controller.filterProducts(() => setState(() {}));
+                                  },
+
+
                                 ),
                               ),
                               SizedBox(width: 20),
@@ -156,7 +110,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     MaterialPageRoute(
                                       builder: (context) => ProductAdditionPage(),
                                     ),
-                                  ).then((_) => _loadProducts());
+                                  ).then((_) => controller.loadProducts(() => setState(() {})));
+
                                 },
                                 icon: Icon(Icons.add),
                                 label: Text('Add Product'),
@@ -173,25 +128,53 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: Row(
                             children: [
-                              _buildFilterTab('All Products', true),
+                              _buildFilterTab(
+                                'All Products',
+                                controller.selectedStatus == 'All Products',
+                                    () {
+                                  controller.selectedStatus = 'All Products';
+                                  controller.filterProducts(() => setState(() {}));
+                                },
+                              ),
                               SizedBox(width: 20),
-                              _buildFilterTab('Published', false),
+                              _buildFilterTab(
+                                'Available',
+                                controller.selectedStatus == 'Available',
+                                    () {
+                                  controller.selectedStatus = 'Available';
+                                  controller.filterProducts(() => setState(() {}));
+                                },
+                              ),
                               SizedBox(width: 20),
-                              _buildFilterTab('Low Stock', false),
+                              _buildFilterTab(
+                                'Sold',
+                                controller.selectedStatus == 'Sold',
+                                    () {
+                                  controller.selectedStatus = 'Sold';
+                                  controller.filterProducts(() => setState(() {}));
+                                },
+                              ),
                               SizedBox(width: 20),
-                              _buildFilterTab('Draft', false),
+                              _buildFilterTab(
+                                'Inactive',
+                                controller.selectedStatus == 'Inactive',
+                                    () {
+                                  controller.selectedStatus = 'Inactive';
+                                  controller.filterProducts(() => setState(() {}));
+                                },
+                              ),
                             ],
+
                           ),
                         ),
                         SizedBox(height: 20),
 
                         // Product table
                         Expanded(
-                          child: isLoading
+                          child: controller.isLoading
                               ? const Center(child: CircularProgressIndicator())
                               : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
-
                             child: DataTable(
                               columns: const [
                                 DataColumn(label: SizedBox(width: 30, child: Checkbox(value: false, onChanged: null))),
@@ -204,7 +187,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 DataColumn(label: Text('Added')),
                                 DataColumn(label: Text('Action')),
                               ],
-                              rows: paginatedProducts.map((product) {
+                              rows: controller.paginatedProducts.map((product) {
                                 return DataRow(
                                   cells: [
                                     DataCell(Checkbox(value: false, onChanged: (v) {})),
@@ -218,17 +201,34 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                               color: Colors.grey[300],
                                               borderRadius: BorderRadius.circular(8),
                                             ),
-                                            child: product.images.isNotEmpty
-                                                ? Image.network(product.images.first, fit: BoxFit.cover)
-                                                : const Icon(Icons.image, color: Colors.grey),
+                                            clipBehavior: Clip.antiAlias,
+                                            child: () {
+                                              print('Image URL: ${product.images.first}');
+                                              return product.images.isNotEmpty
+                                                  ? ClipRRect(
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: Image.network(
+                                                  product.images.first,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) =>
+                                                  const Icon(Icons.broken_image, color: Colors.grey),
+                                                  loadingBuilder: (context, child, progress) {
+                                                    if (progress == null) return child;
+                                                    return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                                  },
+                                                ),
+                                              )
+                                                  : const Icon(Icons.image, color: Colors.grey);
+                                            }(),
                                           ),
                                           const SizedBox(width: 10),
-                                          Text(product.name),
+                                          Flexible(child: Text(product.name)),
                                         ],
                                       ),
                                     ),
-                                    DataCell(Text(product.id.substring(0, 8))), // assuming SKU fallback
-                                    DataCell(Text(product.category.id)), // Optional: Resolve to category name if needed
+
+                                    DataCell(Text(product.id.substring(0, 8))),
+                                    DataCell(Text(product.category.id)),
                                     DataCell(Text(product.condition)),
                                     DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(
@@ -239,7 +239,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          product.status,
+                                          product.status.capitalize(),
                                           style: TextStyle(
                                             color: _getStatusColor(product.status),
                                             fontSize: 12,
@@ -273,7 +273,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                                     ElevatedButton(
                                                       onPressed: () {
                                                         Navigator.pop(context);
-                                                        _deleteProduct(product.id);
+                                                        controller.deleteProduct(product.id, () => setState(() {}));
                                                       },
                                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                                                       child: const Text('Delete'),
@@ -293,38 +293,45 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           ),
                         ),
 
-// Pagination widget remains the same
 
-
+                        // Pagination widget remains the same
                         // Pagination
                         Container(
-                          padding: EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(20),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Showing ${startIndex + 1} to ${endIndex > filteredProducts.length ? filteredProducts.length : endIndex} of ${filteredProducts.length} items'),
+                              Text(
+                                'Showing ${controller.startIndex + 1} to '
+                                    '${controller.endIndex > controller.filteredProducts.length ? controller.filteredProducts.length : controller.endIndex} '
+                                    'of ${controller.filteredProducts.length} items',
+                              ),
                               Row(
                                 children: [
                                   IconButton(
-                                    onPressed: currentPage > 1 ? () => setState(() => currentPage--) : null,
-                                    icon: Icon(Icons.chevron_left),
+                                    onPressed: controller.currentPage > 1
+                                        ? () => setState(() => controller.currentPage--)
+                                        : null,
+                                    icon: const Icon(Icons.chevron_left),
                                   ),
                                   ...List.generate(
-                                    totalPages > 5 ? 5 : totalPages,
+                                    controller.totalPages > 5 ? 5 : controller.totalPages,
                                         (index) {
                                       final pageNum = index + 1;
                                       return Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
                                         child: ElevatedButton(
-                                          onPressed: () => setState(() => currentPage = pageNum),
+                                          onPressed: () => setState(() => controller.currentPage = pageNum),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: currentPage == pageNum ? Color(0xFF7C3AED) : Colors.grey[300],
-                                            minimumSize: Size(40, 40),
+                                            backgroundColor: controller.currentPage == pageNum
+                                                ? const Color(0xFF7C3AED)
+                                                : Colors.grey[300],
+                                            minimumSize: const Size(40, 40),
                                           ),
                                           child: Text(
                                             '$pageNum',
                                             style: TextStyle(
-                                              color: currentPage == pageNum ? Colors.white : Colors.black,
+                                              color: controller.currentPage == pageNum ? Colors.white : Colors.black,
                                             ),
                                           ),
                                         ),
@@ -332,14 +339,18 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     },
                                   ),
                                   IconButton(
-                                    onPressed: currentPage < totalPages ? () => setState(() => currentPage++) : null,
-                                    icon: Icon(Icons.chevron_right),
+                                    onPressed: controller.currentPage < controller.totalPages
+                                        ? () => setState(() => controller.currentPage++)
+                                        : null,
+                                    icon: const Icon(Icons.chevron_right),
                                   ),
                                 ],
                               ),
                             ],
                           ),
                         ),
+
+
                       ],
                     ),
                   ),
@@ -352,117 +363,45 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     );
   }
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 250,
-      color: Color(0xFF7C3AED),
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
-                ),
-                SizedBox(width: 10),
-                Text(
-                  'Logo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+  Widget _buildFilterTab(String title, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isActive ? Color(0xFF7C3AED) : Colors.transparent,
+              width: 2,
             ),
-          ),
-
-        ],
-      ),
-    );
-  }
-
-
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 60,
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Text(
-            'Product',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Spacer(),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange[100],
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              'All Shop',
-              style: TextStyle(color: Colors.orange[800]),
-            ),
-          ),
-          SizedBox(width: 10),
-          Icon(Icons.notifications_outlined),
-          SizedBox(width: 10),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.grey[300],
-            child: Icon(Icons.person, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterTab(String title, bool isActive) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: isActive ? Color(0xFF7C3AED) : Colors.transparent,
-            width: 2,
           ),
         ),
-      ),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: isActive ? Color(0xFF7C3AED) : Colors.grey[600],
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isActive ? Color(0xFF7C3AED) : Colors.grey[600],
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
   }
+
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'published':
+      case 'available':
         return Colors.green;
-      case 'draft':
+      case 'sold':
         return Colors.orange;
-      case 'pending':
-        return Colors.blue;
-      default:
+      case 'inactive':
         return Colors.grey;
+      default:
+        return Colors.black;
     }
   }
+
 
   String _formatDate(Timestamp? timestamp) {
     if (timestamp == null) return '-';
@@ -470,8 +409,4 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _getMonth(int month) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
-  }
 }
