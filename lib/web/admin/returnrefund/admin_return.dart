@@ -131,7 +131,7 @@ class ReturnManagementView extends StatelessWidget {
                                 return DataRow(cells: [
                                   const DataCell(Checkbox(value: false, onChanged: null)),
                                   DataCell(Text('#${item['returnId']}')),
-                                  DataCell(Text('#${item['orderId']}')),
+                                  DataCell(Text('#${item['shortOrderId']}')),
                                   DataCell(Text(item['orderProductId'])),
                                   DataCell(Text(controller.formatDate(item['date']))),
                                   DataCell(Text(item['userId'] ?? 'Unknown')),

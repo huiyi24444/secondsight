@@ -229,7 +229,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
                                     DataCell(Text(product.id.substring(0, 8))),
                                     DataCell(Text(product.category.id)),
-                                    DataCell(Text(product.condition)),
+                                    DataCell(Text(product.condition.capitalize())),
                                     DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(
                                       Container(

@@ -16,10 +16,8 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
 
   String? selectedCustomerId;
   String? selectedProductId;
-  String orderType = 'General';
   String orderStatus = 'Pending';
   final TextEditingController _quantityController = TextEditingController(text: '1');
-  final TextEditingController _noteController = TextEditingController();
 
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> products = [];
@@ -77,11 +75,8 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
         }],
         'total': total,
         'orderStatus': orderStatus.toLowerCase(),
-        'orderType': orderType,
-        'note': _noteController.text,
-        'date': DateTime.now().millisecondsSinceEpoch,
         'paymentMethod': 'Mastercard',
-        'createdAt': FieldValue.serverTimestamp(),
+        'orderDate': FieldValue.serverTimestamp(),
       };
 
       await _firestore
@@ -145,20 +140,6 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                 Row(
                   children: [
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: orderType,
-                        decoration: InputDecoration(
-                          labelText: 'Order Type',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        items: ['General', 'Express', 'Return']
-                            .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                            .toList(),
-                        onChanged: (value) => setState(() => orderType = value!),
-                      ),
-                    ),
-                    SizedBox(width: 20),
-                    Expanded(
                       child: TextFormField(
                         initialValue: DateTime.now().toString().split(' ')[0],
                         readOnly: true,
@@ -172,15 +153,7 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                   ],
                 ),
                 SizedBox(height: 20),
-                TextFormField(
-                  controller: _noteController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Order Note',
-                    hintText: 'Add note about order',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+
                 SizedBox(height: 30),
                 DropdownButtonFormField<String>(
                   value: selectedProductId,

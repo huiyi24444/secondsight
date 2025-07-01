@@ -289,7 +289,7 @@ class _CheckoutViewState extends State<CheckoutView> {
 
   Future<Map<String, dynamic>> _createPaymentIntent() async {
     final response = await http.post(
-      Uri.parse('http://192.168.0.15:3000/create-payment-intent'), // Your PC's IP
+      Uri.parse('http://192.168.0.15:3000/create-payment-intent'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'amount': (widget.total * 100).round(),

@@ -57,7 +57,7 @@ class ReturnManagementController extends ChangeNotifier {
           'id': entry['id'],
           'userId': entry['userId'],
           'returnId': entry['id'].substring(0, 8).toUpperCase(),
-          'orderId': orderId,
+          'shortOrderId': orderId.length >= 6 ? orderId.substring(0, 6).toUpperCase() : orderId.toUpperCase(),
           'orderProductId': orderProductRef.id,
           'date': returnRequest.returnDate.millisecondsSinceEpoch,
           'returnPrice': returnPrice,

@@ -8,6 +8,7 @@ class OrdersModel {
   final double totalAmount;
   final bool eligibilityForReturn;
   final String? shipmentID; // link to shipment subdoc
+  final String payment;
 
   OrdersModel({
     required this.id,
@@ -17,6 +18,8 @@ class OrdersModel {
     required this.totalAmount,
     required this.eligibilityForReturn,
     this.shipmentID,
+    this.payment = "Mastercard",
+
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -28,6 +31,7 @@ class OrdersModel {
       totalAmount: (json['totalAmount'] ?? 0).toDouble(),
       eligibilityForReturn: json['eligibilityForReturn'] ?? false,
       shipmentID: json['shipmentID'],
+      payment: json['payment'] ?? 'Mastercard',
     );
   }
 
@@ -39,6 +43,7 @@ class OrdersModel {
       'totalAmount': totalAmount,
       'eligibilityForReturn': eligibilityForReturn,
       'shipmentID': shipmentID,
+      'payment': payment,
     };
   }
 
@@ -50,6 +55,7 @@ class OrdersModel {
     double? totalAmount,
     bool? eligibilityForReturn,
     String? shipmentID,
+    String? payment,
   }) {
     return OrdersModel(
       id: id ?? this.id,
@@ -59,6 +65,7 @@ class OrdersModel {
       totalAmount: totalAmount ?? this.totalAmount,
       eligibilityForReturn: eligibilityForReturn ?? this.eligibilityForReturn,
       shipmentID: shipmentID ?? this.shipmentID,
+      payment: payment ?? this.payment,
     );
   }
 

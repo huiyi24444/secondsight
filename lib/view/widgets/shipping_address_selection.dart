@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ShippingAddressSelection extends StatelessWidget {
+class ShippingAddressSelection extends StatefulWidget {
   final Function(String) onAddressSelected;
 
   const ShippingAddressSelection({required this.onAddressSelected, Key? key}) : super(key: key);
 
-  // Fetch and format addresses
+  @override
+  State<ShippingAddressSelection> createState() => _ShippingAddressSelectionState();
+}
+
+class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
+  int? selectedIndex;
+
   Future<List<String>> _fetchFormattedAddresses() async {
-    const userId = 'Wra7olVmUb6hbOxDPdOD'; // Hardcoded user ID
+    const userId = 'sBblLZO4yToH2lCJjw4N';
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
@@ -24,7 +30,6 @@ class ShippingAddressSelection extends StatelessWidget {
       final state = data['state'] ?? '';
       final zipcode = data['zipcode'] ?? '';
 
-      // Combine all address fields into a formatted string
       return '$streetOne, $streetTwo, $city, $state, $zipcode';
     }).toList();
   }
@@ -73,10 +78,7 @@ class ShippingAddressSelection extends StatelessWidget {
                   itemCount: addresses.length,
                   itemBuilder: (context, index) {
                     final address = addresses[index];
-                    return _buildAddressOption(address, () {
-                      onAddressSelected(address);
-                      Navigator.pop(context);
-                    });
+                    return _buildAddressOption(address, index);
                   },
                 );
               },
@@ -87,18 +89,35 @@ class ShippingAddressSelection extends StatelessWidget {
     );
   }
 
-  Widget _buildAddressOption(String address, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFF8B5CF6)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        title: Text(address),
-        trailing: const Icon(Icons.check_circle, color: Color(0xFF8B5CF6)),
-        onTap: onTap,
+  Widget _buildAddressOption(String address, int index) {
+    final isSelected = selectedIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedIndex = index;
+        });
+
+        // Call the callback and close the bottom sheet
+        widget.onAddressSelected(address);
+        Navigator.pop(context);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          title: Text(address),
+          trailing: isSelected
+              ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
+              : null,
+        ),
       ),
     );
   }
 }
+

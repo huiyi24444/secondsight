@@ -24,19 +24,36 @@ class ProductManagementController {
   int get endIndex => startIndex + itemsPerPage;
 
   Future<void> loadProducts(VoidCallback onUpdate) async {
+    print('🔄 Loading products...');
     isLoading = true;
     onUpdate();
 
-    final snapshot = await FirebaseFirestore.instance.collection('products').get();
-    allProducts = snapshot.docs
-        .map((doc) => Product.fromDocumentSnapshot(doc))
-        .toList();
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('products').get();
+      print('📄 Fetched ${snapshot.docs.length} products');
 
-    filterProducts(() {
-      isLoading = false; // ✅ turn off loading once filtering is done
+      allProducts = snapshot.docs.map((doc) {
+        try {
+          final product = Product.fromDocumentSnapshot(doc);
+          print('✅ Loaded product: ${product.name}');
+          return product;
+        } catch (e) {
+          print('❌ Error parsing product: $e');
+          return null;
+        }
+      }).whereType<Product>().toList();
+
+      filterProducts(() {
+        isLoading = false;
+        onUpdate();
+      });
+    } catch (e) {
+      print('❌ Error fetching products from Firestore: $e');
+      isLoading = false;
       onUpdate();
-    });
+    }
   }
+
 
 
   void filterProducts(VoidCallback onUpdate) {
