@@ -1,16 +1,23 @@
-// File: lib/views/checkout_view.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:secondsight/view/widgets/shipping_address_selection.dart';
+import '../../model/cart_item_model.dart';
+import '../../model/order_product_model.dart';
+import '../../model/shipment_model.dart';
+import '../../services/stripe_service.dart';
 import 'order_success_view.dart';
+import '../../model/order_model.dart';
 
 class CheckoutView extends StatefulWidget {
   final double subtotal;
   final double shippingCost;
   final double tax;
   final double total;
+  final List<CartItem> cartItems;
 
   const CheckoutView({
     super.key,
@@ -18,6 +25,7 @@ class CheckoutView extends StatefulWidget {
     required this.shippingCost,
     required this.tax,
     required this.total,
+    required this.cartItems,
   });
 
   @override
@@ -27,6 +35,14 @@ class CheckoutView extends StatefulWidget {
 class _CheckoutViewState extends State<CheckoutView> {
   String? selectedAddress;
   String? selectedPaymentMethod;
+  bool _isProcessingPayment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize Stripe when the checkout view loads
+    StripeService.initialize();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +88,7 @@ class _CheckoutViewState extends State<CheckoutView> {
                     // Shipping Address
                     _buildCheckoutOption(
                       'Shipping Address',
-                      'Add Shipping Address',
+                      selectedAddress ?? 'Add Shipping Address',
                       Icons.chevron_right,
                       onTap: () {
                         _showAddressSelection();
@@ -84,7 +100,7 @@ class _CheckoutViewState extends State<CheckoutView> {
                     // Payment Method
                     _buildCheckoutOption(
                       'Payment Method',
-                      'Add Payment Method',
+                      selectedPaymentMethod ?? 'Add Payment Method',
                       Icons.chevron_right,
                       onTap: () {
                         _showPaymentMethodSelection();
@@ -117,7 +133,9 @@ class _CheckoutViewState extends State<CheckoutView> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: selectedAddress != null && selectedPaymentMethod != null
+                onPressed: (selectedAddress != null &&
+                    selectedPaymentMethod != null &&
+                    !_isProcessingPayment)
                     ? () => _processPayment()
                     : null,
                 style: ElevatedButton.styleFrom(
@@ -127,7 +145,16 @@ class _CheckoutViewState extends State<CheckoutView> {
                   ),
                   elevation: 0,
                 ),
-                child: Row(
+                child: _isProcessingPayment
+                    ? SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 2,
+                  ),
+                )
+                    : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -237,7 +264,6 @@ class _CheckoutViewState extends State<CheckoutView> {
     );
   }
 
-
   void _showPaymentMethodSelection() {
     showModalBottomSheet(
       context: context,
@@ -254,58 +280,121 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 
   Future<void> _processPayment() async {
+    setState(() {
+      _isProcessingPayment = true;
+    });
+
     try {
-      // Create payment intent on your backend
-      final paymentIntent = await _createPaymentIntent();
-
-      // Initialize payment sheet
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: paymentIntent['client_secret'],
-          merchantDisplayName: 'Your Store Name',
-
-        ),
+      // 1. Process payment
+      final result = await StripeService.processPaymentWithPaymentSheet(
+        amount: widget.total,
+        currency: 'USD',
+        merchantName: 'SecondSight',
       );
 
-      // Present payment sheet
-      await Stripe.instance.presentPaymentSheet();
+      if (!result.success) {
+        throw Exception(result.message);
+      }
 
-      // Payment succeeded
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OrderSuccessScreen(),
-        ),
+      // 2. Get user info
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("User not logged in");
+
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+      // 3. Create OrdersModel
+      final orderData = OrdersModel(
+        id: '', // Firestore will auto-generate
+        customerId: user.uid,
+        orderDate: DateTime.now(),
+        orderStatus: 'processing',
+        totalAmount: widget.total,
+        eligibilityForReturn: true,
+        shipmentID: null, // Add later
+        payment: result.transactionId ?? 'unknown',
       );
+
+      // 4. Add order document
+      final orderRef = await userRef.collection('order').add({
+        'orderDate': Timestamp.fromDate(orderData.orderDate),
+        'orderStatus': orderData.orderStatus,
+        'totalAmount': orderData.totalAmount,
+        'eligibilityForReturn': orderData.eligibilityForReturn,
+        'shipmentID': orderData.shipmentID ?? '',
+        'payment': orderData.payment,
+      });
+
+      // 5. Add order products
+      for (final item in widget.cartItems) {
+        final orderProduct = OrderProductModel(
+          price: item.product.price,
+          productID: FirebaseFirestore.instance.collection('products').doc(item.product.id),
+          productQuantity: item.quantity,
+          totalPrice: item.product.price * item.quantity,
+        );
+
+        await orderRef.collection('orderProducts').add({
+          'price': orderProduct.price,
+          'productID': orderProduct.productID,
+          'productQuantity': orderProduct.productQuantity,
+          'totalPrice': orderProduct.totalPrice,
+        });
+      }
+
+
+
+      // add shipment document
+      final shipment = ShipmentModel(
+        id: '', // Firestore will auto-generate
+        shipAddress: selectedAddress ?? 'Unknown address',
+        shippedDate: null,
+        trackingNumber: null,
+      );
+
+
+
+      final shipmentRef = await orderRef.collection('shipment').add(shipment.toMap());
+
+      print('Saving shipment map: ${shipment.toMap()}');
+      await orderRef.collection('shipment').add(shipment.toMap());
+
+// 7. Update the order document with shipment ID
+      await orderRef.update({
+        'shipmentID': shipmentRef.id,
+      });
+
+
+      // 6. Go to success screen with orderId
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderSuccessScreen(
+              orderId: orderRef.id,
+              userId: user.uid,
+            ),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment failed: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingPayment = false;
+        });
+      }
     }
   }
 
-  Future<Map<String, dynamic>> _createPaymentIntent() async {
-    final response = await http.post(
-      Uri.parse('http://192.168.0.15:3000/create-payment-intent'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'amount': (widget.total * 100).round(),
-        'currency': 'usd',
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Server error: ${response.statusCode}');
-    }
-  }
 }
-
-
 
 class PaymentMethodSheet extends StatelessWidget {
   final Function(String) onPaymentMethodSelected;

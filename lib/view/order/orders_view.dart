@@ -22,7 +22,6 @@ class OrdersView extends StatefulWidget {
 
 class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateMixin {
   late OrdersController _controller;
-  late String userId;
 
   @override
   void initState() {
@@ -33,14 +32,13 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    userId = Provider.of<AuthProvider>(context, listen: false).userId;
-
-    // Initialize controller with dependencies
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     _controller.initialize(
       vsync: this,
-      userId: userId,
+      userId: authProvider.userId!,
     );
   }
+
 
   @override
   void dispose() {
@@ -112,6 +110,7 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
   }
 
   Widget _buildOrdersList(OrdersController controller, String? statusFilter) {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId!;
     final query = controller.buildOrdersQuery(statusFilter);
 
     return LazyLoadingList(
@@ -125,6 +124,8 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
   }
 
   Widget _buildReturnRequestsList(OrdersController controller) {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId!;
+
     final query = controller.buildReturnRequestsQuery();
 
     return LazyLoadingList(

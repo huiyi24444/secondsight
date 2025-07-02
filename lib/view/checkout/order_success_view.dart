@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../order/order_details_view.dart';
+
 
 class OrderSuccessScreen extends StatelessWidget {
+  final String userId;
+  final String orderId;
+
+  const OrderSuccessScreen({
+    Key? key,
+    required this.userId,
+    required this.orderId,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,7 +31,6 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
               ),
             ),
-
 
             Container(
               decoration: BoxDecoration(
@@ -56,7 +66,13 @@ class OrderSuccessScreen extends StatelessWidget {
                           height: 56,
                           child: ElevatedButton(
                             onPressed: () {
-                              // Navigate to order details or home
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => OrderDetailsView(orderId: orderId, userId: userId,),
+                                ),
+                              );
+
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Color(0xFF8B5CF6),

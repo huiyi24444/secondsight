@@ -69,7 +69,7 @@ class _ProductCardState extends State<ProductCard> {
 
                         final userId = Provider.of<AuthProvider>(context, listen: false).userId;
 
-                        if (userId.isEmpty) {
+                        if (userId == null || userId.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('You need to be logged in to add to wishlist')),
                           );

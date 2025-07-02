@@ -51,13 +51,6 @@ import '../checkout/cart_view.dart';
     @override
     void initState() {
       super.initState();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final userId = Provider.of<AuthProvider>(context, listen: false).userId;
-        setState(() {
-          _profileFuture = FirebaseFirestore.instance.collection('users').doc(userId).get();
-        });
-      });
-
       _categoriesFuture = fetchCategories();
 
       _searchController.addListener(() {
@@ -75,6 +68,18 @@ import '../checkout/cart_view.dart';
     }
 
     @override
+    void didChangeDependencies() {
+      super.didChangeDependencies();
+      final userId = Provider.of<AuthProvider>(context).userId;
+
+      if (userId != null) {
+        _profileFuture = FirebaseFirestore.instance.collection('users').doc(userId).get();
+      }
+    }
+
+
+
+    @override
     void dispose() {
       _searchController.dispose();
       super.dispose();
@@ -83,6 +88,11 @@ import '../checkout/cart_view.dart';
     @override
     Widget build(BuildContext context) {
       final userId = Provider.of<AuthProvider>(context).userId;
+      if (userId == null) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
 
       return Scaffold(
         appBar: PreferredSize(
@@ -173,7 +183,7 @@ import '../checkout/cart_view.dart';
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => CartView(userId: userId),
+                          builder: (_) => CartView(userId: userId!),
                         ),
                       );
                     },

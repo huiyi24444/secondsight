@@ -136,18 +136,23 @@ class ChatInterfaceWidget extends StatelessWidget {
                         maxLines: null,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (value) {
-                          controller.sendMessage(value);
+                          if (value.trim().isEmpty) return;
+                          controller.sendMessage(value.trim());
                           messageController.clear();
                         },
+
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () {
-                      controller.sendMessage(messageController.text);
+                      final text = messageController.text.trim();
+                      if (text.isEmpty) return;
+                      controller.sendMessage(text);
                       messageController.clear();
                     },
+
                     child: Container(
                       width: 48,
                       height: 48,

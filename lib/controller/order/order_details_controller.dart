@@ -55,9 +55,7 @@ class OrderDetailsController extends ChangeNotifier {
       return null;
     }
 
-    print("Fetching shipment for userId: $userId, orderId: $orderId, shipmentId: $shipmentId");
-
-    final doc = await FirebaseFirestore.instance
+    final snapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
         .collection('order')
@@ -66,14 +64,21 @@ class OrderDetailsController extends ChangeNotifier {
         .doc(shipmentId)
         .get();
 
-    if (doc.exists) {
-      print("Shipment document FOUND: ${doc.data()}");
-      return ShipmentModel.fromJson(doc.data()!, doc.id);
-    } else {
-      print("Shipment document NOT found at path: users/$userId/order/$orderId/shipment/$shipmentId");
+    if (!snapshot.exists) {
+      print("Shipment document not found.");
       return null;
     }
+
+    final data = snapshot.data();
+    if (data == null) {
+      print("Shipment data is null.");
+      return null;
+    }
+
+    // Don't return null even if some fields are null
+    return ShipmentModel.fromMap(data, snapshot.id);
   }
+
 
 
   /// Create OrdersModel from document data

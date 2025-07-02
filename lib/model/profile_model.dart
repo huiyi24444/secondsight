@@ -3,7 +3,6 @@ class ProfileModel {
   final String fullName;
   final bool isVerified;
   final String profilePic;
-  final String username;
   final int phoneNum;
   final List<String> cart;
   final List<String> order;
@@ -15,7 +14,6 @@ class ProfileModel {
     required this.fullName,
     required this.isVerified,
     required this.profilePic,
-    required this.username,
     required this.phoneNum,
     required this.cart,
     required this.order,
@@ -46,7 +44,6 @@ class ProfileModel {
       fullName: json['fullName'] ?? '',
       isVerified: json['isVerified'] ?? false,
       profilePic: json['profilePic'] ?? '',
-      username: json['username'] ?? '',
       phoneNum: parsePhoneNum(json['phoneNum']),
       cart: List<String>.from(json['cart'] ?? []),
       order: List<String>.from(json['order'] ?? []),
@@ -62,7 +59,6 @@ class ProfileModel {
       'fullName': fullName,
       'isVerified': isVerified,
       'profilePic': profilePic,
-      'username': username,
       'phoneNum': phoneNum, // Always stored as int
       'cart': cart,
       'order': order,
@@ -77,7 +73,6 @@ class ProfileModel {
     String? fullName,
     bool? isVerified,
     String? profilePic,
-    String? username,
     int? phoneNum,
     List<String>? cart,
     List<String>? order,
@@ -89,7 +84,6 @@ class ProfileModel {
       fullName: fullName ?? this.fullName,
       isVerified: isVerified ?? this.isVerified,
       profilePic: profilePic ?? this.profilePic,
-      username: username ?? this.username,
       phoneNum: phoneNum ?? this.phoneNum,
       cart: cart ?? this.cart,
       order: order ?? this.order,

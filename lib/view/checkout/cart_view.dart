@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../controller/checkout/cart_controller.dart';
 import '../../model/cart_item_model.dart';
@@ -9,6 +10,7 @@ class CartView extends StatefulWidget {
   final String userId; // pass authenticated userId
   const CartView({super.key, required this.userId});
 
+
   @override
   State<CartView> createState() => _CartViewState();
 }
@@ -16,6 +18,7 @@ class CartView extends StatefulWidget {
 class _CartViewState extends State<CartView> {
   final CartController _cartController = CartController();
   late Future<List<CartItem>> _cartItemsFuture;
+
 
   @override
   void initState() {
@@ -354,11 +357,16 @@ class _CartViewState extends State<CartView> {
                         const SizedBox(height: 12),
                         _buildSummaryRow('Total', total, isTotal: true),
                         const SizedBox(height: 20),
+
                         SizedBox(
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
+                              final user = FirebaseAuth.instance.currentUser;
+                              if (user == null) return;
+                              // Fetch cart items from Firestore
+                              final cartItems = await CartController().fetchCartItems(user.uid);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -367,6 +375,7 @@ class _CartViewState extends State<CartView> {
                                     shippingCost: shippingCost,
                                     tax: tax,
                                     total: total,
+                                    cartItems: cartItems,
                                   ),
                                 ),
                               );
@@ -389,7 +398,7 @@ class _CartViewState extends State<CartView> {
                             ),
                           ),
                         ),
-                      ],
+                      ]
                     ),
                   ),
                 ),

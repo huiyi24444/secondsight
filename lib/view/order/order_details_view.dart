@@ -9,6 +9,7 @@ import '../../model/shipment_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/progress_stepper.dart';
+import 'order_details_bottom.dart';
 import 'order_notice.dart';
 import 'order_rating_dialog.dart';
 import 'package:intl/intl.dart';
@@ -95,11 +96,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                     ),
                   );
                 }
-
                 final shipment = shipmentSnapshot.data;
-
-                print('Fetched shipment: ${shipment?.shipAddress}, ${shipment?.shippedDate}, ${shipment?.trackingNumber}');
-
 
                 return SingleChildScrollView(
                   child: Column(
@@ -127,7 +124,12 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
             final data = orderSnapshot.data!;
             final order = _controller.createOrderFromDocument(data);
 
-            return _buildBottomButtons(order);
+            return OrderBottomButtons(
+              order: order,
+              controller: _controller,
+              userId: widget.userId,
+              orderId: widget.orderId,
+            );
           },
         ),
       ),
@@ -439,68 +441,159 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total Amount',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+          // Total Amount Section
+          Container(
+            padding: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withOpacity(0.1),
+                  width: 1,
                 ),
               ),
-              Text(
-                _controller.getFormattedTotalAmount(order.totalAmount),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF8E6CEF),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(  // Shipping Cost Row (add this)
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Shipping Cost',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'RM 8.00',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4), // spacing between shipping and total
+                Row( // Existing Total Amount Row
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Amount',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      _controller.getFormattedTotalAmount(order.totalAmount),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF8E6CEF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
           ),
-          const SizedBox(height: 12),
-          if (shipment != null)
-            ...[
-              _buildSummaryRow('Shipping Address', shipment.shipAddress),
-              _buildSummaryRow(
-                'Shipped Date',
-                _controller.getFormattedDate(shipment.shippedDate),
-              ),
-              _buildSummaryRow('Tracking Number', shipment.trackingNumber),
-            ],
-          _buildSummaryRow(
-            'Eligible for Return',
-            order.eligibilityForReturn ? 'Yes' : 'No',
-          ),
+          const SizedBox(height: 16),
+
+          // Shipment Details
+          if (shipment != null) ...[
+            // Shipping Address with special layout
+            _buildShippingAddressSection(shipment.shipAddress),
+            const SizedBox(height: 16),
+
+            // Other shipment details in a grid layout
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildCompactInfoCard(
+                    'Shipped Date',
+                    shipment.shippedDate != null
+                        ? _controller.getFormattedDate(shipment.shippedDate!)
+                        : 'To be updated',
+                    isPlaceholder: shipment.shippedDate == null,
+                    icon: Icons.calendar_today_outlined,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildCompactInfoCard(
+                    'Return Eligible',
+                    order.eligibilityForReturn ? 'Yes' : 'No',
+                    icon: Icons.replay_outlined,
+                    valueColor: order.eligibilityForReturn ? Colors.green : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Tracking Number with full width
+            _buildTrackingNumberCard(
+              shipment.trackingNumber,
+            ),
+          ] else ...[
+            // If no shipment, just show return eligibility
+            _buildCompactInfoCard(
+              'Eligible for Return',
+              order.eligibilityForReturn ? 'Yes' : 'No',
+              icon: Icons.replay_outlined,
+              valueColor: order.eligibilityForReturn ? Colors.green : Colors.grey,
+            ),
+          ],
         ],
       ),
     );
   }
 
-
-  Widget _buildSummaryRow(String label, String value, {bool isHighlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// Special widget for shipping address
+  Widget _buildShippingAddressSection(String address) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF8E6CEF).withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF8E6CEF).withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Icon(
+                Icons.location_on_outlined,
+                size: 18,
+                color: Colors.grey[600],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Shipping Address',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Text(
-            label,
+            address,
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
-                color: isHighlight ? const Color(0xFF8E6CEF) : Colors.black87,
-              ),
+              height: 1.5,
             ),
           ),
         ],
@@ -508,341 +601,161 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-
-  Widget _buildBottomButtons(OrdersModel order) {
+// Compact info card for other details
+  Widget _buildCompactInfoCard(
+      String label,
+      String value, {
+        bool isPlaceholder = false,
+        IconData? icon,
+        Color? valueColor,
+      }) {
     return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildReturnRefundButton(order),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildRateButton(order),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReturnRefundButton(OrdersModel order) {
-    final bool isEligible = _controller.isEligibleForReturn(order);
-
-    return SizedBox(
-      height: 48,
-      child: ElevatedButton(
-        onPressed: isEligible
-            ? () => _handleReturnRefund(order)
-            : () => _showIneligibleDialog(),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isEligible ? Colors.white : Colors.grey[100],
-          foregroundColor: isEligible ? Colors.redAccent : Colors.grey[400],
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isEligible ? Colors.redAccent : Colors.grey[300]!,
-              width: 1.5,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        child: Text(
-          _controller.getReturnButtonText(order),
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: isEligible ? Colors.redAccent : Colors.grey[400],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRateButton(OrdersModel order) {
-    final bool canRate = _controller.canRateOrder(order);
-
-    return SizedBox(
-      height: 48,
-      child: ElevatedButton(
-        onPressed: canRate ? () => _handleRate(order) : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: canRate ? const Color(0xFF8E6CEF) : Colors.grey[300],
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        child: Text(
-          _controller.getRatingButtonText(order),
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: canRate ? Colors.white : Colors.grey[500],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _handleReturnRefund(OrdersModel order) {
-    _showProductSelectionDialog(order);
-  }
-
-  void _handleRate(OrdersModel order) {
-    showRatingDialog(context: context, order: order);
-  }
-
-  void _showProductSelectionDialog(OrdersModel order) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Select Item to Return',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              StreamBuilder<QuerySnapshot>(
-                stream: _controller.getOrderProductsStream(),
-                builder: (context, productsSnapshot) {
-                  if (!productsSnapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF8E6CEF),
-                      ),
-                    );
-                  }
-
-                  final products = productsSnapshot.data!.docs;
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      final data = products[index].data() as Map<String, dynamic>;
-                      final orderProduct = _controller.createOrderProductFromDocument(data);
-                      final productRef = orderProduct.productID;
-                      final orderProductId = products[index].id;
-
-                      return FutureBuilder<DocumentSnapshot>(
-                        future: _controller.getProductDocument(productRef),
-                        builder: (context, productSnapshot) {
-                          if (!productSnapshot.hasData) {
-                            return const SizedBox(
-                              height: 60,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Color(0xFF8E6CEF),
-                                ),
-                              ),
-                            );
-                          }
-
-                          final product = productSnapshot.data!.data() as Map<String, dynamic>?;
-                          final productURL = _controller.extractProductImageUrl(product);
-                          final productName = _controller.extractProductName(product);
-
-                          return _buildProductSelectionItem(
-                              orderProduct,
-                              productURL,
-                              productName,
-                              orderProductId
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildProductSelectionItem(
-      OrderProductModel orderProduct,
-      String productURL,
-      String productName,
-      String orderProductId
-      ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(7),
-            child: Image.network(
-              productURL,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.grey[200],
-                  child: const Icon(
-                    Icons.image_not_supported,
-                    color: Colors.grey,
-                    size: 20,
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        title: Text(
-          productName,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          _controller.getProductSummaryText(
-              orderProduct.productQuantity,
-              orderProduct.totalPrice
-          ),
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: Color(0xFF8E6CEF),
-        ),
-        onTap: () {
-          Navigator.pop(context);
-          _navigateToReturnRequest(orderProductId);
-        },
-      ),
-    );
-  }
-
-  void _navigateToReturnRequest(String orderProductId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ReturnRequestView(
-          orderId: widget.orderId,
-          userId: widget.userId,
-          orderProductId: orderProductId,
-        ),
-      ),
-    );
-  }
-
-  void _showIneligibleDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(
-                Icons.info_outline_rounded,
-                color: Colors.orange[600],
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Return Not Available',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: 16,
+                  color: Colors.grey[600],
+                ),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
-          content: Text(
-            _controller.getReturnIneligibilityMessage(),
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.4,
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isPlaceholder
+                  ? Colors.grey[400]
+                  : valueColor ?? Colors.black87,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF8E6CEF),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Got it',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
+
+// Special widget for tracking number
+  Widget _buildTrackingNumberCard(String? trackingNumber) {
+    final hasTracking = trackingNumber != null && trackingNumber.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: hasTracking
+            ? const Color(0xFF8E6CEF).withOpacity(0.05)
+            : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: hasTracking
+            ? Border.all(
+          color: const Color(0xFF8E6CEF).withOpacity(0.1),
+          width: 1,
+        )
+            : null,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.local_shipping_outlined,
+            size: 20,
+            color: hasTracking
+                ? const Color(0xFF8E6CEF)
+                : Colors.grey[400],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tracking Number',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasTracking ? trackingNumber : 'To be updated',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: hasTracking
+                        ? const Color(0xFF8E6CEF)
+                        : Colors.grey[400],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasTracking)
+            Icon(
+              Icons.copy_outlined,
+              size: 18,
+              color: Colors.grey[400],
+            ),
+        ],
+      ),
+    );
+  }
+
+// Keep the old method for backward compatibility if needed
+  Widget _buildSummaryRow(String label, String value, {bool isPlaceholder = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isPlaceholder ? Colors.grey[400] : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
 
 }

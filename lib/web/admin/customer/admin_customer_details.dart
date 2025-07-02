@@ -144,7 +144,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                 ],
                               ),
                               const SizedBox(height: 30),
-                              _buildInfoRow('Username', customer!.username),
                               _buildInfoRow('Email', customer!.email),
                               _buildInfoRow('Phone', customer!.phoneNum.toString()),
                               _buildInfoRow(
