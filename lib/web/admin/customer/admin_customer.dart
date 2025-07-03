@@ -77,11 +77,8 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
         };
 
         final customer = CustomerModel.fromJson(data, doc.id);
-
-
         loadedCustomers.add(customer);
       }
-
 
       setState(() {
         customers = loadedCustomers;
@@ -113,8 +110,8 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
         switch (selectedFilter) {
           case 'Active':
             return customer.status == 'active';
-          case 'Blocked':
-            return customer.status == 'blocked';
+          case 'Inactive':
+            return customer.status == 'inactive';
           default:
             return true;
         }
@@ -127,7 +124,6 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
     });
   }
 
-
   void _showCustomerDetailsPage(CustomerModel customer) {
     Navigator.push(
       context,
@@ -136,7 +132,6 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
       ),
     );
   }
-
 
   void _showAddCustomerDialog() {
     showDialog(
@@ -157,201 +152,40 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
       endIndex > filteredCustomers.length ? filteredCustomers.length : endIndex,
     );
 
-
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Row(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
         children: [
-          // Main Content
+          // Top Bar
+          const CustomTopBar(title: 'Customer Management'),
+
+          // Content Area
           Expanded(
-            child: Column(
-              children: [
-                // Top Bar
-                const CustomTopBar(
-                  title: 'Customer',
-                ),
-                // Content Area
-                Expanded(
-                  child: Container(
-                    margin: EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        // Header with search and actions
-                        Container(
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _searchController,
-                                      decoration: InputDecoration(
-                                        hintText: 'Search customer...',
-                                        prefixIcon: Icon(Icons.search),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: BorderSide(color: Colors.grey[300]!),
-                                        ),
-                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
-                                      ),
-                                      onChanged: (value) => _filterCustomers(),
-                                    ),
-                                  ),
-                                  SizedBox(width: 20),
-                                  IconButton(
-                                    onPressed: () {
-                                      // Export functionality
-                                    },
-                                    icon: Icon(Icons.upload),
-                                    tooltip: 'Export',
-                                  ),
-                                  SizedBox(width: 10),
-                                  ElevatedButton.icon(
-                                    onPressed: _showAddCustomerDialog,
-                                    icon: Icon(Icons.add),
-                                    label: Text('Add Customer'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(0xFF7C3AED),
-                                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 20),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      _buildFilterChip('All', selectedFilter == 'All'),
-                                      SizedBox(width: 10),
-                                      _buildFilterChip('Active', selectedFilter == 'Active'),
-                                      SizedBox(width: 10),
-                                      _buildFilterChip('Blocked', selectedFilter == 'Blocked'),
-                                    ],
-                                  ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        onPressed: () {
-                                          // Filter functionality
-                                        },
-                                        icon: Icon(Icons.filter_list),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Customer list/grid
-                        Expanded(
-                          child: isLoading
-                              ? Center(child: CircularProgressIndicator())
-                              : isGridView
-                              ? GridView.builder(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 4,
-                              crossAxisSpacing: 20,
-                              mainAxisSpacing: 20,
-                              childAspectRatio: 1.2,
-                            ),
-                            itemCount: currentCustomers.length,
-                            itemBuilder: (context, index) {
-                              final customer = currentCustomers[index];
-                              return _buildCustomerCard(customer);
-                            },
-                          )
-                              : ListView.builder(
-                            itemCount: currentCustomers.length,
-                            itemBuilder: (context, index) {
-                              final customer = currentCustomers[index];
-                              return _buildCustomerListItem(customer);
-                            },
-                          ),
-                        ),
-                        // Pagination
-                        Container(
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Showing ${startIndex + 1} to ${endIndex > filteredCustomers.length ? filteredCustomers.length : endIndex} of ${filteredCustomers.length} items'),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: currentPage > 1
-                                        ? () => setState(() => currentPage--)
-                                        : null,
-                                    icon: Icon(Icons.chevron_left),
-                                  ),
-                                  ...List.generate(
-                                    totalPages > 5 ? 5 : totalPages,
-                                        (index) {
-                                      final pageNum = index + 1;
-                                      return Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 4),
-                                        child: ElevatedButton(
-                                          onPressed: () => setState(() => currentPage = pageNum),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: currentPage == pageNum
-                                                ? Color(0xFF7C3AED)
-                                                : Colors.grey[300],
-                                            minimumSize: Size(40, 40),
-                                          ),
-                                          child: Text(
-                                            '$pageNum',
-                                            style: TextStyle(
-                                              color: currentPage == pageNum
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    onPressed: currentPage < totalPages
-                                        ? () => setState(() => currentPage++)
-                                        : null,
-                                    icon: Icon(Icons.chevron_right),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  // Header Section
+                  _buildHeaderSection(),
+
+                  const SizedBox(height: 24),
+
+                  // Filter Section
+                  _buildFilterSection(),
+
+                  const SizedBox(height: 24),
+
+                  // Customer List/Grid
+                  Expanded(
+                    child: _buildCustomerContent(currentCustomers),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 20),
+
+                  // Pagination
+                  _buildPaginationSection(totalPages, startIndex, endIndex),
+                ],
+              ),
             ),
           ),
         ],
@@ -359,35 +193,336 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
     );
   }
 
+  Widget _buildHeaderSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.people_outline,
+                  color: Color(0xFF7C3AED),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Customer Management',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  Text(
+                    'Manage and monitor your customers',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              _buildStatsCard('Total', '${customers.length}', Colors.blue),
+              const SizedBox(width: 16),
+              _buildStatsCard('Active', '${customers.where((c) => c.status == 'active').length}', Colors.green),
+              const SizedBox(width: 16),
+              _buildStatsCard('Inactive', '${customers.where((c) => c.status == 'inactive').length}', Colors.red),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search customers by name, email, or phone...',
+                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
+                    onChanged: (value) => _filterCustomers(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    setState(() {
+                      isGridView = !isGridView;
+                    });
+                  },
+                  icon: Icon(isGridView ? Icons.view_list : Icons.grid_view),
+                  tooltip: isGridView ? 'List View' : 'Grid View',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: IconButton(
+                  onPressed: () {},
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: 'Export',
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _showAddCustomerDialog,
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text('Add Customer'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsCard(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'Filter by status:',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(width: 16),
+          _buildFilterChip('All', selectedFilter == 'All'),
+          const SizedBox(width: 12),
+          _buildFilterChip('Active', selectedFilter == 'Active'),
+          const SizedBox(width: 12),
+          _buildFilterChip('Blocked', selectedFilter == 'Blocked'),
+          const Spacer(),
+          Text(
+            '${filteredCustomers.length} customers found',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerContent(List<CustomerModel> currentCustomers) {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF7C3AED),
+        ),
+      );
+    }
+
+    if (currentCustomers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No customers found',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search or filter criteria',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: isGridView
+          ? GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 6,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: currentCustomers.length,
+        itemBuilder: (context, index) {
+          final customer = currentCustomers[index];
+          return _buildCustomerCard(customer);
+        },
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.all(4),
+        itemCount: currentCustomers.length,
+        itemBuilder: (context, index) {
+          final customer = currentCustomers[index];
+          return _buildCustomerListItem(customer);
+        },
+      ),
+    );
+  }
+
   Widget _buildCustomerCard(CustomerModel customer) {
     return InkWell(
       onTap: () => _showCustomerDetailsPage(customer),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 5)],
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
         ),
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey[300],
-                  child: Text(
-                    customer.fullName.substring(0, 1).toUpperCase(),
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                Container(
+                  width: 65,
+                  height: 65,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF7C3AED),
+                        const Color(0xFF7C3AED).withOpacity(0.8),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      customer.fullName.substring(0, 1).toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
                 Positioned(
                   bottom: 0,
                   right: 0,
                   child: Container(
-                    width: 12,
-                    height: 12,
+                    width: 22,
+                    height: 22,
                     decoration: BoxDecoration(
                       color: customer.status == 'active' ? Colors.green : Colors.red,
                       shape: BoxShape.circle,
@@ -397,39 +532,49 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
                 ),
               ],
             ),
-            SizedBox(height: 10),
-            Text(customer.fullName, style: TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-            Text(customer.email, style: TextStyle(color: Colors.grey[600], fontSize: 12), overflow: TextOverflow.ellipsis),
-            SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    Text('Orders', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    //Text('${customer.orderCount}', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text('Balance', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                    //Text('RM ${customer.balance.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ],
+            const SizedBox(height: 10),
+            Text(
+              customer.fullName,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+                color: Color(0xFF1E293B),
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              maxLines: 1,
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 3),
+            Text(
+              customer.email,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 15,
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+            ),
+            const SizedBox(height: 10),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: customer.status == 'active' ? Colors.green[100] : Colors.red[100],
+                color: customer.status == 'active'
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: customer.status == 'active'
+                      ? Colors.green.withOpacity(0.3)
+                      : Colors.red.withOpacity(0.3),
+                ),
               ),
               child: Text(
-                customer.status,
+                customer.status.toUpperCase(),
                 style: TextStyle(
                   color: customer.status == 'active' ? Colors.green[700] : Colors.red[700],
-                  fontSize: 12,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -441,48 +586,177 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
 
   Widget _buildCustomerListItem(CustomerModel customer) {
     return Container(
-      margin: EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 5)],
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: ListTile(
         onTap: () => _showCustomerDetailsPage(customer),
-        leading: CircleAvatar(
-          backgroundColor: Colors.grey[300],
-          child: Text(customer.fullName.substring(0, 1).toUpperCase()),
-        ),
-        title: Text(customer.fullName),
-        subtitle: Text(customer.email),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+        contentPadding: const EdgeInsets.all(16),
+        leading: Stack(
           children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-            ),
-            SizedBox(width: 20),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: customer.status == 'active' ? Colors.green[100] : Colors.red[100],
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF7C3AED),
+                    const Color(0xFF7C3AED).withOpacity(0.8),
+                  ],
+                ),
+                shape: BoxShape.circle,
               ),
-              child: Text(
-                customer.status,
-                style: TextStyle(
-                  color: customer.status == 'active' ? Colors.green[700] : Colors.red[700],
-                  fontSize: 12,
+              child: Center(
+                child: Text(
+                  customer.fullName.substring(0, 1).toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: customer.status == 'active' ? Colors.green : Colors.red,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          customer.fullName,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+        subtitle: Text(
+          customer.email,
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: customer.status == 'active'
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: customer.status == 'active'
+                      ? Colors.green.withOpacity(0.3)
+                      : Colors.red.withOpacity(0.3),
+                ),
+              ),
+              child: Text(
+                customer.status.toUpperCase(),
+                style: TextStyle(
+                  color: customer.status == 'active' ? Colors.green[700] : Colors.red[700],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildPaginationSection(int totalPages, int startIndex, int endIndex) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Showing ${startIndex + 1} to ${endIndex > filteredCustomers.length ? filteredCustomers.length : endIndex} of ${filteredCustomers.length} customers',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: currentPage > 1 ? () => setState(() => currentPage--) : null,
+                icon: const Icon(Icons.chevron_left),
+                style: IconButton.styleFrom(
+                  backgroundColor: currentPage > 1 ? Colors.grey[100] : Colors.grey[50],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ...List.generate(
+                totalPages > 5 ? 5 : totalPages,
+                    (index) {
+                  final pageNum = index + 1;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => currentPage = pageNum),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: currentPage == pageNum
+                            ? const Color(0xFF7C3AED)
+                            : Colors.grey[100],
+                        foregroundColor: currentPage == pageNum
+                            ? Colors.white
+                            : Colors.grey[700],
+                        minimumSize: const Size(40, 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text('$pageNum'),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: currentPage < totalPages ? () => setState(() => currentPage++) : null,
+                icon: const Icon(Icons.chevron_right),
+                style: IconButton.styleFrom(
+                  backgroundColor: currentPage < totalPages ? Colors.grey[100] : Colors.grey[50],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildFilterChip(String label, bool isSelected) {
     return InkWell(
@@ -492,21 +766,25 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
           _filterCustomers();
         });
       },
+      borderRadius: BorderRadius.circular(25),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF7C3AED) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? const Color(0xFF7C3AED) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF7C3AED) : Colors.grey.shade300,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.white : Colors.grey[700],
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 14,
           ),
         ),
       ),
     );
   }
 }
-

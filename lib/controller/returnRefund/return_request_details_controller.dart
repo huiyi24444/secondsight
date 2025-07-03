@@ -67,55 +67,39 @@ class ReturnRequestDetailsController {
       case 'pending':
         return {
           'title': 'Return In Progress',
-          'steps': ['Request Submitted', 'Under Review', 'Processing', 'Completed'],
+          'steps': ['Pending Review', 'Approval Results', 'Processing', 'Completed'],
           'currentStep': 0,
         };
       case 'approved':
         return {
           'title': 'Return Approved',
-          'steps': ['Request Submitted', 'Approved', 'Processing', 'Completed'],
+          'steps': ['Pending Review', 'Approved', 'Processing', 'Completed'],
           'currentStep': 1,
         };
       case 'processing':
         return {
           'title': 'Processing Return',
-          'steps': ['Request Submitted', 'Approved', 'Processing', 'Completed'],
+          'steps': ['Pending Review', 'Approved', 'Processing', 'Completed'],
           'currentStep': 2,
         };
       case 'completed':
         return {
           'title': 'Return Completed',
-          'steps': ['Request Submitted', 'Approved', 'Processing', 'Completed'],
+          'steps': ['Pending Review', 'Approved', 'Processing', 'Completed'],
           'currentStep': 3,
         };
       case 'rejected':
         return {
           'title': 'Return Rejected',
-          'steps': ['Request Submitted', 'Rejected'],
+          'steps': ['Pending Review', 'Rejected'],
           'currentStep': 1,
         };
       default:
         return {
           'title': 'Return Status',
-          'steps': ['Request Submitted', 'Under Review', 'Processing', 'Completed'],
+          'steps': ['Pending Review', 'Under Review', 'Processing', 'Completed'],
           'currentStep': 0,
         };
-    }
-  }
-
-  int _getReturnStep(String status) {
-    switch (status.toLowerCase()) {
-      case 'submitted':
-      case 'request_submitted':
-        return 0;
-      case 'pending':
-      case 'pending_approval':
-        return 1;
-      case 'approved':
-      case 'request_approved':
-        return 2;
-      default:
-        return 0;
     }
   }
 

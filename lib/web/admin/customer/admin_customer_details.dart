@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../model/order_model.dart';
 import '../../../model/user_model.dart';
 import '../widget/topbar.dart';
 
@@ -17,7 +18,7 @@ class CustomerDetailsPage extends StatefulWidget {
 class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   CustomerModel? customer;
-  List<Map<String, dynamic>> customerOrders = [];
+  List<OrdersModel> customerOrders = [];
   bool isLoading = true;
 
   @override
@@ -29,24 +30,18 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   Future<void> _loadCustomerDetails() async {
     try {
       final customerDoc = await _firestore.collection('users').doc(widget.userId).get();
-      final ordersSnapshot = await _firestore.collection('order')
-          .where('userId', isEqualTo: widget.userId)
+
+      final ordersSnapshot = await _firestore
+          .collection('users')
+          .doc(widget.userId)
+          .collection('order')
           .get();
 
-      List<Map<String, dynamic>> orders = [];
-      double totalSpent = 0;
+      List<OrdersModel> orders = [];
 
       for (var doc in ordersSnapshot.docs) {
-        final data = doc.data();
-        orders.add({
-          'id': doc.id,
-          'orderId': data['orderId'] ?? doc.id.substring(0, 8),
-          'date': data['date'],
-          'total': data['total'] ?? 0.0,
-          'status': data['orderStatus'] ?? 'pending',
-          'items': data['items'] ?? [],
-        });
-        totalSpent += data['total'] ?? 0.0;
+        final order = OrdersModel.fromJson(doc.data(), doc.id);
+        orders.add(order);
       }
 
       setState(() {
@@ -59,6 +54,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       setState(() => isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +145,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                               _buildInfoRow(
                                 'Last Transaction',
                                 customerOrders.isNotEmpty
-                                    ? _formatDate(customerOrders.first['date'])
+                                    ? _formatDate(customerOrders.first.orderDate)
                                     : 'No transactions',
                               ),
                               const SizedBox(height: 20),
@@ -187,7 +183,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                   Expanded(
                                     child: _buildSummaryCard(
                                       'Total Spent',
-                                      'RM ${customerOrders.fold(0.0, (prev, o) => prev + o['total']).toStringAsFixed(2)}',
+                                      'RM ${customerOrders.fold(0.0, (prev, o) => prev + o.totalAmount).toStringAsFixed(2)}',
                                       Icons.attach_money,
                                       Colors.green,
                                     ),
@@ -303,11 +299,12 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildOrderCountCard(String label, String status, Color color) {
-    final count = customerOrders.where((o) => o['status'] == status).length;
+    final count = customerOrders.where((o) => o.orderStatus == status).length;
     return _buildSummaryCard(label, count.toString(), Icons.circle, color);
   }
 
-  Widget _buildTransactionItem(Map<String, dynamic> order) {
+
+  Widget _buildTransactionItem(OrdersModel order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
@@ -317,32 +314,36 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       ),
       child: Row(
         children: [
-          Text('#${order['orderId']}'),
+          Text('#${order.shortOrderId}'),
           const SizedBox(width: 20),
           Text(
-            'Vintage Denim Jacket + ${order['items'].length - 1} more',
+            'Vintage Denim Jacket + 1 more', // Customize with actual items if needed
             style: TextStyle(color: Colors.grey[600]),
           ),
           const Spacer(),
-          Text('RM ${order['total'].toStringAsFixed(2)}'),
+          Text('RM ${order.totalAmount.toStringAsFixed(2)}'),
           const SizedBox(width: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: _getStatusColor(order['status']).withOpacity(0.2),
+              color: _getStatusColor(order.orderStatus).withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              order['status'],
-              style: TextStyle(color: _getStatusColor(order['status']), fontSize: 12),
+              order.orderStatus,
+              style: TextStyle(
+                color: _getStatusColor(order.orderStatus),
+                fontSize: 12,
+              ),
             ),
           ),
           const SizedBox(width: 20),
-          Text(_formatDate(order['date'])),
+          Text(_formatDate(order.orderDate)),
         ],
       ),
     );
   }
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -357,11 +358,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     }
   }
 
-  String _formatDate(int? timestamp) {
-    if (timestamp == null) return 'N/A';
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'N/A';
     return '${date.day} ${_getMonth(date.month)} ${date.year}';
   }
+
 
   String _getMonth(int month) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

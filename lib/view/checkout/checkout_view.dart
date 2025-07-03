@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:secondsight/view/checkout/payment_method_view.dart';
 import 'package:secondsight/view/widgets/shipping_address_selection.dart';
 import '../../model/cart_item_model.dart';
 import '../../model/order_product_model.dart';
@@ -324,7 +325,7 @@ class _CheckoutViewState extends State<CheckoutView> {
         'payment': orderData.payment,
       });
 
-      // 5. Add order products
+      // 5. Add order products and update stock quantities
       for (final item in widget.cartItems) {
         final orderProduct = OrderProductModel(
           price: item.product.price,
@@ -339,11 +340,45 @@ class _CheckoutViewState extends State<CheckoutView> {
           'productQuantity': orderProduct.productQuantity,
           'totalPrice': orderProduct.totalPrice,
         });
+
+        // Update product stock quantity
+        final productRef = FirebaseFirestore.instance.collection('products').doc(item.product.id);
+
+        // Use a transaction to ensure atomic updates
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          // Get the current product document
+          final productSnapshot = await transaction.get(productRef);
+
+          if (!productSnapshot.exists) {
+            throw Exception('Product ${item.product.id} not found');
+          }
+
+          final productData = productSnapshot.data() as Map<String, dynamic>;
+          final currentStock = productData['stockQuantity'] as int? ?? 0;
+
+          // Calculate new stock quantity
+          final newStock = currentStock - item.quantity;
+
+          if (newStock < 0) {
+            throw Exception('Insufficient stock for product ${item.product.id}');
+          }
+
+          // Prepare update data
+          final updateData = <String, dynamic>{
+            'stockQuantity': newStock,
+          };
+
+          // If stock reaches 0, update product status to 'sold'
+          if (newStock == 0) {
+            updateData['productStatus'] = 'sold';
+          }
+
+          // Update the product document
+          transaction.update(productRef, updateData);
+        });
       }
 
-
-
-      // add shipment document
+      // 6. Add shipment document
       final shipment = ShipmentModel(
         id: '', // Firestore will auto-generate
         shipAddress: selectedAddress ?? 'Unknown address',
@@ -351,20 +386,16 @@ class _CheckoutViewState extends State<CheckoutView> {
         trackingNumber: null,
       );
 
-
-
       final shipmentRef = await orderRef.collection('shipment').add(shipment.toMap());
 
       print('Saving shipment map: ${shipment.toMap()}');
-      await orderRef.collection('shipment').add(shipment.toMap());
 
-// 7. Update the order document with shipment ID
+      // 7. Update the order document with shipment ID
       await orderRef.update({
         'shipmentID': shipmentRef.id,
       });
 
-
-      // 6. Go to success screen with orderId
+      // 8. Go to success screen with orderId
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -392,99 +423,5 @@ class _CheckoutViewState extends State<CheckoutView> {
         });
       }
     }
-  }
-
-}
-
-class PaymentMethodSheet extends StatelessWidget {
-  final Function(String) onPaymentMethodSelected;
-
-  PaymentMethodSheet({required this.onPaymentMethodSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Select Payment Method',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildPaymentOption(
-                  '**** 4567',
-                  'Visa',
-                  true,
-                      () {
-                    onPaymentMethodSelected('**** 4567');
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentOption(String cardNumber, String cardType, bool isSelected, VoidCallback onTap) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isSelected ? Color(0xFF8B5CF6) : Colors.grey[300]!,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Center(
-            child: Text(
-              cardType,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-        title: Text(cardNumber),
-        trailing: isSelected
-            ? Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
-            : null,
-        onTap: onTap,
-      ),
-    );
   }
 }

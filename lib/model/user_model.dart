@@ -41,4 +41,16 @@ class CustomerModel {
       'status': status,
     };
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'email': email,
+      'fullName': fullName,
+      'isVerified': isVerified,
+      'phoneNum': phoneNum,
+      'profilePic': profilePic,
+      'status': status,
+    };
+  }
+
 }

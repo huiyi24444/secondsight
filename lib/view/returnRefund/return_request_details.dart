@@ -122,7 +122,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
       case 'pending':
         return ReturnStatus.pending;
       default:
-        return ReturnStatus.approved;
+        return ReturnStatus.pending;
     }
   }
 
@@ -289,6 +289,36 @@ class ReturnRequestDetailsView extends StatelessWidget {
                           ),
                         ],
                       ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else if (request.returnStatus.toLowerCase() == 'cancelled') ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Return Request Cancelled',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],

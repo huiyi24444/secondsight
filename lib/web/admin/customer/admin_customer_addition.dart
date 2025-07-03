@@ -3,6 +3,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../model/user_model.dart';
+
 class AddCustomerDialog extends StatefulWidget {
   final Function onCustomerAdded;
 
@@ -21,8 +23,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
 
-  String selectedCountry = 'MALAYSIA';
   bool isLoading = false;
+
 
   Future<void> _addCustomer() async {
     if (!_formKey.currentState!.validate()) return;
@@ -30,22 +32,20 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
     setState(() => isLoading = true);
 
     try {
-      final userRef = _firestore.collection('Customer').doc(); // generate userId here
+      final userRef = _firestore.collection('users').doc(); // generate userId here
 
-      final customerData = {
-        'email': _emailController.text.trim(),
-        'fullName': _fullNameController.text.trim(),
-        'username': _usernameController.text.trim(),
-        'phoneNum': int.tryParse(_phoneController.text.trim()) ?? 0,
-        'profilePic': '',
-        'isVerified': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'address': {
-          'country': selectedCountry,
-        },
-      };
+      // Use the model
+      final customer = CustomerModel(
+        id: userRef.id,
+        email: _emailController.text.trim(),
+        fullName: _fullNameController.text.trim(),
+        isVerified: false,
+        phoneNum: int.tryParse(_phoneController.text.trim()) ?? 0,
+        profilePic: '',
+        status: 'active', // Or any default you choose
+      );
 
-      await userRef.set(customerData);
+      await userRef.set(customer.toMap()..addAll({'createdAt': FieldValue.serverTimestamp()}));
 
       Navigator.pop(context);
       widget.onCustomerAdded();
@@ -102,16 +102,6 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               const SizedBox(height: 20),
 
-              TextFormField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                validator: (value) =>
-                value == null || value.isEmpty ? 'Please enter a username' : null,
-              ),
-              const SizedBox(height: 20),
 
               TextFormField(
                 controller: _emailController,
@@ -127,50 +117,15 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               ),
               const SizedBox(height: 20),
 
-              Row(
-                children: [
-                  Container(
-                    width: 120,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButton<String>(
-                      value: selectedCountry,
-                      isExpanded: true,
-                      underline: const SizedBox(),
-                      items: ['MALAYSIA', 'SINGAPORE', 'USA', 'UK'].map((country) {
-                        return DropdownMenuItem(
-                          value: country,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.flag, size: 16),
-                              const SizedBox(width: 5),
-                              Text(country, style: const TextStyle(fontSize: 14)),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() => selectedCountry = value!);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _phoneController,
-                      decoration: InputDecoration(
-                        labelText: 'Phone Number',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      validator: (value) =>
-                      value == null || value.isEmpty ? 'Enter phone number' : null,
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: _phoneController,
+                decoration: InputDecoration(
+                  labelText: 'Phone Number',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                validator: (value) =>
+                value == null || value.isEmpty ? 'Enter phone number' : null,
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 30),
 

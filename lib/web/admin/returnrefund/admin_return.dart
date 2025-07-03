@@ -99,9 +99,13 @@ class ReturnManagementView extends StatelessWidget {
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Pending'),
                               const SizedBox(width: 20),
+                              _buildFilterTab(context, 'Processing'),
+                              const SizedBox(width: 20),
                               _buildFilterTab(context, 'Approved'),
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Refunded'),
+                              _buildFilterTab(context, 'Rejected'),
+                              const SizedBox(width: 20),
+                              _buildFilterTab(context, 'Completed'),
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Cancelled'),
                             ],
@@ -134,7 +138,7 @@ class ReturnManagementView extends StatelessWidget {
                                   DataCell(Text('#${item['shortOrderId']}')),
                                   DataCell(Text(item['orderProductId'])),
                                   DataCell(Text(controller.formatDate(item['date']))),
-                                  DataCell(Text(item['userId'] ?? 'Unknown')),
+                                  DataCell(Text(item['userEmail'] ?? 'Unknown')),
                                   DataCell(Text('RM ${item['returnPrice'].toStringAsFixed(2)}')),
                                   const DataCell(Text('Mastercard')),
                                   DataCell(
@@ -156,18 +160,20 @@ class ReturnManagementView extends StatelessWidget {
                                   DataCell(
                                     PopupMenuButton<String>(
                                       icon: const Icon(Icons.more_vert),
-                                      onSelected: (value) {
+                                      onSelected: (value) async {
                                         if (value == 'view') {
-                                          showReturnDetailsDialog(
-                                            context: context,
+                                          await ReturnDetailsDialog.show(
+                                            context,
                                             returnItem: item,
                                             onUpdateReturnStatus: (userId, returnId, newStatus) {
                                               return controller.updateReturnStatus(context, userId, returnId, newStatus);
                                             },
                                             formatDate: controller.formatDate,
                                             formatStatus: controller.formatStatus,
+                                            firestore: FirebaseFirestore.instance,
                                           );
-                                        } else if (value == 'delete') {
+                                        }
+                                        else if (value == 'delete') {
                                           showDialog(
                                             context: context,
                                             builder: (_) => AlertDialog(
@@ -196,7 +202,7 @@ class ReturnManagementView extends StatelessWidget {
                                             ),
                                           );
                                         } else {
-                                          controller.updateReturnStatus(context, item['userId'], item['id'], value);
+                                          controller.updateReturnStatus(context, item['userEmail'], item['id'], value);
                                         }
                                       },
                                       itemBuilder: (_) => const [

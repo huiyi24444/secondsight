@@ -38,8 +38,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       orderId: widget.orderId,
       userId: widget.userId,
     );
-
-
   }
 
   @override
@@ -47,7 +45,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     _controller.dispose();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -722,40 +719,4 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       ),
     );
   }
-
-// Keep the old method for backward compatibility if needed
-  Widget _buildSummaryRow(String label, String value, {bool isPlaceholder = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isPlaceholder ? Colors.grey[400] : Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-
 }

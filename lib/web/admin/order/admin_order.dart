@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../model/order_model.dart';
+import '../../../model/order_product_model.dart';
 import '../widget/topbar.dart';
+import 'admin_order_details.dart';
 
 class OrderManagementPage extends StatefulWidget {
   const OrderManagementPage({Key? key}) : super(key: key);
@@ -17,10 +19,13 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
 
   List<OrdersModel> orders = [];
   List<OrdersModel> filteredOrders = [];
+  Map<String, List<OrderProductModel>> orderProducts = {};
+  Map<String, Map<String, dynamic>> productDetails = {};
   bool isLoading = true;
   String selectedTab = 'All';
   int currentPage = 1;
   int itemsPerPage = 10;
+  Set<String> expandedOrders = {};
 
   Map<String, String> customerNames = {};
 
@@ -37,10 +42,22 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
 
       List<OrdersModel> loadedOrders = [];
       Map<String, String> customerNameMap = {};
+      Map<String, List<OrderProductModel>> orderProductsMap = {};
+      Map<String, Map<String, dynamic>> productDetailsMap = {};
+
+      // First, load all products for reference
+      final productsSnapshot = await _firestore.collection('products').get();
+      for (final productDoc in productsSnapshot.docs) {
+        productDetailsMap[productDoc.id] = {
+          'name': productDoc.data()['productName'] ?? 'Unknown Product',
+          'imageUrl': (productDoc.data()['productURL'] as List?)?.first ?? '',
+          'price': productDoc.data()['price'] ?? 0.0,
+        };
+      }
 
       for (final userDoc in usersSnapshot.docs) {
         final userId = userDoc.id;
-        customerNameMap[userId] = userId;
+        customerNameMap[userId] = userDoc.data()['name'] ?? userDoc.data()['email'] ?? userId;
 
         final ordersSnapshot = await userDoc.reference.collection('order').get();
 
@@ -48,13 +65,30 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
           final orderData = orderDoc.data();
           final order = OrdersModel.fromJson(orderData, orderDoc.id);
           loadedOrders.add(order.copyWith(customerId: userId));
-        }
 
+          // Load order products
+          final orderProductsSnapshot = await orderDoc.reference.collection('orderProducts').get();
+          List<OrderProductModel> products = [];
+
+          for (final productDoc in orderProductsSnapshot.docs) {
+            final productData = productDoc.data();
+            products.add(OrderProductModel(
+              price: productData['price']?.toDouble() ?? 0.0,
+              productID: productData['productID'],
+              productQuantity: productData['productQuantity'] ?? 1,
+              totalPrice: productData['totalPrice']?.toDouble() ?? 0.0,
+            ));
+          }
+
+          orderProductsMap[order.id] = products;
+        }
       }
 
       setState(() {
         orders = loadedOrders;
         customerNames = customerNameMap;
+        orderProducts = orderProductsMap;
+        productDetails = productDetailsMap;
         _filterOrders();
         isLoading = false;
       });
@@ -64,20 +98,20 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     }
   }
 
-
-
   void _filterOrders() {
     List<OrdersModel> filtered = orders;
 
     if (selectedTab != 'All') {
       filtered = filtered.where((order) {
         switch (selectedTab) {
-          case 'Pending':
-            return order.orderStatus.toLowerCase() == 'pending';
+          case 'Pending Payment':
+            return order.orderStatus.toLowerCase() == 'pending_payment';
           case 'Processing':
             return order.orderStatus.toLowerCase() == 'processing';
           case 'Delivered':
-            return order.orderStatus.toLowerCase() == 'delivered';
+            return order.orderStatus.toLowerCase() == 'shipped';
+          case 'Completed':
+            return order.orderStatus.toLowerCase() == 'completed';
           case 'Cancelled':
             return order.orderStatus.toLowerCase() == 'cancelled';
           default:
@@ -90,7 +124,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       final search = _searchController.text.toLowerCase();
       filtered = filtered.where((order) =>
           order.shortOrderId.toLowerCase().contains(search)
-        // you can also add customer name if it's linked
       ).toList();
     }
 
@@ -101,27 +134,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   }
 
 
-  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
-    try {
-      final order = orders.firstWhere((o) => o.id == orderId);
-      await _firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .update({'orderStatus': newStatus});
-
-      _loadOrders();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order status updated successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating order: $e')),
-      );
-    }
-  }
-
 
   void _showCreateOrderDialog() {
     showDialog(
@@ -131,6 +143,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -146,15 +159,12 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       backgroundColor: Colors.grey[100],
       body: Row(
         children: [
-          // Main Content
           Expanded(
             child: Column(
               children: [
-                // Top Bar
                 const CustomTopBar(
                   title: 'Order Management',
                 ),
-                // Content Area
                 Expanded(
                   child: Container(
                     margin: EdgeInsets.all(20),
@@ -222,99 +232,228 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                           ),
                         ),
                         SizedBox(height: 20),
-                        // Orders table
+                        // Orders table with expandable products
                         Expanded(
                           child: isLoading
                               ? Center(child: CircularProgressIndicator())
                               : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              columns: [
-                                DataColumn(label: Container(width: 30, child: Checkbox(value: false, onChanged: (v) {}))),
-                                DataColumn(label: Text('Order ID')),
-                                DataColumn(label: Text('Product')),
-                                DataColumn(label: Text('Date')),
-                                DataColumn(label: Text('Customer')),
-                                DataColumn(label: Text('Total')),
-                                DataColumn(label: Text('Payment')),
-                                DataColumn(label: Text('Status')),
-                                DataColumn(label: Text('Action')),
-                              ],
-                              rows: currentOrders.map((order) {
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Checkbox(value: false, onChanged: (v) {})),
-                                    DataCell(Text('#${order.shortOrderId}')),
-                                    DataCell(Text(order.shipmentID ?? 'No shipment')),
-                                    DataCell(Text(_formatDate(order.orderDate))),
-                                    DataCell(Text(customerNames[order.customerId] ?? 'Unknown')),
+                            child: Column(
+                              children: currentOrders.map((order) {
+                                final products = orderProducts[order.id] ?? [];
+                                final isExpanded = expandedOrders.contains(order.id);
 
-                                    DataCell(Text('RM ${order.totalAmount.toStringAsFixed(2)}')),
-                                    DataCell(Text('Mastercard')), // Placeholder for now
-                                    DataCell(
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _getStatusColor(order.orderStatus).withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          _formatStatus(order.orderStatus),
-                                          style: TextStyle(
-                                            color: _getStatusColor(order.orderStatus),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      PopupMenuButton<String>(
-                                        icon: Icon(Icons.more_vert),
-                                        onSelected: (value) {
-                                          if (value == 'view') {
-                                            // Navigate to order details
-                                          } else if (value == 'delete') {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: Text('Delete Order'),
-                                                content: Text('Are you sure you want to delete this order?'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(context),
-                                                    child: Text('Cancel'),
-                                                  ),
-                                                  ElevatedButton(
-                                                    onPressed: () async {
-                                                      Navigator.pop(context);
-                                                      await _firestore.collection('order').doc(order.id).delete();
-                                                      _loadOrders();
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: Colors.red,
+                                return Container(
+                                  margin: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[200]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Main order row
+                                      InkWell(
+                                        onTap: () => setState(() {
+                                          if (isExpanded) {
+                                            expandedOrders.remove(order.id);
+                                          } else {
+                                            expandedOrders.add(order.id);
+                                          }
+                                        }),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isExpanded ? Icons.expand_less : Icons.expand_more,
+                                                color: Colors.grey[600],
+                                              ),
+                                              SizedBox(width: 12),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '#${order.shortOrderId}',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w600,
+                                                        fontSize: 14,
+                                                      ),
                                                     ),
-                                                    child: Text('Delete'),
+                                                    SizedBox(height: 4),
+                                                    Text(
+                                                      '${products.length} product${products.length > 1 ? 's' : ''}',
+                                                      style: TextStyle(
+                                                        color: Colors.grey[600],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Text(
+                                                  _formatDate(order.orderDate),
+                                                  style: TextStyle(fontSize: 13),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Text(
+                                                  customerNames[order.customerId] ?? 'Unknown',
+                                                  style: TextStyle(fontSize: 13),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  'RM ${order.totalAmount.toStringAsFixed(2)}',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Container(
+                                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: _getStatusColor(order.orderStatus).withOpacity(0.2),
+                                                    borderRadius: BorderRadius.circular(12),
+                                                  ),
+                                                  child: Text(
+                                                    _formatStatus(order.orderStatus),
+                                                    style: TextStyle(
+                                                      color: _getStatusColor(order.orderStatus),
+                                                      fontSize: 12,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(width: 8),
+                                              IconButton(
+                                                icon: Icon(Icons.visibility_outlined),
+                                                onPressed: () => OrderDetailsDialog.show(
+                                                  context,
+                                                  order: order,
+                                                  products: orderProducts[order.id] ?? [],
+                                                  productDetails: productDetails,
+                                                  customerNames: customerNames,
+                                                  firestore: _firestore,
+                                                  onOrdersReload: _loadOrders,
+                                                ),
+                                                tooltip: 'View Details',
+                                              ),
+                                              PopupMenuButton<String>(
+                                                icon: Icon(Icons.more_vert),
+                                                onSelected: (value) {
+                                                  if (value == 'delete') {
+                                                    // Delete logic
+                                                  } else {
+                                                    OrderDetailsDialog.updateOrderStatus(
+                                                      order,
+                                                      value,
+                                                      FirebaseFirestore.instance,
+                                                      _loadOrders, // or whatever method reloads your orders
+                                                      context,
+                                                    );
+                                                  }
+                                                },
+                                                itemBuilder: (BuildContext context) => [
+                                                  PopupMenuItem(value: 'pending', child: Text('Mark as Pending')),
+                                                  PopupMenuItem(value: 'processing', child: Text('Mark as Processing')),
+                                                  PopupMenuItem(value: 'delivered', child: Text('Mark as Delivered')),
+                                                  PopupMenuItem(value: 'cancelled', child: Text('Mark as Cancelled')),
+                                                  PopupMenuDivider(),
+                                                  PopupMenuItem(
+                                                    value: 'delete',
+                                                    child: Text('Delete Order', style: TextStyle(color: Colors.red)),
                                                   ),
                                                 ],
                                               ),
-                                            );
-                                          } else {
-                                            _updateOrderStatus(order.id, value);
-                                          }
-                                        },
-                                        itemBuilder: (BuildContext context) => [
-                                          PopupMenuItem(value: 'view', child: Text('View Details')),
-                                          PopupMenuDivider(),
-                                          PopupMenuItem(value: 'pending', child: Text('Mark as Pending')),
-                                          PopupMenuItem(value: 'processing', child: Text('Mark as Processing')),
-                                          PopupMenuItem(value: 'delivered', child: Text('Mark as Delivered')),
-                                          PopupMenuItem(value: 'cancelled', child: Text('Mark as Cancelled')),
-                                          PopupMenuDivider(),
-                                          PopupMenuItem(value: 'delete', child: Text('Delete Order', style: TextStyle(color: Colors.red))),
-                                        ],
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      // Expandable products section
+                                      if (isExpanded)
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[50],
+                                            border: Border(
+                                              top: BorderSide(color: Colors.grey[200]!),
+                                            ),
+                                          ),
+                                          padding: EdgeInsets.all(16),
+                                          child: Column(
+                                            children: products.map((product) {
+                                              final productId = (product.productID as DocumentReference).id;
+                                              final details = productDetails[productId] ?? {};
+
+                                              return Container(
+                                                margin: EdgeInsets.only(bottom: 8),
+                                                padding: EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 40,
+                                                      height: 40,
+                                                      margin: EdgeInsets.only(left: 36, right: 12),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.grey[200],
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: details['imageUrl'] != ''
+                                                          ? ClipRRect(
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        child: Image.network(
+                                                          details['imageUrl'],
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            return Icon(Icons.image, size: 20, color: Colors.grey);
+                                                          },
+                                                        ),
+                                                      )
+                                                          : Icon(Icons.image, size: 20, color: Colors.grey),
+                                                    ),
+                                                    Expanded(
+                                                      child: Text(
+                                                        details['name'] ?? 'Unknown Product',
+                                                        style: TextStyle(fontSize: 13),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      'Qty: ${product.productQuantity}',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 20),
+                                                    Text(
+                                                      'RM ${product.totalPrice.toStringAsFixed(2)}',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 40),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 );
                               }).toList(),
                             ),
@@ -436,14 +575,13 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     return '${date.day} ${_getMonth(date.month)} ${date.year}';
   }
 
-
   String _getMonth(int month) {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
 }
 
-// Create Order Dialog
+// Create Order Dialog remains the same
 class CreateOrderDialog extends StatefulWidget {
   final Function onOrderCreated;
 
@@ -458,15 +596,13 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
   final _formKey = GlobalKey<FormState>();
 
   String? selectedCustomerId;
-  String? selectedProductId;
   String orderType = 'General';
   String orderStatus = 'Pending';
-  final TextEditingController _quantityController = TextEditingController(text: '1');
   final TextEditingController _noteController = TextEditingController();
 
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> products = [];
-  Map<String, dynamic> selectedProductDetails = {};
+  List<Map<String, dynamic>> selectedProducts = [];
   bool isLoading = true;
 
   @override
@@ -491,7 +627,7 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
           'id': doc.id,
           'name': doc.data()['productName'] ?? 'Unknown Product',
           'price': doc.data()['price'] ?? 0.0,
-          'sku': doc.data()['sku'] ?? '',
+          'stock': doc.data()['stockQuantity'] ?? 0,
         }).toList();
 
         isLoading = false;
@@ -502,39 +638,117 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
     }
   }
 
+  void _addProduct() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String? selectedProductId;
+        int quantity = 1;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Add Product'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedProductId,
+                    decoration: InputDecoration(
+                      labelText: 'Select Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: products.map<DropdownMenuItem<String>>((product) {
+                      return DropdownMenuItem<String>(
+                        value: product['id'],
+                        child: Text('${product['name']} - RM${product['price']}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedProductId = value;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: '1',
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Quantity',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      quantity = int.tryParse(value) ?? 1;
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedProductId != null ? () {
+                    final product = products.firstWhere((p) => p['id'] == selectedProductId);
+                    this.setState(() {
+                      selectedProducts.add({
+                        'id': product['id'],
+                        'name': product['name'],
+                        'price': product['price'],
+                        'quantity': quantity,
+                        'total': product['price'] * quantity,
+                      });
+                    });
+                    Navigator.pop(context);
+                  } : null,
+                  child: Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _createOrder() async {
     if (!_formKey.currentState!.validate()) return;
+    if (selectedProducts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please add at least one product')),
+      );
+      return;
+    }
 
     try {
-      final quantity = int.parse(_quantityController.text);
-      final total = selectedProductDetails['price'] * quantity;
+      // Calculate total
+      double total = selectedProducts.fold(0, (sum, product) => sum + product['total']);
 
-      final orderData = {
-        'orderId': 'ORD${DateTime.now().millisecondsSinceEpoch}'.substring(0, 10),
-        'customerId': selectedCustomerId,
-        'items': [{
-          'productId': selectedProductId,
-          'productName': selectedProductDetails['name'],
-          'quantity': quantity,
-          'price': selectedProductDetails['price'],
-        }],
-        'total': total,
-        'orderStatus': orderStatus.toLowerCase(),
-        'orderType': orderType,
-        'note': _noteController.text,
-        'date': DateTime.now().millisecondsSinceEpoch,
-        'paymentMethod': 'Mastercard',
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await _firestore
+      // Create order in user's order subcollection
+      final orderRef = await _firestore
           .collection('users')
           .doc(selectedCustomerId)
           .collection('order')
-          .add(orderData);
+          .add({
+        'orderDate': Timestamp.now(),
+        'orderStatus': orderStatus.toLowerCase(),
+        'totalAmount': total,
+        'eligibilityForReturn': true,
+        'shipmentID': null,
+        'payment': 'pending',
+      });
 
-
-
+      // Add order products
+      for (final product in selectedProducts) {
+        await orderRef.collection('orderProducts').add({
+          'price': product['price'],
+          'productID': _firestore.collection('products').doc(product['id']),
+          'productQuantity': product['quantity'],
+          'totalPrice': product['total'],
+        });
+      }
 
       Navigator.pop(context);
       widget.onOrderCreated();
@@ -553,7 +767,7 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        width: 600,
+        width: 700,
         padding: EdgeInsets.all(30),
         child: Form(
           key: _formKey,
@@ -592,7 +806,7 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                   ),
                   items: customers.map<DropdownMenuItem<String>>((customer) {
                     return DropdownMenuItem<String>(
-                      value: customer['id'] as String, // ensure it's a String
+                      value: customer['id'],
                       child: Text('${customer['name']} (${customer['email']})'),
                     );
                   }).toList(),
@@ -625,86 +839,120 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                     ),
                     SizedBox(width: 20),
                     Expanded(
-                      child: TextFormField(
-                        initialValue: DateTime.now().toString().split(' ')[0],
+                      child: DropdownButtonFormField<String>(
+                        value: orderStatus,
                         decoration: InputDecoration(
-                          labelText: 'Order Date',
+                          labelText: 'Order Status',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          suffixIcon: Icon(Icons.calendar_today),
                         ),
-                        readOnly: true,
+                        items: ['Pending', 'Processing', 'Delivered', 'Cancelled'].map((status) {
+                          return DropdownMenuItem(value: status, child: Text(status));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            orderStatus = value!;
+                          });
+                        },
                       ),
                     ),
                   ],
                 ),
+                SizedBox(height: 30),
+
+                // Products Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    TextButton.icon(
+                      onPressed: _addProduct,
+                      icon: Icon(Icons.add),
+                      label: Text('Add Product'),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 15),
+
+                Container(
+                  constraints: BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: selectedProducts.isEmpty
+                      ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Text(
+                        'No products added yet',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                  )
+                      : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: selectedProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = selectedProducts[index];
+                      return ListTile(
+                        title: Text(product['name']),
+                        subtitle: Text('Qty: ${product['quantity']} × RM${product['price']}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'RM${product['total'].toStringAsFixed(2)}',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  selectedProducts.removeAt(index);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                if (selectedProducts.isNotEmpty) ...[
+                  SizedBox(height: 16),
+                  Divider(),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Amount:',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          'RM${selectedProducts.fold(0.0, (sum, product) => sum + product['total']).toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF7C3AED),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 SizedBox(height: 20),
                 TextFormField(
                   controller: _noteController,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Order Note',
+                    labelText: 'Order Note (Optional)',
                     hintText: 'Add note about order',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                ),
-                SizedBox(height: 30),
-
-                // Add Products
-                Text('Add Products to Your Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  value: selectedProductId,
-                  decoration: InputDecoration(
-                    labelText: 'Search product name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  items: products.map<DropdownMenuItem<String>>((product) {
-                    return DropdownMenuItem<String>(
-                      value: product['id'] as String, // Ensure it's String
-                      child: Text('${product['name']} - \$${product['price']}'),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedProductId = value;
-                      selectedProductDetails = products.firstWhere((p) => p['id'] == value);
-                    });
-                  },
-                  validator: (value) => value == null ? 'Please select a product' : null,
-                ),
-                SizedBox(height: 20),
-                TextFormField(
-                  controller: _quantityController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Quantity',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter quantity';
-                    if (int.tryParse(value) == null) return 'Please enter a valid number';
-                    return null;
-                  },
-                ),
-                SizedBox(height: 30),
-
-                // Status
-                Text('Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                SizedBox(height: 15),
-                DropdownButtonFormField<String>(
-                  value: orderStatus,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  items: ['Pending', 'Processing', 'Delivered', 'Cancelled'].map((status) {
-                    return DropdownMenuItem(value: status, child: Text(status));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      orderStatus = value!;
-                    });
-                  },
                 ),
                 SizedBox(height: 30),
 

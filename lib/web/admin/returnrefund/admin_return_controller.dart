@@ -22,17 +22,23 @@ class ReturnManagementController extends ChangeNotifier {
       final List<Map<String, dynamic>> loadedReturns = [];
 
       for (final userDoc in usersSnapshot.docs) {
-        final returnRequestsSnapshot = await userDoc.reference.collection('returnRequests').get();
+        final userData = userDoc.data();
+        final userEmail = userData['email'] ?? 'Unknown';
+
+        final returnRequestsSnapshot =
+        await userDoc.reference.collection('returnRequests').get();
 
         for (final returnDoc in returnRequestsSnapshot.docs) {
           final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
+
           loadedReturns.add({
             'id': returnRequest.id,
-            'userId': userDoc.id,
+            'userEmail': userEmail,
             'returnRequest': returnRequest,
           });
         }
       }
+
 
       final mappedReturns = await Future.wait(loadedReturns.map((entry) async {
         final returnRequest = entry['returnRequest'];
@@ -41,7 +47,7 @@ class ReturnManagementController extends ChangeNotifier {
         final orderProductData = orderProductDoc.data() as Map<String, dynamic>? ?? {};
 
         String orderId = 'N/A';
-        String userId = 'Unknown';
+        String userEmail = 'Unknown';
         double returnPrice = (returnRequest.returnPrice ?? 0).toDouble(); // ✅ fixed
 
         final orderRef = orderProductRef.parent.parent;
@@ -50,12 +56,12 @@ class ReturnManagementController extends ChangeNotifier {
           final orderData = orderDoc.data() as Map<String, dynamic>? ?? {};
 
           orderId = orderRef.id;
-          userId = orderData['userId'] ?? '';
+          userEmail = orderData['userEmail'] ?? '';
         }
 
         return {
           'id': entry['id'],
-          'userId': entry['userId'],
+          'userEmail': entry['userEmail'],
           'returnId': entry['id'].substring(0, 8).toUpperCase(),
           'shortOrderId': orderId.length >= 6 ? orderId.substring(0, 6).toUpperCase() : orderId.toUpperCase(),
           'orderProductId': orderProductRef.id,
@@ -112,9 +118,9 @@ class ReturnManagementController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateReturnStatus(BuildContext context, String userId, String returnId, String newStatus) async {
+  Future<void> updateReturnStatus(BuildContext context, String userEmail, String returnId, String newStatus) async {
     try {
-      final returnRef = _firestore.collection('users').doc(userId).collection('returnRequests').doc(returnId);
+      final returnRef = _firestore.collection('users').doc(userEmail).collection('returnRequests').doc(returnId);
       await returnRef.update({'returnStatus': newStatus});
 
       if (newStatus == 'refunded') {

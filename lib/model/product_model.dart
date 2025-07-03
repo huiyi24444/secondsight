@@ -98,8 +98,10 @@ class Product {
     );
   }
 
+
   factory Product.fromDocumentSnapshot(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    print('Measurements from snapshot: ${data['measurements']}');
     return Product(
       id: doc.id,
       name: data['productName'] ?? '',
