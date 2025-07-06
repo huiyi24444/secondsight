@@ -5,6 +5,8 @@ import '../../model/order_model.dart';
 import '../order/order_details_view.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'order_status_utils.dart';
+
 
 class OrderCard extends StatelessWidget {
   final OrdersModel order;
@@ -85,13 +87,13 @@ class OrderCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _getStatusColor(orderStatus).withOpacity(0.1),
+            color: OrderStatusUtils.getStatusColor(orderStatus).withOpacity(0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            _getStatusText(orderStatus),
+            OrderStatusUtils.getStatusText(orderStatus),
             style: TextStyle(
-              color: _getStatusColor(orderStatus),
+              color: OrderStatusUtils.getStatusColor(orderStatus),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -279,42 +281,4 @@ class OrderCard extends StatelessWidget {
     );
   }
 
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending_payment':
-        return Colors.orange;
-      case 'processing':
-        return const Color(0xFF8E6CEF);
-      case 'shipped':
-        return Colors.blue;
-      case 'completed':
-        return Colors.green;
-      case 'returned':
-        return Colors.amber;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending_payment':
-        return 'To Pay';
-      case 'processing':
-        return 'To Ship';
-      case 'shipped':
-        return 'To Receive';
-      case 'completed':
-        return 'Completed';
-      case 'returned':
-        return 'Returned';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
 }

@@ -263,23 +263,7 @@ class ChatSupportController extends ChangeNotifier {
         .join(' ');
   }
 
-  Color getStatusColor(String? status) {
-    switch (status) {
-      case 'processing':
-        return const Color(0xFF8E6CEF);
-      case 'completed':
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      case 'shipped':
-        return Colors.orange;
-      case 'pending_payment':
-        return Colors.amber;
-      default:
-        return Colors.grey;
-    }
-  }
+
 
   String formatDate(DateTime date) {
     final now = DateTime.now();

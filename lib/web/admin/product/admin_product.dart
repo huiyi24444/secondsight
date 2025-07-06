@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/product_status_utils.dart';
 import 'package:secondsight/view/widgets/string_extensions.dart';
 
 import '../../../model/product_model.dart';
@@ -235,13 +236,13 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor(product.status).withOpacity(0.2),
+                                          color: ProductStatusUtils.getProductStatusColor(product.status).withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
                                           product.status.capitalize(),
                                           style: TextStyle(
-                                            color: _getStatusColor(product.status),
+                                            color: ProductStatusUtils.getProductStatusColor(product.status),
                                             fontSize: 12,
                                           ),
                                         ),
@@ -385,21 +386,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         ),
       ),
     );
-  }
-
-
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'available':
-        return Colors.green;
-      case 'sold':
-        return Colors.orange;
-      case 'inactive':
-        return Colors.grey;
-      default:
-        return Colors.black;
-    }
   }
 
 

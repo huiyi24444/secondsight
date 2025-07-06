@@ -115,44 +115,7 @@ class OrderDetailsController extends ChangeNotifier {
     return product?['productName'] ?? 'Unknown Product';
   }
 
-  /// Get status color based on order status
-  Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'processing':
-        return const Color(0xFF8E6CEF);
-      case 'completed':
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      case 'shipped':
-        return Colors.orange;
-      case 'pending_payment':
-        return Colors.amber;
-      default:
-        return Colors.grey;
-    }
-  }
 
-  /// Get display text for order status
-  String getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'processing':
-        return 'Processing';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'shipped':
-        return 'Shipped';
-      case 'delivered':
-        return 'Delivered';
-      case 'pending_payment':
-        return 'Pending Payment';
-      default:
-        return status.toUpperCase();
-    }
-  }
 
   // Get order status step configuration
   Map<String, dynamic> getOrderStatusConfig(String orderStatus) {
@@ -172,14 +135,12 @@ class OrderDetailsController extends ChangeNotifier {
   }
   int _getOrderStep(String status) {
     switch (status.toLowerCase()) {
-      case 'pending_payment':
-        return 0;
       case 'processing':
-        return 1;
+        return 0;
       case 'shipped':
-        return 2;
+        return 1;
       case 'completed':
-        return 3;
+        return 2;
       case 'returned':
         return 3;
       default:

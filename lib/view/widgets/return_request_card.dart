@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:secondsight/view/widgets/return_status_utils.dart';
 import '../../model/return_request_model.dart';
 import '../../model/order_product_model.dart';
 import '../returnRefund/return_request_details.dart';
@@ -131,13 +132,13 @@ class ReturnRequestCard extends StatelessWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(returnRequest.returnStatus).withOpacity(0.1),
+                            color: ReturnStatusUtils.getReturnStatusColor(returnRequest.returnStatus).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            _getStatusText(returnRequest.returnStatus),
+                            ReturnStatusUtils.getReturnStatusText(returnRequest.returnStatus),
                             style: TextStyle(
-                              color: _getStatusColor(returnRequest.returnStatus),
+                              color: ReturnStatusUtils.getReturnStatusColor(returnRequest.returnStatus),
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -273,42 +274,5 @@ class ReturnRequestCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'submitted':
-      case 'pending':
-        return const Color(0xFF8E6CEF);
-      case 'approved':
-      case 'completed':
-        return Colors.green;
-      case 'rejected':
-      case 'cancelled':
-        return Colors.red;
-      case 'processing':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
 
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'submitted':
-        return 'Submitted';
-      case 'pending':
-        return 'Pending';
-      case 'approved':
-        return 'Approved';
-      case 'rejected':
-        return 'Rejected';
-      case 'completed':
-        return 'Completed';
-      case 'processing':
-        return 'Processing';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
 }

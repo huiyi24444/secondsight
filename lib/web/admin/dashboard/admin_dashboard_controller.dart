@@ -1,73 +1,145 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
+// admin_dashboard_controller.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+
 import '../../../model/user_model.dart';
 
 class AdminDashboardController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<DashboardStats> fetchDashboardStats() async {
+  Future<DashboardStats> fetchDashboardStats({
+    DateFilterType filterType = DateFilterType.day,
+    DateTime? selectedDate,
+  }) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('order')
-          .limit(10)
-          .get();
+      selectedDate ??= DateTime.now();
 
-      print("\u{1F525} Total recent orders fetched: \${snapshot.docs.length}");
+      // Calculate date range based on filter type
+      DateTime startDate, endDate;
+      DateTime previousStartDate, previousEndDate;
 
-      for (var doc in snapshot.docs) {
-        print("\u{1F4DD} Raw order document: \${doc.data()}");
+      switch (filterType) {
+        case DateFilterType.day:
+          startDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+          endDate = startDate.add(const Duration(days: 1));
+          previousStartDate = startDate.subtract(const Duration(days: 1));
+          previousEndDate = startDate;
+          break;
+        case DateFilterType.month:
+          startDate = DateTime(selectedDate.year, selectedDate.month, 1);
+          endDate = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+          previousStartDate = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+          previousEndDate = startDate;
+          break;
+        case DateFilterType.year:
+          startDate = DateTime(selectedDate.year, 1, 1);
+          endDate = DateTime(selectedDate.year + 1, 1, 1);
+          previousStartDate = DateTime(selectedDate.year - 1, 1, 1);
+          previousEndDate = startDate;
+          break;
       }
 
-      final ordersSnapshot = await _firestore.collectionGroup('order').get();
-      final List<OrdersModel> orders = ordersSnapshot.docs
+      // Fetch orders for selected period
+      final ordersQuery = await _firestore
+          .collectionGroup('order')
+          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('orderDate', isLessThan: Timestamp.fromDate(endDate))
+          .get();
+
+      final List<OrdersModel> orders = ordersQuery.docs
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
 
+      // Fetch orders for previous period (for comparison)
+      final previousOrdersQuery = await _firestore
+          .collectionGroup('order')
+          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(previousStartDate))
+          .where('orderDate', isLessThan: Timestamp.fromDate(previousEndDate))
+          .get();
+
+      final List<OrdersModel> previousOrders = previousOrdersQuery.docs
+          .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
+          .toList();
+
+      // Fetch today's orders for the indicator
+      final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      final todayEnd = todayStart.add(const Duration(days: 1));
+
+      final todayOrdersQuery = await _firestore
+          .collectionGroup('order')
+          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+          .where('orderDate', isLessThan: Timestamp.fromDate(todayEnd))
+          .get();
+
+      final todayOrders = todayOrdersQuery.docs.length;
+
+      // Fetch customers
       final customersSnapshot = await _firestore.collection('users').get();
       final List<CustomerModel> customers = customersSnapshot.docs
           .map((doc) => CustomerModel.fromJson(doc.data(), doc.id))
           .toList();
 
+      // Calculate stats for current period
       double revenue = orders
           .where((o) => o.orderStatus == 'completed')
           .fold(0.0, (sum, o) => sum + o.totalAmount);
 
+      double previousRevenue = previousOrders
+          .where((o) => o.orderStatus == 'completed')
+          .fold(0.0, (sum, o) => sum + o.totalAmount);
+
       int completed = orders.where((o) => o.orderStatus == 'completed').length;
-      int pending = orders.where((o) => o.orderStatus == 'pending_payment').length;
-      int active = orders
-          .where((o) => o.orderStatus == 'processing' || o.orderStatus == 'shipped')
+      int to_ship = orders.where((o) => o.orderStatus == 'to_ship' || o.orderStatus == 'to_ship').length;
+      int to_receive = orders
+          .where((o) => o.orderStatus == 'to_receive' )
           .length;
       int cancelled = orders.where((o) => o.orderStatus == 'cancelled').length;
 
+      // Calculate changes
+      int revenueChange = revenue > 0 && previousRevenue > 0
+          ? ((revenue - previousRevenue) / previousRevenue * 100).round()
+          : 0;
+      int orderChange = orders.isNotEmpty && previousOrders.isNotEmpty
+          ? orders.length - previousOrders.length
+          : 0;
+
+      // Fetch recent orders (always show last 10 regardless of filter)
       final recentOrdersSnapshot = await FirebaseFirestore.instance
           .collectionGroup('order')
           .orderBy('orderDate', descending: true)
-          .orderBy('orderStatus')
           .limit(10)
           .get();
-
-      print('Fetched recent orders: \${recentOrdersSnapshot.docs.length}');
-      print('Recent orders raw data: \${recentOrdersSnapshot.docs.map((d) => d.data())}');
 
       List<OrdersModel> recentOrders = recentOrdersSnapshot.docs
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
+
+      // Count new orders (within last 24 hours)
+      final last24Hours = DateTime.now().subtract(const Duration(hours: 24));
+      final newOrdersCount = recentOrders
+          .where((order) => order.orderDate.isAfter(last24Hours))
+          .length;
 
       return DashboardStats(
         totalRevenue: revenue.toInt(),
         totalCustomers: customers.length,
         allOrders: orders.length,
         completedOrders: completed,
-        pendingOrders: pending,
-        activeOrders: active,
+        to_ship_orders: to_ship,
+        to_receive_orders: to_receive,
         cancelledOrders: cancelled,
         recentOrders: recentOrders,
         rawOrderDocs: recentOrdersSnapshot.docs,
+        todayOrders: todayOrders,
+        revenueChange: revenueChange,
+        orderChange: orderChange,
+        customerChange: 0, // You can implement customer change logic if needed
+        newOrdersCount: newOrdersCount,
       );
     } catch (e) {
-      print('Error fetching dashboard stats: \$e');
+      print('Error fetching dashboard stats: $e');
       rethrow;
     }
   }
@@ -77,7 +149,7 @@ class AdminDashboardController {
     final orderId = orderDoc.id;
 
     if (userDocRef == null) {
-      throw Exception("User document reference not found for order \$orderId");
+      throw Exception("User document reference not found for order $orderId");
     }
 
     final orderProductsSnapshot = await userDocRef
@@ -97,21 +169,36 @@ class DashboardStats {
   final int totalCustomers;
   final int allOrders;
   final int completedOrders;
-  final int pendingOrders;
-  final int activeOrders;
+  final int to_ship_orders;
+  final int to_receive_orders;
   final int cancelledOrders;
   final List<OrdersModel> recentOrders;
   final List<DocumentSnapshot> rawOrderDocs;
+  final int todayOrders;
+  final int revenueChange;
+  final int orderChange;
+  final int customerChange;
+  //final int activeChange;
+  final int newOrdersCount;
 
   DashboardStats({
     required this.totalRevenue,
     required this.totalCustomers,
     required this.allOrders,
     required this.completedOrders,
-    required this.pendingOrders,
-    required this.activeOrders,
+    required this.to_ship_orders,
+    required this.to_receive_orders,
     required this.cancelledOrders,
     required this.recentOrders,
     required this.rawOrderDocs,
+    required this.todayOrders,
+    required this.revenueChange,
+    required this.orderChange,
+    required this.customerChange,
+    //required this.activeChange,
+    required this.newOrdersCount,
   });
 }
+
+// Define the enum here only once
+enum DateFilterType { day, month, year }

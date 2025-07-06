@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/order_status_utils.dart';
 
 import '../../controller/chat/chat_support_controller.dart';
 import '../../model/order_model.dart';
@@ -392,7 +393,7 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: _controller.getStatusColor(order.orderStatus),
+                                      color: OrderStatusUtils.getStatusColor(order.orderStatus),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(

@@ -142,21 +142,6 @@ class ReturnManagementController extends ChangeNotifier {
     }
   }
 
-  Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return Colors.green;
-      case 'refunded':
-        return Colors.blue;
-      case 'pending':
-        return Colors.orange;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
   String formatStatus(String status) {
     return status[0].toUpperCase() + status.substring(1);
   }

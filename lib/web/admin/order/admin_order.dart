@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../../../view/widgets/order_status_utils.dart';
 import '../widget/topbar.dart';
 import 'admin_order_details.dart';
 
@@ -321,13 +322,13 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                                                 child: Container(
                                                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                                   decoration: BoxDecoration(
-                                                    color: _getStatusColor(order.orderStatus).withOpacity(0.2),
+                                                    color: OrderStatusUtils.getStatusColor(order.orderStatus).withOpacity(0.2),
                                                     borderRadius: BorderRadius.circular(12),
                                                   ),
                                                   child: Text(
                                                     _formatStatus(order.orderStatus),
                                                     style: TextStyle(
-                                                      color: _getStatusColor(order.orderStatus),
+                                                      color: OrderStatusUtils.getStatusColor(order.orderStatus),
                                                       fontSize: 12,
                                                     ),
                                                     textAlign: TextAlign.center,
@@ -552,20 +553,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'delivered':
-        return Colors.green;
-      case 'processing':
-        return Colors.blue;
-      case 'pending':
-        return Colors.orange;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
 
   String _formatStatus(String status) {
     return status[0].toUpperCase() + status.substring(1);

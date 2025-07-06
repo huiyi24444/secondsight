@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/user_model.dart';
 import '../widget/topbar.dart';
@@ -326,13 +327,13 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: _getStatusColor(order.orderStatus).withOpacity(0.2),
+              color: OrderStatusUtils.getStatusColor(order.orderStatus).withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               order.orderStatus,
               style: TextStyle(
-                color: _getStatusColor(order.orderStatus),
+                color: OrderStatusUtils.getStatusColor(order.orderStatus),
                 fontSize: 12,
               ),
             ),
@@ -344,18 +345,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     );
   }
 
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 
   String _formatDate(DateTime? date) {
@@ -368,5 +357,3 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
-
-}

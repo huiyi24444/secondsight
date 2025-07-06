@@ -9,6 +9,7 @@ import '../../model/order_product_model.dart';
 import '../../model/refund_model.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/progress_stepper.dart';
+import '../widgets/return_status_utils.dart';
 import 'cancel_return_request.dart';
 
 
@@ -66,7 +67,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
                       children: [
                         _buildStatusCard(returnRequest),
 
-                        if (_getStatusFromRequest(returnRequest) != ReturnStatus.pending)
+                        if (_getStatusFromRequest(returnRequest) != ReturnStatus.pending_approval)
                           ReturnStatusCard(status: _getStatusFromRequest(returnRequest)),
 
                         _buildProductCard(productURL, productName, orderProduct),
@@ -115,14 +116,14 @@ class ReturnRequestDetailsView extends StatelessWidget {
     switch (request.returnStatus?.toLowerCase()) {
       case 'approved':
         return ReturnStatus.approved;
-      case 'processing':
-        return ReturnStatus.processing;
+      case 'pending_inspection':
+        return ReturnStatus.pending_inspection;
       case 'completed':
         return ReturnStatus.completed;
-      case 'pending':
-        return ReturnStatus.pending;
+      case 'pending_approval':
+        return ReturnStatus.pending_approval;
       default:
-        return ReturnStatus.pending;
+        return ReturnStatus.pending_approval;
     }
   }
 
@@ -329,7 +330,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
 
           Builder(
             builder: (context) {
-              final config = controller.getReturnStatusConfig(request.returnStatus);
+              final config = ReturnStatusUtils.getReturnStatusConfig(request.returnStatus);
               return ProgressStepper(
                 title: config['title'],
                 steps: config['steps'],

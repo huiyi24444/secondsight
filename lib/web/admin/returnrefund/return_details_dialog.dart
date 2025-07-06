@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../view/widgets/return_status_utils.dart';
+
 class ReturnDetailsDialog {
   static Future<void> show(
       BuildContext context, {
@@ -73,7 +75,7 @@ class ReturnDetailsDialog {
                                         height: 8,
                                         margin: const EdgeInsets.only(right: 8),
                                         decoration: BoxDecoration(
-                                          color: _getReturnStatusColor(status),
+                                          color: ReturnStatusUtils.getReturnStatusColor(status),
                                           shape: BoxShape.circle,
                                         ),
                                       ),
@@ -422,20 +424,6 @@ class ReturnDetailsDialog {
     );
   }
 
-  static Color _getReturnStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'approved':
-        return Colors.blue;
-      case 'refunded':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
 
   static String _formatReturnStatus(String status) {
     return status[0].toUpperCase() + status.substring(1);

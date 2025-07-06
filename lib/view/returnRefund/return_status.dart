@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ReturnStatus { pending, approved, processing, completed }
+enum ReturnStatus { pending_approval, approved, pending_inspection, completed }
 
 
 class ReturnStatusInfo {
@@ -31,7 +31,7 @@ class ReturnStatusCard extends StatelessWidget {
 
   ReturnStatusInfo _getStatusInfo() {
     switch (status) {
-      case ReturnStatus.pending: // ✅ Add this
+      case ReturnStatus.pending_approval: // ✅ Add this
         return const ReturnStatusInfo(
           title: '',
           subtitle: '',
@@ -49,7 +49,7 @@ class ReturnStatusCard extends StatelessWidget {
           icon: Icons.local_shipping_outlined,
           color: Colors.green,
         );
-      case ReturnStatus.processing:
+      case ReturnStatus.pending_inspection:
         return const ReturnStatusInfo(
           title: 'Item Collected',
           subtitle: 'Your item has been successfully collected',
@@ -73,7 +73,6 @@ class ReturnStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusInfo = _getStatusInfo();
-
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       padding: const EdgeInsets.all(16),

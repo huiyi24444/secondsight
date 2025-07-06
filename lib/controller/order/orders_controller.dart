@@ -117,26 +117,6 @@ class OrdersController extends ChangeNotifier {
     return ReturnRequestModel.fromDocument(doc);
   }
 
-  /// Get display text for order status
-  String getStatusDisplayText(String status) {
-    switch (status) {
-      case 'pending_payment':
-        return 'to pay';
-      case 'processing':
-        return 'to ship';
-      case 'shipped':
-        return 'to receive';
-      case 'completed':
-        return 'completed';
-      case 'returns':
-        return 'returns';
-      case 'cancelled':
-        return 'cancelled';
-      default:
-        return status;
-    }
-  }
-
   /// Check if current tab is return requests tab
   bool get isReturnRequestsTab => _currentTabIndex == tabStatuses.indexOf('returns');
 

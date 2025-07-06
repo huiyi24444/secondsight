@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/return_status_utils.dart';
 
 import '../../../model/return_request_model.dart';
 import '../../../web/admin/returnrefund/return_details_dialog.dart';
@@ -145,13 +146,13 @@ class ReturnManagementView extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: controller.getStatusColor(item['status']).withOpacity(0.2),
+                                        color: ReturnStatusUtils.getReturnStatusColor(item['status']).withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
                                         controller.formatStatus(item['status']),
                                         style: TextStyle(
-                                          color: controller.getStatusColor(item['status']),
+                                          color: ReturnStatusUtils.getReturnStatusColor(item['status']),
                                           fontSize: 12,
                                         ),
                                       ),
