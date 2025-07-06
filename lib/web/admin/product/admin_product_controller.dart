@@ -94,4 +94,22 @@ class ProductManagementController {
     );
   }
 
+  Map<String, String> categoryNames = {};
+
+  Future<void> loadCategories() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('categories')
+          .get();
+
+      categoryNames = Map.fromEntries(
+          snapshot.docs.map((doc) =>
+              MapEntry(doc.id, doc.data()['name'] as String? ?? 'Unknown')
+          )
+      );
+    } catch (e) {
+      print('Error loading categories: $e');
+    }
+  }
+
 }

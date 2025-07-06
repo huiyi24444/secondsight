@@ -153,7 +153,7 @@ class _SmallOrderCardState extends State<SmallOrderCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${products.length} items • Qty: $totalQuantity',
+                        '${products.length} items ',  //• Qty: $totalQuantity
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                       const SizedBox(height: 2),

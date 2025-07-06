@@ -49,7 +49,6 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                 CustomTopBar(
                   title: 'Product',
                   subtitle: 'Add Product',
-                  badgeText: 'All Shop',
                 ),
                 // Content Area
                 Expanded(

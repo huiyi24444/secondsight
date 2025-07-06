@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../model/product_measurements_model.dart';
 import '../../model/product_model.dart';
 import '../../features/virtual_try_on/screens/virtual_try_on_screen.dart';
 import '../../services/auth_provider.dart';
@@ -224,7 +225,7 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _buildInfoBox(
-                              label: 'Size: ${product.measurements['productSize'] ?? 'Unknown'}',
+                              label:'Size ${product.productSize}',
                               conditionColor: null,
                               isCondition: false,
                             ),
@@ -425,8 +426,21 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     );
   }
 
-  Widget _buildMeasurementsTable(Map<String, dynamic>? measurements) {
-    if (measurements == null || measurements.isEmpty) {
+  Widget _buildMeasurementsTable(ProductMeasurements measurements) {
+    // Check if all fields are null
+    final allNull = [
+      measurements.bust,
+      measurements.waist,
+      measurements.hip,
+      measurements.shoulderWidth,
+      measurements.sleeveLength,
+      measurements.shirtLength,
+      measurements.inseam,
+      measurements.outseam,
+      measurements.totalLength,
+    ].every((value) => value == null);
+
+    if (allNull) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Text(
@@ -440,26 +454,38 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
       );
     }
 
-    final filteredEntries = measurements.entries.where((entry) => entry.key != 'productSize');
+    // Helper function to build rows
+    TableRow buildRow(String label, double? value) {
+      return TableRow(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(label),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(value != null ? '${value.toStringAsFixed(1)} cm' : '-'),
+          ),
+        ],
+      );
+    }
 
     return Table(
       border: TableBorder.all(color: Colors.grey.shade300),
-      children: filteredEntries.map((entry) {
-        return TableRow(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(entry.key),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(entry.value.toString()),
-            ),
-          ],
-        );
-      }).toList(),
+      children: [
+        if (measurements.bust != null) buildRow('Bust', measurements.bust),
+        if (measurements.waist != null) buildRow('Waist', measurements.waist),
+        if (measurements.hip != null) buildRow('Hip', measurements.hip),
+        if (measurements.shoulderWidth != null) buildRow('Shoulder Width', measurements.shoulderWidth),
+        if (measurements.sleeveLength != null) buildRow('Sleeve Length', measurements.sleeveLength),
+        if (measurements.shirtLength != null) buildRow('Shirt Length', measurements.shirtLength),
+        if (measurements.inseam != null) buildRow('Inseam', measurements.inseam),
+        if (measurements.outseam != null) buildRow('Outseam', measurements.outseam),
+        if (measurements.totalLength != null) buildRow('Total Length', measurements.totalLength),
+      ],
     );
   }
+
 
 
   Widget _buildStyledTag(String tag) {

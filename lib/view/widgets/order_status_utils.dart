@@ -35,12 +35,10 @@ class OrderStatusUtils {
 
   static String formatStatus(String status) {
     switch (status.toLowerCase()) {
-      case 'pending_payment':
-        return 'Pending';
-      case 'processing':
-        return 'Processing';
-      case 'shipped':
-        return 'Shipped';
+      case 'to_ship':
+        return 'To Ship';
+      case 'to_receive':
+        return 'To Receive';
       case 'completed':
         return 'Completed';
       case 'cancelled':

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
-
-class CustomTopBar extends StatelessWidget {
+class CustomTopBar extends StatefulWidget {
   final String title;
   final String? subtitle;
-  final String badgeText;
 
   const CustomTopBar({
     super.key,
     required this.title,
     this.subtitle,
-    this.badgeText = 'All Shop',
   });
+
+  @override
+  State<CustomTopBar> createState() => _CustomTopBarState();
+}
+
+class _CustomTopBarState extends State<CustomTopBar> {
+  bool isHovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -20,9 +24,9 @@ class CustomTopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          if (subtitle == null)
+          if (widget.subtitle == null)
             Text(
-              title,
+              widget.title,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -31,18 +35,29 @@ class CustomTopBar extends StatelessWidget {
           else
             Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                MouseRegion(
+                  onEnter: (_) => setState(() => isHovered = true),
+                  onExit: (_) => setState(() => isHovered = false),
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        decoration:
+                        isHovered ? TextDecoration.underline : TextDecoration.none,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Icon(Icons.chevron_right),
+                const Icon(Icons.chevron_right, color: Colors.grey),
                 const SizedBox(width: 10),
                 Text(
-                  subtitle!,
+                  widget.subtitle!,
                   style: TextStyle(
                     fontSize: 18,
                     color: Colors.grey[600],
@@ -50,18 +65,8 @@ class CustomTopBar extends StatelessWidget {
                 ),
               ],
             ),
+
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange[100],
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Text(
-              badgeText,
-              style: TextStyle(color: Colors.orange[800]),
-            ),
-          ),
           const SizedBox(width: 10),
           const Icon(Icons.notifications_outlined),
           const SizedBox(width: 10),
@@ -75,3 +80,4 @@ class CustomTopBar extends StatelessWidget {
     );
   }
 }
+

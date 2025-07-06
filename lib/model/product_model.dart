@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/model/product_measurements_model.dart';
 
 class Product {
   final String id;
@@ -9,8 +10,9 @@ class Product {
   final String status;
   final int stockQuantity;
   final String description;
+  final String productSize;
   final Map<String, dynamic> virtualTryOn;
-  final Map<String, dynamic> measurements;
+  final ProductMeasurements measurements;
   final DocumentReference category;
   final List<String> tags;
   final List<String> images;
@@ -26,6 +28,7 @@ class Product {
     required this.status,
     required this.stockQuantity,
     required this.description,
+    required this.productSize,
     required this.virtualTryOn,
     required this.measurements,
     required this.category,
@@ -60,12 +63,13 @@ class Product {
       status: data['productStatus'] ?? '',
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
+      productSize: data['productSize'] ?? '-', // safe default
       virtualTryOn: (data['virtualTryOn'] ?? {}) is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['virtualTryOn'])
           : {},
-      measurements: (data['measurements'] ?? {}) is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data['measurements'])
-          : {},
+      measurements: ProductMeasurements.fromMap(
+          (data['measurements'] ?? {}) as Map<String, dynamic>
+      ),
       category: data['category'] as DocumentReference<Object?>,
       images: List<String>.from(data['productURL'] ?? []),
       createdAt: data['createdAt'] as Timestamp?,
@@ -84,8 +88,11 @@ class Product {
       status: data['productStatus'] ?? '',
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
+      productSize: data['productSize'] ?? '-', // safe default
       virtualTryOn: Map<String, dynamic>.from(data['virtualTryOn'] ?? {}),
-      measurements: Map<String, dynamic>.from(data['measurements'] ?? {}),
+      measurements: ProductMeasurements.fromMap(
+          (data['measurements'] ?? {}) as Map<String, dynamic>
+      ),
       category: FirebaseFirestore.instance.doc(data['category']),
       images: List<String>.from(data['productURL'] ?? []),
       createdAt: data['createdAt'] is int
@@ -111,12 +118,13 @@ class Product {
       status: data['productStatus'] ?? '',
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
+      productSize: data['productSize'] ?? '-', // safe default
       virtualTryOn: (data['virtualTryOn'] ?? {}) is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['virtualTryOn'])
           : {},
-      measurements: (data['measurements'] ?? {}) is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data['measurements'])
-          : {},
+      measurements: ProductMeasurements.fromMap(
+          (data['measurements'] ?? {}) as Map<String, dynamic>
+      ),
       category: data['category'] as DocumentReference<Object?>,
       images: List<String>.from(data['productURL'] ?? []),
       createdAt: data['createdAt'] as Timestamp?,

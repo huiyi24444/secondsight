@@ -7,6 +7,7 @@ import '../../../model/product_model.dart';
 import '../widget/topbar.dart';
 import 'admin_product_addition.dart';
 import 'admin_product_controller.dart';
+import 'admin_product_details.dart';
 
 class ProductManagementPage extends StatefulWidget {
   const ProductManagementPage({Key? key}) : super(key: key);
@@ -24,12 +25,15 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+
+
   final controller = ProductManagementController();
 
   @override
   void initState() {
     super.initState();
     controller.loadProducts(() => setState(() {}));
+    controller.loadCategories();
   }
 
 
@@ -118,6 +122,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 label: Text('Add Product'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Color(0xFF7C3AED),
+                                  foregroundColor: Colors.white,
                                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                 ),
                               ),
@@ -229,7 +234,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     ),
 
                                     DataCell(Text(product.id.substring(0, 8))),
-                                    DataCell(Text(product.category.id)),
+                                    DataCell(Text(controller.categoryNames[product.category.id] ?? 'Unknown')),
                                     DataCell(Text(product.condition.capitalize())),
                                     DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(
@@ -255,7 +260,16 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                           IconButton(
                                             icon: const Icon(Icons.edit, size: 18),
                                             onPressed: () {
-                                              // Navigate to edit page
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => ProductEditDialog(
+                                                  product: product,
+                                                  onUpdate: () {
+                                                    // Reload products after successful update
+                                                    controller.loadProducts(() => setState(() {}));
+                                                  },
+                                                ),
+                                              );
                                             },
                                           ),
                                           IconButton(
@@ -394,5 +408,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     final date = timestamp.toDate();
     return '${date.day}/${date.month}/${date.year}';
   }
+
+
 
 }

@@ -440,7 +440,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
             ),
             SizedBox(height: 16),
             Text('Condition: ${_product!.condition}'),
-            Text('Size: ${_product!.measurements['productSize'] ?? 'N/A'}'),
+            Text('Size: ${_product!.productSize ?? 'N/A'}'),
             SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

@@ -212,7 +212,7 @@ class _CartViewState extends State<CartView> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Size ${item.product.measurements['productSize'] ?? '-'} • ${item.product.condition}',
+                                    'Size ${item.product.productSize} • ${item.product.condition}',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.grey[600],

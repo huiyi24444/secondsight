@@ -359,63 +359,58 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Widget _buildStats() => Column(
     children: [
+      // First row - Overview metrics
       Row(
         children: [
+          _buildStatCard(
+            'Total Orders',
+            '${data!.allOrders}',
+            data!.orderChange,
+            Icons.shopping_bag,
+            Colors.blue,
+            isHighlighted: data!.orderChange > 0,
+          ),
+          const SizedBox(width: 20),
           _buildStatCard(
             'Total Revenue',
             '\$${data!.totalRevenue}',
             data!.revenueChange,
             Icons.attach_money,
-            Colors.purple,
+            Colors.green,
             isHighlighted: data!.revenueChange > 0,
           ),
           const SizedBox(width: 20),
           _buildStatCard(
-            'Customers',
-            '${data!.totalCustomers}',
-            data!.customerChange,
-            Icons.people,
-            Colors.blue,
-            isHighlighted: data!.customerChange > 0,
+            'Avg Order Value',
+            '\$${data!.allOrders > 0 ? (data!.totalRevenue / data!.allOrders).toStringAsFixed(2) : "0.00"}',
+            0,
+            Icons.trending_up,
+            Colors.purple,
           ),
-          const SizedBox(width: 20),
-          _buildStatCard(
-            'Orders',
-            '${data!.allOrders}',
-            data!.orderChange,
-            Icons.shopping_cart,
-            Colors.orange,
-            isHighlighted: data!.orderChange > 0,
-          ),
-          const SizedBox(width: 20),
-
         ],
       ),
       const SizedBox(height: 20),
+      // Second row - Order status breakdown
       Row(
         children: [
-          _buildStatCard(
-            'All Orders',
-            '${data!.allOrders}',
-            0,
-            Icons.list_alt,
-            Colors.blue,
-          ),
-          const SizedBox(width: 20),
           _buildStatCard(
             'To Ship',
             '${data!.to_ship_orders}',
             0,
-            Icons.pending,
+            Icons.local_shipping,
             Colors.orange,
+            subtitle: 'Pending shipment',
+            showBadge: data!.to_ship_orders > 0,
           ),
           const SizedBox(width: 20),
           _buildStatCard(
             'To Receive',
             '${data!.to_receive_orders}',
             0,
-            Icons.pending,
-            Colors.orange,
+            Icons.airport_shuttle,
+            Colors.blue[700]!,
+            subtitle: 'In transit',
+            showBadge: data!.to_receive_orders > 0,
           ),
           const SizedBox(width: 20),
           _buildStatCard(
@@ -424,6 +419,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             0,
             Icons.check_circle,
             Colors.green,
+            subtitle: 'Successfully delivered',
           ),
           const SizedBox(width: 20),
           _buildStatCard(
@@ -432,9 +428,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             0,
             Icons.cancel,
             Colors.red,
+            subtitle: 'Order cancelled',
           ),
-          const SizedBox(width: 20),
-          const Expanded(child: SizedBox()),
         ],
       )
     ],
@@ -446,7 +441,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       int change,
       IconData icon,
       Color color,
-      {bool isHighlighted = false}
+      {bool isHighlighted = false,
+        String? subtitle,
+        bool showBadge = false}
       ) => Expanded(
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -469,13 +466,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 24),
+              Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               if (change != 0)
                 Container(
@@ -493,7 +508,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       const SizedBox(width: 2),
                       Text(
-                        '${change.abs()}',
+                        '${change > 0 ? "+" : ""}${change.abs()}${title.contains('Revenue') ? "%" : ""}',
                         style: TextStyle(
                           color: change > 0 ? Colors.green[700] : Colors.red[700],
                           fontSize: 12,
@@ -509,11 +524,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
           const SizedBox(height: 5),
           Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          if (subtitle != null)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 11,
+                ),
+              ),
+            ),
           if (isHighlighted && change > 0)
             Container(
               margin: const EdgeInsets.only(top: 8),
               child: Text(
-                'Updated today',
+                'vs previous period',
                 style: TextStyle(
                   color: color,
                   fontSize: 11,
@@ -525,7 +551,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ),
     ),
   );
-
   Widget _buildSummaryAndOrders() => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
