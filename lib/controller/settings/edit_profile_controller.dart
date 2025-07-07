@@ -237,10 +237,11 @@ class EditProfileController {
               decoration: _inputDecoration('Enter your phone number', Icons.phone_outlined),
               validator: (value) {
                 if (value != null && value.isNotEmpty) {
-                  if (value.length < 10 || !RegExp(r'^[0-9+\-\s()]+\$').hasMatch(value)) {
-                    return 'Please enter a valid phone number';
+                  if (!RegExp(r'^\d{11}$').hasMatch(value)) {
+                    return 'Please enter a valid 10-digit phone number';
                   }
                 }
+
                 return null;
               },
             ),

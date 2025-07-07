@@ -199,4 +199,6 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future checkEmailVerification() async {}
 }

@@ -8,9 +8,12 @@ import '../../controller/order/orders_controller.dart';
 import '../../services/auth_provider.dart';
 import '../../model/order_model.dart';
 import '../../model/return_request_model.dart';
+import '../settings/profile_view.dart';
+import '../widgets/bottom_nav_bar.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/order_card.dart';
 import '../widgets/return_request_card.dart';
+import 'notifications_view.dart';
 import 'order_details_view.dart';
 
 class OrdersView extends StatefulWidget {
@@ -106,6 +109,31 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
           },
         ),
       ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: 2,
+        onItemTapped: (index) {
+          if (index == 0) return;
+          Widget target;
+          switch (index) {
+            case 1:
+              target = const NotificationsView();
+              break;
+            case 2:
+              target = const OrdersView();
+              break;
+            case 3:
+              target = const ProfileView();
+              break;
+            default:
+              return;
+          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
+          );
+        },
+      ),
+
     );
   }
 

@@ -33,7 +33,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   void initState() {
     super.initState();
     controller.loadProducts(() => setState(() {}));
-    controller.loadCategories();
+    controller.loadCategories(() => setState(() {}));
   }
 
 
@@ -234,7 +234,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     ),
 
                                     DataCell(Text(product.id.substring(0, 8))),
-                                    DataCell(Text(controller.categoryNames[product.category.id] ?? 'Unknown')),
+                                    DataCell(
+                                      Text(controller.getCategoryName(product.category.id)),
+                                    ),
                                     DataCell(Text(product.condition.capitalize())),
                                     DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(

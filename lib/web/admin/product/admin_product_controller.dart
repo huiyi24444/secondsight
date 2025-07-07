@@ -18,10 +18,12 @@ class ProductManagementController {
   bool isLoading = true;
 
   int get totalPages => (filteredProducts.length / itemsPerPage).ceil();
-
   int get startIndex => (currentPage - 1) * itemsPerPage;
-
   int get endIndex => startIndex + itemsPerPage;
+
+  List<QueryDocumentSnapshot> categories = [];
+  Map<String, String> categoryNames = {};
+  bool categoriesLoading = true;
 
   Future<void> loadProducts(VoidCallback onUpdate) async {
     print('🔄 Loading products...');
@@ -94,22 +96,44 @@ class ProductManagementController {
     );
   }
 
-  Map<String, String> categoryNames = {};
-
-  Future<void> loadCategories() async {
+  // Load categories
+  Future<void> loadCategories(Function callback) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('categories')
+      categoriesLoading = true;
+      callback();
+
+      final snapshot = await firestore
+          .collection('category')  // Using 'category' based on your Firebase structure
           .get();
 
+      categories = snapshot.docs;
+
+      // Create a map for quick category name lookups
       categoryNames = Map.fromEntries(
-          snapshot.docs.map((doc) =>
-              MapEntry(doc.id, doc.data()['name'] as String? ?? 'Unknown')
-          )
+          snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return MapEntry(
+                doc.id,
+                data['catName'] as String? ?? data['name'] as String? ?? 'Unknown'
+            );
+          })
       );
+
+      categoriesLoading = false;
+      callback();
+
+      print('Loaded ${categories.length} categories');
     } catch (e) {
       print('Error loading categories: $e');
+      categoriesLoading = false;
+      callback();
     }
   }
+
+  // Get category name by ID
+  String getCategoryName(String categoryId) {
+    return categoryNames[categoryId] ?? 'Unknown';
+  }
+
 
 }

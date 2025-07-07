@@ -7,7 +7,6 @@ class OrdersController extends ChangeNotifier {
   // Tab configuration
   static const List<String> tabTitles = [
     'All Orders',
-    'To Pay',
     'To Ship',
     'To Receive',
     'Completed',
@@ -17,9 +16,8 @@ class OrdersController extends ChangeNotifier {
 
   static const List<String?> tabStatuses = [
     null, // All Orders - no filter
-    'pending_payment',
-    'processing',
-    'shipped',
+    'to_ship',
+    'to_receive',
     'completed',
     'returns',
     'cancelled',
@@ -58,11 +56,9 @@ class OrdersController extends ChangeNotifier {
     if (status == null) return 'You haven\'t placed any orders yet.';
 
     switch (status) {
-      case 'pending_payment':
-        return 'You have no pending payments.';
-      case 'processing':
+      case 'to_ship':
         return 'No orders are being prepared for shipping.';
-      case 'shipped':
+      case 'to_receive':
         return 'No orders are currently in transit.';
       case 'completed':
         return 'You haven\'t completed any orders yet.';

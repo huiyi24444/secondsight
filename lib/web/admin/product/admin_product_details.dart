@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/model/product_model.dart';
+import 'package:secondsight/model/product_measurements_model.dart';
+
+import 'admin_product_image.dart';
+import 'measurements_widget.dart';
 
 class ProductEditDialog extends StatefulWidget {
   final Product product;
   final Function() onUpdate;
+
 
   const ProductEditDialog({
     Key? key,
@@ -18,49 +23,95 @@ class ProductEditDialog extends StatefulWidget {
 
 class _ProductEditDialogState extends State<ProductEditDialog> {
   final _formKey = GlobalKey<FormState>();
+
+  // Basic info controllers
   late TextEditingController _nameController;
   late TextEditingController _priceController;
+  late TextEditingController _oriPriceController;
   late TextEditingController _descriptionController;
+  late TextEditingController _stockQuantityController;
+
+  // Measurements controllers
+  late TextEditingController _bustController;
+  late TextEditingController _waistController;
+  late TextEditingController _hipController;
+  late TextEditingController _shoulderWidthController;
+  late TextEditingController _sleeveLengthController;
+  late TextEditingController _shirtLengthController;
+  late TextEditingController _inseamController;
+  late TextEditingController _outseamController;
+  late TextEditingController _totalLengthController;
+
+  // Virtual Try-On controllers
+  late TextEditingController _tryOnDataController;
+  late String _tryOnType;
+  late bool _tryOnEnabled;
+
+  // Dropdown selections
   late String _selectedCategoryId;
   late String _selectedCondition;
   late String _selectedStatus;
+  late String _selectedSize;
+
+  // Tags
+  late List<String> _tags;
+  final TextEditingController _tagController = TextEditingController();
+
   bool _isLoading = false;
   bool _categoriesLoading = true;
-
-  // Categories from Firebase
   List<QueryDocumentSnapshot> _categories = [];
 
   // Define options for dropdowns
   final List<String> _conditions = ['new', 'like new', 'good', 'fair', 'poor'];
   final List<String> _statuses = ['available', 'sold', 'inactive'];
+  final List<String> _sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Freesize', '-'];
+  final List<String> _tryOnTypes = ['upper', 'lower', 'full'];
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize basic info controllers
     _nameController = TextEditingController(text: widget.product.name);
     _priceController = TextEditingController(text: widget.product.price.toString());
-    _descriptionController = TextEditingController(text: widget.product.description ?? '');
+    _oriPriceController = TextEditingController(text: widget.product.oriPrice.toString());
+    _descriptionController = TextEditingController(text: widget.product.description);
+    _stockQuantityController = TextEditingController(text: widget.product.stockQuantity.toString());
 
-    // Store the category ID from the product
+    // Initialize measurements controllers from ProductMeasurements
+    _bustController = TextEditingController(text: widget.product.measurements.bust?.toString() ?? '');
+    _waistController = TextEditingController(text: widget.product.measurements.waist?.toString() ?? '');
+    _hipController = TextEditingController(text: widget.product.measurements.hip?.toString() ?? '');
+    _shoulderWidthController = TextEditingController(text: widget.product.measurements.shoulderWidth?.toString() ?? '');
+    _sleeveLengthController = TextEditingController(text: widget.product.measurements.sleeveLength?.toString() ?? '');
+    _shirtLengthController = TextEditingController(text: widget.product.measurements.shirtLength?.toString() ?? '');
+    _inseamController = TextEditingController(text: widget.product.measurements.inseam?.toString() ?? '');
+    _outseamController = TextEditingController(text: widget.product.measurements.outseam?.toString() ?? '');
+    _totalLengthController = TextEditingController(text: widget.product.measurements.totalLength?.toString() ?? '');
+
+    // Initialize Virtual Try-On
+    _tryOnDataController = TextEditingController(text: widget.product.virtualTryOn['tryOnData'] ?? '');
+    _tryOnType = widget.product.virtualTryOn['type'] ?? 'upper';
+    _tryOnEnabled = widget.product.virtualTryOn['enabled'] ?? true;
+
+    // Initialize selections
     _selectedCategoryId = widget.product.category.id;
-
-    // Normalize condition and status to lowercase to match dropdown options
     _selectedCondition = widget.product.condition.toLowerCase();
     _selectedStatus = widget.product.status.toLowerCase();
+    _selectedSize = widget.product.productSize;
 
-    // Load categories from Firebase
+    // Initialize tags
+    _tags = List<String>.from(widget.product.tags);
+
+    // Load categories
     _loadCategories();
   }
 
   Future<void> _loadCategories() async {
     try {
-      // Note: The collection name might be 'category' not 'categories'
-      // Based on your project files, it seems to be 'category'
       final snapshot = await FirebaseFirestore.instance
-          .collection('category')  // Changed from 'categories' to 'category'
+          .collection('category')
           .get();
-
-      print('Loaded ${snapshot.docs.length} categories'); // Debug log
 
       if (mounted) {
         setState(() {
@@ -74,12 +125,6 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
         setState(() {
           _categoriesLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading categories: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -88,7 +133,20 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _oriPriceController.dispose();
     _descriptionController.dispose();
+    _stockQuantityController.dispose();
+    _bustController.dispose();
+    _waistController.dispose();
+    _hipController.dispose();
+    _shoulderWidthController.dispose();
+    _sleeveLengthController.dispose();
+    _shirtLengthController.dispose();
+    _inseamController.dispose();
+    _outseamController.dispose();
+    _totalLengthController.dispose();
+    _tryOnDataController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -97,19 +155,43 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
       setState(() => _isLoading = true);
 
       try {
-        // Update the product with the new values
+        // Prepare measurements data
+        final measurements = ProductMeasurements(
+          bust: _bustController.text.isNotEmpty ? double.parse(_bustController.text) : null,
+          waist: _waistController.text.isNotEmpty ? double.parse(_waistController.text) : null,
+          hip: _hipController.text.isNotEmpty ? double.parse(_hipController.text) : null,
+          shoulderWidth: _shoulderWidthController.text.isNotEmpty ? double.parse(_shoulderWidthController.text) : null,
+          sleeveLength: _sleeveLengthController.text.isNotEmpty ? double.parse(_sleeveLengthController.text) : null,
+          shirtLength: _shirtLengthController.text.isNotEmpty ? double.parse(_shirtLengthController.text) : null,
+          inseam: _inseamController.text.isNotEmpty ? double.parse(_inseamController.text) : null,
+          outseam: _outseamController.text.isNotEmpty ? double.parse(_outseamController.text) : null,
+          totalLength: _totalLengthController.text.isNotEmpty ? double.parse(_totalLengthController.text) : null,
+        );
+
+        // Prepare virtual try-on data
+        Map<String, dynamic> virtualTryOn = {
+          'tryOnData': _tryOnDataController.text.trim(),
+          'type': _tryOnType,
+          'enabled': _tryOnEnabled,
+        };
+
+        // Update the product with all values
         await FirebaseFirestore.instance
             .collection('products')
             .doc(widget.product.id)
             .update({
-          'name': _nameController.text.trim(),
-          'price': double.parse(_priceController.text.trim()),
-          'description': _descriptionController.text.trim(),
-          'category': {
-            'id': _selectedCategoryId,  // Store as an object with id field
-          },
-          'condition': _selectedCondition,
-          'status': _selectedStatus,
+          'productName': _nameController.text.trim(),
+          'productPrice': double.parse(_priceController.text.trim()),
+          'productOriPrice': double.parse(_oriPriceController.text.trim()),
+          'productDesc': _descriptionController.text.trim(),
+          'category': FirebaseFirestore.instance.collection('category').doc(_selectedCategoryId),
+          'productCondition': _selectedCondition,
+          'productStatus': _selectedStatus,
+          'productSize': _selectedSize,
+          'stockQuantity': int.parse(_stockQuantityController.text.trim()),
+          'measurements': measurements.toMap(),
+          'virtualTryOn': virtualTryOn,
+          'tags': _tags,
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
@@ -140,6 +222,22 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
     }
   }
 
+  void _addTag() {
+    final tag = _tagController.text.trim();
+    if (tag.isNotEmpty && !_tags.contains(tag)) {
+      setState(() {
+        _tags.add(tag);
+        _tagController.clear();
+      });
+    }
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _tags.remove(tag);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -147,8 +245,8 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Container(
-        width: 600,
-        constraints: const BoxConstraints(maxHeight: 700),
+        width: 700,
+        constraints: const BoxConstraints(maxHeight: 800),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -190,34 +288,36 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Product Images Preview
-                      if (widget.product.images.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 20),
-                          height: 100,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: widget.product.images.length,
-                            itemBuilder: (context, index) {
-                              return Container(
-                                margin: const EdgeInsets.only(right: 10),
-                                width: 100,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    widget.product.images[index],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                    const Icon(Icons.broken_image, color: Colors.grey),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                      ProductImageEditor(
+                        initialImages: widget.product.images,
+                        onImagesChanged: (updatedImages) async {
+                          // Update Firestore directly here
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection('products')
+                                .doc(widget.product.id)
+                                .update({
+                              'productURL': updatedImages,
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+
+                            print('Images updated in Firestore: ${updatedImages.length}');
+                          } catch (e) {
+                            print('Error updating Firestore: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error saving images: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+
+
+                      // Section: Basic Information
+                      _buildSectionHeader('Basic Information'),
+                      const SizedBox(height: 10),
 
                       // Product Name
                       _buildLabel('Product Name'),
@@ -233,15 +333,14 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Price and Category Row
+                      // Price Row
                       Row(
                         children: [
-                          // Price
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildLabel('Price (RM)'),
+                                _buildLabel('Selling Price (RM)'),
                                 TextFormField(
                                   controller: _priceController,
                                   keyboardType: TextInputType.number,
@@ -260,26 +359,71 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                             ),
                           ),
                           const SizedBox(width: 20),
-                          // Category
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Original Price (RM)'),
+                                TextFormField(
+                                  controller: _oriPriceController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: _buildInputDecoration('0.00'),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter original price';
+                                    }
+                                    if (double.tryParse(value.trim()) == null) {
+                                      return 'Please enter a valid number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Stock Quantity'),
+                                TextFormField(
+                                  controller: _stockQuantityController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: _buildInputDecoration('0'),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Please enter stock quantity';
+                                    }
+                                    if (int.tryParse(value.trim()) == null) {
+                                      return 'Please enter a valid number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Category and Size Row
+                      Row(
+                        children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildLabel('Category'),
-                                _categoriesLoading
-                                    ? TextFormField(
-                                  enabled: false,
-                                  decoration: _buildInputDecoration('Loading categories...'),
-                                )
-                                    : DropdownButtonFormField<String>(
+                                DropdownButtonFormField<String>(
                                   value: _categories.any((cat) => cat.id == _selectedCategoryId)
                                       ? _selectedCategoryId
                                       : null,
                                   decoration: _buildInputDecoration('Select category'),
                                   items: _categories.map((categoryDoc) {
                                     final data = categoryDoc.data() as Map<String, dynamic>;
-                                    // Based on your project structure, the field name is 'catName'
-                                    return DropdownMenuItem(
+                                    return DropdownMenuItem<String>(
                                       value: categoryDoc.id,
                                       child: Text(data['catName'] ?? data['name'] ?? 'Unknown'),
                                     );
@@ -297,6 +441,28 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Size'),
+                                DropdownButtonFormField<String>(
+                                  value: _sizes.contains(_selectedSize) ? _selectedSize : '-',
+                                  decoration: _buildInputDecoration('Select size'),
+                                  items: _sizes.map((size) {
+                                    return DropdownMenuItem(
+                                      value: size,
+                                      child: Text(size),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() => _selectedSize = value!);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -304,7 +470,6 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                       // Condition and Status Row
                       Row(
                         children: [
-                          // Condition
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,18 +490,11 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                                   onChanged: (value) {
                                     setState(() => _selectedCondition = value!);
                                   },
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please select a condition';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(width: 20),
-                          // Status
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,12 +514,6 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                                   onChanged: (value) {
                                     setState(() => _selectedStatus = value!);
                                   },
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please select a status';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ],
                             ),
@@ -374,9 +526,125 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                       _buildLabel('Description'),
                       TextFormField(
                         controller: _descriptionController,
-                        maxLines: 4,
+                        maxLines: 3,
                         decoration: _buildInputDecoration('Enter product description'),
                       ),
+                      const SizedBox(height: 30),
+
+                      // Section: Measurements
+                      MeasurementsWidget(
+                        selectedCategoryId: _selectedCategoryId,
+                        categories: _categories,
+                        bustController: _bustController,
+                        waistController: _waistController,
+                        hipController: _hipController,
+                        shoulderWidthController: _shoulderWidthController,
+                        sleeveLengthController: _sleeveLengthController,
+                        shirtLengthController: _shirtLengthController,
+                        inseamController: _inseamController,
+                        outseamController: _outseamController,
+                        totalLengthController: _totalLengthController,
+                        buildLabel: _buildLabel,
+                        buildInputDecoration: _buildInputDecoration,
+                      ),
+
+                      // Section: Virtual Try-On
+                      _buildSectionHeader('Virtual Try-On'),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Try-On Image URL'),
+                                TextFormField(
+                                  controller: _tryOnDataController,
+                                  decoration: _buildInputDecoration('Enter image URL'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('Try-On Type'),
+                                DropdownButtonFormField<String>(
+                                  value: _tryOnType,
+                                  decoration: _buildInputDecoration('Select type'),
+                                  items: _tryOnTypes.map((type) {
+                                    return DropdownMenuItem(
+                                      value: type,
+                                      child: Text(type[0].toUpperCase() + type.substring(1)),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() => _tryOnType = value!);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      CheckboxListTile(
+                        title: const Text('Enable Virtual Try-On'),
+                        value: _tryOnEnabled,
+                        onChanged: (value) {
+                          setState(() => _tryOnEnabled = value ?? true);
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Section: Tags
+                      _buildSectionHeader('Tags'),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _tagController,
+                              decoration: _buildInputDecoration('Add a tag'),
+                              onFieldSubmitted: (_) => _addTag(),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: _addTag,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7C3AED),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                            ),
+                            child: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      if (_tags.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _tags.map((tag) {
+                            return Chip(
+                              label: Text(tag),
+                              deleteIcon: const Icon(Icons.close, size: 18),
+                              onDeleted: () => _removeTag(tag),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -433,39 +701,51 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
       ),
     );
   }
+}
 
-  Widget _buildLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
 
-  InputDecoration _buildInputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
+Widget _buildSectionHeader(String title) {
+  return Text(
+    title,
+    style: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF7C3AED),
+    ),
+  );
+}
+
+Widget _buildLabel(String label) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF7C3AED)),
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 12,
-      ),
-    );
-  }
+    ),
+  );
+}
+
+InputDecoration _buildInputDecoration(String hint) {
+  return InputDecoration(
+    hintText: hint,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+    ),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 12,
+    ),
+  );
 }

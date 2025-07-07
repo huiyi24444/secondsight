@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:secondsight/view/products/wishlist_view.dart';
 import '../../model/profile_model.dart';
 import '../../services/auth_provider.dart';
+import '../order/notifications_view.dart';
+import '../order/orders_view.dart';
+import '../widgets/bottom_nav_bar.dart';
 import '../widgets/custom_back_button.dart';
 import 'address_list_view.dart';
 import 'payment_method_view.dart';
@@ -152,7 +155,7 @@ class _ProfileViewState extends State<ProfileView> {
               // Profile Header Section
               Container(
                 color: Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(
                   children: [
                     Stack(
@@ -258,6 +261,30 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ),
             ],
+          );
+        },
+      ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: 3,
+        onItemTapped: (index) {
+          if (index == 0) return;
+          Widget target;
+          switch (index) {
+            case 1:
+              target = const NotificationsView();
+              break;
+            case 2:
+              target = const OrdersView();
+              break;
+            case 3:
+              target = const ProfileView();
+              break;
+            default:
+              return;
+          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
           );
         },
       ),

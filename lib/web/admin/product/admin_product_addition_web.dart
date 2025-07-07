@@ -517,9 +517,9 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                                     controller: controller.priceController,
                                     keyboardType: TextInputType.number,
                                     decoration: InputDecoration(
-                                      labelText: 'Base Price',
+                                      labelText: 'New Price',
                                       prefixText: '\$ ',
-                                      hintText: 'Type base price here...',
+                                      hintText: 'Type new price here...',
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(8),
                                       ),

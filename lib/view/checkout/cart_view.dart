@@ -143,8 +143,7 @@ class _CartViewState extends State<CartView> {
 
           final subtotal = _calculateSubtotal(items);
           const shippingCost = 8.0;
-          const tax = 0.0;
-          final total = subtotal + shippingCost + tax;
+          final total = subtotal + shippingCost;
 
           return Column(
             children: [
@@ -348,8 +347,6 @@ class _CartViewState extends State<CartView> {
                         const SizedBox(height: 8),
                         _buildSummaryRow('Shipping', shippingCost),
                         const SizedBox(height: 8),
-                        _buildSummaryRow('Tax', tax),
-                        const SizedBox(height: 12),
                         Container(
                           height: 1,
                           color: Colors.grey[200],
@@ -373,7 +370,6 @@ class _CartViewState extends State<CartView> {
                                   builder: (_) => CheckoutView(
                                     subtotal: subtotal,
                                     shippingCost: shippingCost,
-                                    tax: tax,
                                     total: total,
                                     cartItems: cartItems,
                                   ),

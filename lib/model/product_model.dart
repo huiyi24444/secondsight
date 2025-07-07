@@ -3,21 +3,21 @@ import 'package:secondsight/model/product_measurements_model.dart';
 
 class Product {
   final String id;
-  final String name;
-  final double price;
-  final double oriPrice;
-  final String condition;
-  final String status;
-  final int stockQuantity;
-  final String description;
-  final String productSize;
-  final Map<String, dynamic> virtualTryOn;
-  final ProductMeasurements measurements;
-  final DocumentReference category;
-  final List<String> tags;
-  final List<String> images;
-  final Timestamp? createdAt;
-  final Timestamp? updatedAt;
+  String name;
+  double price;
+  double oriPrice;
+  String condition;
+  String status;
+  int stockQuantity;
+  String description;
+  String productSize;
+  Map<String, dynamic> virtualTryOn;
+  ProductMeasurements measurements;
+  DocumentReference category;
+  List<String> tags;
+  List<String> images;
+  Timestamp? createdAt;
+  Timestamp? updatedAt;
 
   Product({
     required this.id,

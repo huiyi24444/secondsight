@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../services/auth_provider.dart';
 
 class RegisterView extends StatefulWidget {
@@ -43,7 +42,6 @@ class _RegisterViewState extends State<RegisterView> {
       }
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
       final success = await authProvider.register(
         _emailController.text.trim(),
         _passwordController.text,
@@ -53,26 +51,33 @@ class _RegisterViewState extends State<RegisterView> {
       if (success && mounted) {
         final user = Provider.of<AuthProvider>(context, listen: false).user;
         if (user != null) {
+          // Create user document in Firestore
           await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
             'email': user.email,
             'fullName': _nameController.text.trim(),
-            'isVerified': false,
+            'isVerified': false, // Will be updated when email is verified
             'phoneNum': 0,
             'profilePic': '',
             'status': 'active',
+            'createdAt': FieldValue.serverTimestamp(),
           });
-        }
 
-        Navigator.of(context).pushReplacementNamed('/home');
+          // Send email verification
+          await authProvider.sendEmailVerification();
+
+          // Navigate to email verification view
+          Navigator.of(context).pushReplacementNamed(
+            '/email-verification',
+            arguments: _emailController.text.trim(),
+          );
+        }
       }
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       body: SafeArea(
         child: Center(

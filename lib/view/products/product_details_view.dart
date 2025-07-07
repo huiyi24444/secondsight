@@ -6,6 +6,7 @@ import '../../model/product_model.dart';
 import '../../features/virtual_try_on/screens/virtual_try_on_screen.dart';
 import '../../services/auth_provider.dart';
 import '../checkout/cart_view.dart';
+import '../widgets/cart_icon_widget.dart';
 import '../widgets/string_extensions.dart';
 
 class ProductDetailsView extends StatefulWidget {
@@ -48,8 +49,6 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
         final product = Product.fromDocument(data, widget.productId);
         print('Measurements in Product model: ${product.measurements}');
 
-
-
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -57,369 +56,541 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
             foregroundColor: Colors.black,
             elevation: 0,
             actions: [
-              IconButton(
-                icon: const Icon(Icons.favorite_border),
-                onPressed: () {},
-              ),
+              const CartIconWithBadge(),
               IconButton(
                 icon: const Icon(Icons.share_outlined),
                 onPressed: () {},
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Enhanced Product Images with Indicator
-                Stack(
+          body: Stack(
+            children: [
+              // Main scrollable content
+              SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 100), // Add padding to prevent content being hidden by button
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      height: 400,
-                      child: PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentImageIndex = index;
-                          });
-                        },
-                        itemCount: product.images.length,
-                        itemBuilder: (context, index) {
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 16),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                product.images[index],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: const Icon(
-                                      Icons.image_not_supported,
-                                      size: 50,
-                                      color: Colors.grey,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    // Image counter badge
-                    Positioned(
-                      right: 24,
-                      bottom: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${_currentImageIndex + 1} / ${product.images.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                    // Enhanced Product Images with Indicator
+                    Stack(
+                      children: [
+                        SizedBox(
+                          height: 400,
+                          child: PageView.builder(
+                            controller: _pageController,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentImageIndex = index;
+                              });
+                            },
+                            itemCount: product.images.length,
+                            itemBuilder: (context, index) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 16),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    product.images[index],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Icon(
+                                          Icons.image_not_supported,
+                                          size: 50,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
+                        // Image counter badge
+                        Positioned(
+                          right: 24,
+                          bottom: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_currentImageIndex + 1} / ${product.images.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Image dots indicator
+                    if (product.images.length > 1)
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            product.images.length,
+                                (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              height: 8,
+                              width: _currentImageIndex == index ? 24 : 8,
+                              decoration: BoxDecoration(
+                                color: _currentImageIndex == index
+                                    ? const Color(0xFF8E6CEF)
+                                    : Colors.grey[300],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Product Name
+                          Text(
+                            product.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Price with discount badge
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'RM ${product.price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  color: Color(0xFF8E6CEF),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'RM ${product.oriPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '-${((1 - product.price / product.oriPrice) * 100).toStringAsFixed(0)}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Enhanced Size & Condition Row
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildInfoBox(
+                                  label: capitalizeEachWord(product.condition),
+                                  conditionColor: _getConditionColor(product.condition),
+                                  isCondition: true,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildInfoBox(
+                                  label:'Size ${product.productSize}',
+                                  conditionColor: null,
+                                  isCondition: false,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Enhanced Try On Button
+                          Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              gradient: product.hasVirtualTryOn
+                                  ? const LinearGradient(
+                                colors: [Color(0xFF8E6CEF), Color(0xFFA78BFA)],
+                              )
+                                  : null,
+                              color: product.hasVirtualTryOn ? null : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: product.hasVirtualTryOn
+                                  ? [
+                                BoxShadow(
+                                  color: const Color(0xFF8E6CEF).withOpacity(0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                                  : null,
+                            ),
+                            child: ElevatedButton.icon(
+                              onPressed: product.hasVirtualTryOn
+                                  ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => VirtualTryOnScreen(
+                                      productId: widget.productId,
+                                      product: product,
+                                    ),
+                                  ),
+                                );
+                              }
+                                  : null,
+                              icon: Icon(
+                                product.hasVirtualTryOn ? Icons.camera_alt : Icons.camera_alt_outlined,
+                                color: product.hasVirtualTryOn ? Colors.white : Colors.grey[600],
+                              ),
+                              label: Text(
+                                product.hasVirtualTryOn
+                                    ? "Try On Virtually"
+                                    : "Virtual Try-On Not Available",
+                                style: TextStyle(
+                                  color: product.hasVirtualTryOn ? Colors.white : Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                          _buildExpandableSection(
+                            title: 'Tags',
+                            child:   Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: product.tags!.map((tag) {
+                                return _buildStyledTag(tag);
+                              }).toList(),
+                            ),
+                          ),
+                          _buildExpandableSection(
+                            title: 'Details',
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0), // Small spacing around the text
+                              child: Align(
+                                alignment: Alignment.centerLeft, // Align text to the left
+                                child: Text(
+                                  product.description,
+                                  textAlign: TextAlign.left,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          _buildExpandableSection(
+                              title: 'Measurements',
+                              child: _buildMeasurementsTable(product.measurements)
+                          ),
+
+                          const SizedBox(height: 20),
+                        ],
                       ),
                     ),
                   ],
                 ),
+              ),
 
-                // Image dots indicator
-                if (product.images.length > 1)
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        product.images.length,
-                            (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          height: 8,
-                          width: _currentImageIndex == index ? 24 : 8,
-                          decoration: BoxDecoration(
-                            color: _currentImageIndex == index
-                                ? const Color(0xFF8E6CEF)
-                                : Colors.grey[300],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Product Name
-                      Text(
-                        product.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Price with discount badge
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'RM ${product.price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              color: Color(0xFF8E6CEF),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'RM ${product.oriPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red[50],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '-${((1 - product.price / product.oriPrice) * 100).toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.red[700],
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Enhanced Size & Condition Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildInfoBox(
-                              label: capitalizeEachWord(product.condition),
-                              conditionColor: _getConditionColor(product.condition),
-                              isCondition: true,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildInfoBox(
-                              label:'Size ${product.productSize}',
-                              conditionColor: null,
-                              isCondition: false,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-
-                      // Enhanced Try On Button
-                      Container(
-                        width: double.infinity,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: product.hasVirtualTryOn
-                              ? const LinearGradient(
-                            colors: [Color(0xFF8E6CEF), Color(0xFFA78BFA)],
-                          )
-                              : null,
-                          color: product.hasVirtualTryOn ? null : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: product.hasVirtualTryOn
-                              ? [
-                            BoxShadow(
-                              color: const Color(0xFF8E6CEF).withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                              : null,
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: product.hasVirtualTryOn
-                              ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => VirtualTryOnScreen(
-                                  productId: widget.productId,
-                                  product: product,
-                                ),
-                              ),
-                            );
-                          }
-                              : null,
-                          icon: Icon(
-                            product.hasVirtualTryOn ? Icons.camera_alt : Icons.camera_alt_outlined,
-                            color: product.hasVirtualTryOn ? Colors.white : Colors.grey[600],
-                          ),
-                          label: Text(
-                            product.hasVirtualTryOn
-                                ? "Try On Virtually"
-                                : "Virtual Try-On Not Available",
-                            style: TextStyle(
-                              color: product.hasVirtualTryOn ? Colors.white : Colors.grey[600],
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-
-                      ),
-
-                      const SizedBox(height: 20),
-                      _buildExpandableSection(
-                          title: 'Tags',
-                          child:   Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: product.tags!.map((tag) {
-                              return _buildStyledTag(tag);
-                            }).toList(),
-                          ),
-                      ),
-                      _buildExpandableSection(
-                        title: 'Details',
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 0), // Small spacing around the text
-                          child: Align(
-                            alignment: Alignment.centerLeft, // Align text to the left
-                            child: Text(
-                              product.description,
-                              textAlign: TextAlign.left,
-                            ),
-                          ),
-                        ),
-                      ),
-
-
-
-                      _buildExpandableSection(
-                          title: 'Measurements',
-                          child: _buildMeasurementsTable(product.measurements)
-
-                      ),
-
-                      const SizedBox(height: 20),
-                    ],
-
-
-                  ),
-                ),
-                // Fixed Bottom Button
-                Container(
+              // Fixed Add to Bag Button at bottom
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
                       ),
                     ],
                   ),
                   padding: const EdgeInsets.all(16),
                   child: SafeArea(
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          if (userId == null || userId.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please log in first.')),
-                            );
-                            return;
-                          }
+                    child: Row(
+                      children: [
+                        // Optional: Add a heart icon button
+                        Container(
+                          height: 56,
+                          width: 56,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: StreamBuilder<DocumentSnapshot>(
+                              stream: userId != null
+                                  ? FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(userId)
+                                  .collection('wishlist')
+                                  .doc(widget.productId)
+                                  .snapshots()
+                                  : null,
+                              builder: (context, snapshot) {
+                                final isFavorite = snapshot.hasData && snapshot.data!.exists;
 
-                          final cartRef = FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(userId)
-                              .collection('cart');
+                                return IconButton(
+                                  icon: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : Colors.grey[600],
+                                  ),
+                                  onPressed: () async {
+                                    if (userId == null || userId.isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Please log in first.')),
+                                      );
+                                      return;
+                                    }
 
-                          final existingCart = await cartRef
-                              .where('productID',
-                              isEqualTo: FirebaseFirestore.instance
-                                  .collection('products')
-                                  .doc(widget.productId))
-                              .limit(1)
-                              .get();
+                                    final favRef = FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(userId)
+                                        .collection('wishlist')
+                                        .doc(widget.productId);
 
-                          if (existingCart.docs.isNotEmpty) {
-                            final existingDoc = existingCart.docs.first;
-                            await existingDoc.reference.update({
-                              'cartQuantity': (existingDoc.data()['cartQuantity'] ?? 1) + 1,
-                            });
-                          } else {
-                            await cartRef.add({
-                              'productID': FirebaseFirestore.instance
-                                  .collection('products')
-                                  .doc(widget.productId),
-                              'cartQuantity': 1,
-                            });
-                          }
+                                    if (isFavorite) {
+                                      // Remove from favorites
+                                      await favRef.delete();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Removed from wishlist'),
+                                          duration: Duration(seconds: 1),
+                                        ),
+                                      );
+                                    } else {
+                                      // Add to favorites
+                                      await favRef.set({
+                                        'productRef': FirebaseFirestore.instance
+                                            .collection('products')
+                                            .doc(widget.productId),
+                                        'addedAt': FieldValue.serverTimestamp(),
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Added to wishlist'),
+                                          duration: Duration(seconds: 1),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                );
+                              }
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Add to Bag button
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                if (userId == null || userId.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please log in first.')),
+                                  );
+                                  return;
+                                }
 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart!'),
-                              duration: Duration(seconds: 2),
+                                final cartRef = FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(userId)
+                                    .collection('cart');
+
+                                final existingCart = await cartRef
+                                    .where('productID',
+                                    isEqualTo: FirebaseFirestore.instance
+                                        .collection('products')
+                                        .doc(widget.productId))
+                                    .limit(1)
+                                    .get();
+
+                                if (existingCart.docs.isNotEmpty) {
+                                  final existingDoc = existingCart.docs.first;
+                                  await existingDoc.reference.update({
+                                    'cartQuantity': (existingDoc.data()['cartQuantity'] ?? 1) + 1,
+                                  });
+                                } else {
+                                  await cartRef.add({
+                                    'productID': FirebaseFirestore.instance
+                                        .collection('products')
+                                        .doc(widget.productId),
+                                    'cartQuantity': 1,
+                                  });
+                                }
+
+                                // Show success dialog
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (BuildContext dialogContext) {
+                                    return AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      title: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.shade50,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green.shade600,
+                                              size: 24,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          const Text(
+                                            'Added to Cart!',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            product.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'RM ${product.price.toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                            'Would you like to view your cart?',
+                                            style: TextStyle(fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(dialogContext).pop();
+                                          },
+                                          child: Text(
+                                            'Continue Shopping',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.of(dialogContext).pop();
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => CartView(userId: userId),
+                                              ),
+                                            );
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.black,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'View Cart',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.shopping_bag_outlined,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                'Add to Bag',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
                             ),
-                          );
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => CartView(userId: userId)),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7B61FF),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Add to Bag',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -486,8 +657,6 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     );
   }
 
-
-
   Widget _buildStyledTag(String tag) {
     // Determine tag style based on content
     Color bgColor = Colors.grey[100]!;
@@ -518,7 +687,6 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     );
   }
 
-
   Widget _buildExpandableSection({required String title, required Widget child}) {
     return Theme(
       data: ThemeData().copyWith(dividerColor: Colors.transparent),
@@ -529,13 +697,12 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     );
   }
 
-
   Color _getConditionColor(String condition) {
     switch (condition.toLowerCase()) {
       case 'new':
       case 'brand new':
         return Colors.green;
-      case 'like new':
+      case 'like_new':
       case 'excellent':
         return Colors.lightGreen;
       case 'good':
@@ -592,5 +759,4 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
       ),
     );
   }
-
 }

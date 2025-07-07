@@ -16,7 +16,8 @@ import '../checkout/cart_view.dart';
   import '../order/order_tracking_view.dart';
   import '../order/orders_view.dart';
   import '../widgets/bottom_nav_bar.dart';
-  import '../widgets/product_card.dart';
+  import '../widgets/cart_icon_widget.dart';
+import '../widgets/product_card.dart';
 
   class MyHomePage extends StatefulWidget {
     const MyHomePage({super.key});
@@ -171,24 +172,7 @@ import '../checkout/cart_view.dart';
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 16.0, top: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.shopping_cart_outlined),
-                    color: Colors.white,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CartView(userId: userId!),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                child: CartIconWithBadge(),  // Removed 'const'
               ),
             ],
           ),

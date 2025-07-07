@@ -2,7 +2,10 @@
 // notifications_view.dart
 import 'package:flutter/material.dart';
 
+import '../settings/profile_view.dart';
+import '../widgets/bottom_nav_bar.dart';
 import '../widgets/custom_back_button.dart';
+import 'orders_view.dart';
 
 class NotificationsView extends StatelessWidget {
   const NotificationsView({super.key});
@@ -92,6 +95,30 @@ class NotificationsView extends StatelessWidget {
                 ),
               ),
             ),
+          );
+        },
+      ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: 1,
+        onItemTapped: (index) {
+          if (index == 0) return;
+          Widget target;
+          switch (index) {
+            case 1:
+              target = const NotificationsView();
+              break;
+            case 2:
+              target = const OrdersView();
+              break;
+            case 3:
+              target = const ProfileView();
+              break;
+            default:
+              return;
+          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
           );
         },
       ),

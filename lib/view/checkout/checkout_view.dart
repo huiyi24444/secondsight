@@ -16,7 +16,6 @@ import '../../model/order_model.dart';
 class CheckoutView extends StatefulWidget {
   final double subtotal;
   final double shippingCost;
-  final double tax;
   final double total;
   final List<CartItem> cartItems;
 
@@ -24,7 +23,6 @@ class CheckoutView extends StatefulWidget {
     super.key,
     required this.subtotal,
     required this.shippingCost,
-    required this.tax,
     required this.total,
     required this.cartItems,
   });
@@ -117,7 +115,6 @@ class _CheckoutViewState extends State<CheckoutView> {
                         children: [
                           _buildSummaryRow('Subtotal', widget.subtotal),
                           _buildSummaryRow('Shipping Cost', widget.shippingCost),
-                          _buildSummaryRow('Tax', widget.tax),
                           Divider(),
                           _buildSummaryRow('Total', widget.total, isTotal: true),
                         ],
