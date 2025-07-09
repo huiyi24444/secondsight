@@ -62,7 +62,7 @@ class _RegisterViewState extends State<RegisterView> {
             'email': user.email,
             'fullName': _nameController.text.trim(),
             'isVerified': false, // Will be updated when email is verified
-            'phoneNum': '',
+            'phoneNum': 0,
             'profilePic': '',
             'status': 'active',
             'createdAt': FieldValue.serverTimestamp(),

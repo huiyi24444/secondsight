@@ -28,7 +28,7 @@ class OrdersModel {
       customerId: json['customerId'], // optional, might be null
       orderDate: (json['orderDate'] as Timestamp).toDate(),
       orderStatus: json['orderStatus'] ?? 'processing',
-      totalAmount: (json['totalAmount'] ?? 0).toDouble(),
+      totalAmount: double.tryParse(json['totalAmount'].toString()) ?? 0.0,
       eligibilityForReturn: json['eligibilityForReturn'] ?? false,
       shipmentID: json['shipmentID'],
       payment: json['payment'] ?? 'Mastercard',

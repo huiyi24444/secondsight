@@ -17,7 +17,7 @@ class CartIconWithBadge extends StatelessWidget {
     this.iconColor,
     this.badgeColor,
     this.badgeTextColor,
-    this.iconSize = 24,
+    this.iconSize = 27,
     this.showBackground = true,
     this.backgroundColor,
   });

@@ -22,9 +22,15 @@ class ProductAdditionController {
   final descriptionController = TextEditingController();
   final priceController = TextEditingController();
   final originalPriceController = TextEditingController();
-  final heightController = TextEditingController();
-  final lengthController = TextEditingController();
-  final widthController = TextEditingController();
+  final bustController = TextEditingController();
+  final waistController = TextEditingController();
+  final hipController = TextEditingController();
+  final shoulderWidthController = TextEditingController();
+  final sleeveLengthController = TextEditingController();
+  final shirtLengthController = TextEditingController();
+  final inseamController = TextEditingController();
+  final outseamController = TextEditingController();
+  final totalLengthController = TextEditingController();
   String? selectedSize;
   final quantityController = TextEditingController();
 
@@ -49,20 +55,28 @@ class ProductAdditionController {
   bool isLoading = false;
   bool isCategoriesLoading = true;
 
+  List<QueryDocumentSnapshot> categoriesFromSnapshot = [];
+
   Future<void> loadCategories(VoidCallback onUpdate) async {
     try {
       isCategoriesLoading = true;
       onUpdate();
 
       final snapshot = await firestore.collection('category').get();
+
+      // ✅ Store raw snapshot for MeasurementsWidget
+      categoriesFromSnapshot = snapshot.docs;
+
+      // ✅ Store converted model list for dropdown
       categories = snapshot.docs.map((doc) => Category.fromDocument(doc)).toList();
     } catch (e) {
-      print('Error loading categories: \$e');
+      print('Error loading categories: $e');
     } finally {
       isCategoriesLoading = false;
       onUpdate();
     }
   }
+
 
   Future<void> pickImages(VoidCallback onUpdate) async {
     if (selectedImages.length >= 5) return;
@@ -152,14 +166,6 @@ class ProductAdditionController {
           : price;
 
 
-      final measurements = {
-        'productHeight': heightController.text.isNotEmpty ? double.parse(heightController.text) : null,
-        'productLength': lengthController.text.isNotEmpty ? double.parse(lengthController.text) : null,
-        'productWidth': widthController.text.isNotEmpty ? double.parse(widthController.text) : null,
-        'productSize': selectedSize,
-
-      };
-
       Map<String, dynamic>? virtualTryOnData;
       if (virtualTryOnEnabled && uploadedTryOnImageUrl != null) {
         virtualTryOnData = {
@@ -179,7 +185,18 @@ class ProductAdditionController {
         'productStatus': selectedStatus,
         'tags': selectedTags,
         'productURL': uploadedImageUrls,
-        'measurements': measurements,
+        'measurements': {
+          'bust': double.tryParse(bustController.text) ?? 0.0,
+          'waist': double.tryParse(waistController.text) ?? 0.0,
+          'hip': double.tryParse(hipController.text) ?? 0.0,
+          'shoulderWidth': double.tryParse(shoulderWidthController.text) ?? 0.0,
+          'sleeveLength': double.tryParse(sleeveLengthController.text) ?? 0.0,
+          'shirtLength': double.tryParse(shirtLengthController.text) ?? 0.0,
+          'inseam': double.tryParse(inseamController.text) ?? 0.0,
+          'outseam': double.tryParse(outseamController.text) ?? 0.0,
+          'totalLength': double.tryParse(totalLengthController.text) ?? 0.0,
+        },
+
         'stockQuantity': int.parse(quantityController.text),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt':  FieldValue.serverTimestamp(),

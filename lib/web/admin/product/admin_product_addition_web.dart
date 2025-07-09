@@ -6,6 +6,7 @@ import 'dart:html' as html;
 
 import '../../../model/category_model.dart';
 import '../widget/topbar.dart';
+import 'measurements_widget.dart';
 
 
 class ProductAdditionPage extends StatefulWidget {
@@ -623,103 +624,48 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Height', style: TextStyle(fontSize: 14)),
-                                      const SizedBox(height: 5),
-                                      TextFormField(
-                                        controller: controller.heightController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          hintText: 'Height (cm)',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Length', style: TextStyle(fontSize: 14)),
-                                      const SizedBox(height: 5),
-                                      TextFormField(
-                                        controller: controller.lengthController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          hintText: 'Length (cm)',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Width', style: TextStyle(fontSize: 14)),
-                                      const SizedBox(height: 5),
-                                      TextFormField(
-                                        controller: controller.widthController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          hintText: 'Width (cm)',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Size', style: TextStyle(fontSize: 14)),
-                                      const SizedBox(height: 5),
-                                      DropdownButtonFormField<String>(
-                                        value: controller.selectedSize,
-                                        items: ['S', 'M', 'L', 'XL'].map((size) {
-                                          return DropdownMenuItem(
-                                            value: size,
-                                            child: Text(size),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
-                                          controller.selectedSize = value;
-                                        },
-                                        decoration: InputDecoration(
-                                          hintText: 'Select Size',
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Please select a size';
-                                          }
-                                          return null;
-                                        },
-                                      ),
+                            MeasurementsWidget(
+                              selectedCategoryId: controller.selectedCategory?.id,
+                              categories: controller.categoriesFromSnapshot, // <-- List<QueryDocumentSnapshot>
+                              bustController: controller.bustController,
+                              waistController: controller.waistController,
+                              hipController: controller.hipController,
+                              shoulderWidthController: controller.shoulderWidthController,
+                              sleeveLengthController: controller.sleeveLengthController,
+                              shirtLengthController: controller.shirtLengthController,
+                              inseamController: controller.inseamController,
+                              outseamController: controller.outseamController,
+                              totalLengthController: controller.totalLengthController,
+                              buildLabel: (label) => Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                              buildInputDecoration: (hint) => InputDecoration(
+                                hintText: hint,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
 
+                            const SizedBox(height: 40),
 
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            DropdownButtonFormField<String>(
+                              value: controller.selectedSize,
+                              items: ['S', 'M', 'L', 'XL'].map((size) {
+                                return DropdownMenuItem(
+                                  value: size,
+                                  child: Text(size),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                controller.selectedSize = value;
+                              },
+                              decoration: InputDecoration(
+                                labelText: 'Size',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please select a size';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 40),
 

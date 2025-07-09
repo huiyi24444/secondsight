@@ -156,7 +156,7 @@ import '../widgets/product_card.dart';
             centerTitle: true,
             actions: [
               Padding(
-                padding: const EdgeInsets.only(top: 15.0, right: 8.0, left: 4.0),
+                padding: const EdgeInsets.only(right: 1.0, top: 12),
                 child: IconButton(
                   onPressed: () {
                     Navigator.push(
@@ -166,7 +166,7 @@ import '../widgets/product_card.dart';
                   },
                   icon: const Icon(Icons.messenger_outline),
                   color: Colors.black,
-                  iconSize: 27,
+                  //iconSize: 27,
                 ),
               ),
               Padding(
