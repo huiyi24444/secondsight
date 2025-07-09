@@ -168,7 +168,6 @@ import '../widgets/product_card.dart';
                   color: Colors.black,
                   iconSize: 27,
                 ),
-
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 16.0, top: 12),
@@ -373,6 +372,7 @@ import '../widgets/product_card.dart';
                     return SizedBox(
                       height: 270,
                       child: ListView.builder(
+                        itemCount: products.length,
                         scrollDirection: Axis.horizontal,
                         physics: const ClampingScrollPhysics(), // Prevents overscroll
                         itemBuilder: (context, index) {

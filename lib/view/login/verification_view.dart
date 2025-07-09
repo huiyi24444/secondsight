@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -14,6 +15,7 @@ class EmailVerificationView extends StatefulWidget {
 
 class _EmailVerificationViewState extends State<EmailVerificationView> {
   Timer? _timer;
+  Timer? _verificationTimer;
   bool _canResend = false;
   int _resendCountdown = 60;
 
@@ -27,6 +29,7 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _verificationTimer?.cancel();
     super.dispose();
   }
 
@@ -51,14 +54,27 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
   }
 
   void _checkEmailVerified() {
-    Timer.periodic(const Duration(seconds: 3), (timer) {
+    _verificationTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      authProvider.checkEmailVerification().then((isVerified) {
-        if (isVerified && mounted) {
-          timer.cancel();
-          Navigator.of(context).pushReplacementNamed('/home');
+      final isVerified = await authProvider.checkEmailVerification();
+
+      if (isVerified && mounted) {
+        timer.cancel();
+
+        // Update Firestore to mark email as verified
+        final user = authProvider.user;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'isVerified': true,
+            'emailVerifiedAt': FieldValue.serverTimestamp(),
+          });
         }
-      });
+
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     });
   }
 
@@ -66,14 +82,23 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     try {
-      await authProvider.sendEmailVerification();
-      _startResendTimer();
+      final success = await authProvider.sendEmailVerification();
 
-      if (mounted) {
+      if (success) {
+        _startResendTimer();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verification email resent successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification email resent successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Failed to resend email'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -141,7 +166,8 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
 
                     // Email address
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(8),
@@ -193,7 +219,9 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
 
                     // Resend button
                     ElevatedButton(
-                      onPressed: _canResend && !authProvider.isLoading ? _resendVerificationEmail : null,
+                      onPressed: _canResend && !authProvider.isLoading
+                          ? _resendVerificationEmail
+                          : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -227,13 +255,15 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                     // Check verification status button
                     TextButton(
                       onPressed: () async {
-                        final isVerified = await authProvider.checkEmailVerification();
+                        final isVerified =
+                        await authProvider.checkEmailVerification();
                         if (isVerified && mounted) {
                           Navigator.of(context).pushReplacementNamed('/home');
                         } else if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Email not verified yet. Please check your email.'),
+                              content: Text(
+                                  'Email not verified yet. Please check your email.'),
                               backgroundColor: Colors.orange,
                             ),
                           );
@@ -243,11 +273,12 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                         'I\'ve verified my email',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Colors.grey,
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 5),
 
                     // Error message
                     if (authProvider.errorMessage != null)
@@ -296,7 +327,8 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                           onPressed: () {
                             // Sign out the current user and go back to register
                             authProvider.signOut();
-                            Navigator.of(context).pushReplacementNamed('/register');
+                            Navigator.of(context)
+                                .pushReplacementNamed('/register');
                           },
                           child: const Text(
                             'Sign up again',
@@ -307,6 +339,10 @@ class _EmailVerificationViewState extends State<EmailVerificationView> {
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
+
+
                   ],
                 );
               },

@@ -1,6 +1,9 @@
+
+// register_view.dart - Fixed version
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/login/verification_view.dart';
 import '../../services/auth_provider.dart';
 
 class RegisterView extends StatefulWidget {
@@ -52,11 +55,14 @@ class _RegisterViewState extends State<RegisterView> {
         final user = Provider.of<AuthProvider>(context, listen: false).user;
         if (user != null) {
           // Create user document in Firestore
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
             'email': user.email,
             'fullName': _nameController.text.trim(),
             'isVerified': false, // Will be updated when email is verified
-            'phoneNum': 0,
+            'phoneNum': '',
             'profilePic': '',
             'status': 'active',
             'createdAt': FieldValue.serverTimestamp(),
@@ -66,10 +72,15 @@ class _RegisterViewState extends State<RegisterView> {
           await authProvider.sendEmailVerification();
 
           // Navigate to email verification view
-          Navigator.of(context).pushReplacementNamed(
-            '/email-verification',
-            arguments: _emailController.text.trim(),
-          );
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => EmailVerificationView(
+                  email: _emailController.text.trim(),
+                ),
+              ),
+            );
+          }
         }
       }
     }
@@ -78,6 +89,7 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -227,7 +239,8 @@ class _RegisterViewState extends State<RegisterView> {
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                !_obscureConfirmPassword;
                               });
                             },
                           ),
@@ -259,7 +272,8 @@ class _RegisterViewState extends State<RegisterView> {
                                 _agreedToTerms = value ?? false;
                               });
                             },
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                           ),
                           Expanded(
                             child: GestureDetector(
@@ -323,7 +337,8 @@ class _RegisterViewState extends State<RegisterView> {
 
                       // Register Button
                       ElevatedButton(
-                        onPressed: authProvider.isLoading ? null : _handleRegister,
+                        onPressed:
+                        authProvider.isLoading ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -363,7 +378,8 @@ class _RegisterViewState extends State<RegisterView> {
                           ),
                           TextButton(
                             onPressed: () {
-                              Navigator.of(context).pushReplacementNamed('/login');
+                              Navigator.of(context)
+                                  .pushReplacementNamed('/login');
                             },
                             child: const Text(
                               'Sign In',

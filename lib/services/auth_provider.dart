@@ -1,3 +1,4 @@
+// auth_provider.dart - Updated with email verification methods
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,10 +10,16 @@ class AuthProvider with ChangeNotifier {
 
   // Getters
   User? get user => _user;
+
   String? get userId => _user?.uid;
+
   bool get isAuthenticated => _user != null;
+
   bool get isLoading => _isLoading;
+
   String? get errorMessage => _errorMessage;
+
+  bool get isEmailVerified => _user?.emailVerified ?? false;
 
   AuthProvider() {
     // Listen to auth state changes
@@ -68,7 +75,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Register with email and password
-  Future<bool> register(String email, String password, String displayName) async {
+  Future<bool> register(String email, String password,
+      String displayName) async {
     try {
       _isLoading = true;
       _errorMessage = null;
@@ -161,6 +169,7 @@ class AuthProvider with ChangeNotifier {
       if (displayName != null) {
         await _user!.updateDisplayName(displayName);
       }
+
       if (photoURL != null) {
         await _user!.updatePhotoURL(photoURL);
       }
@@ -176,13 +185,21 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Verify email
+  // Send email verification
   Future<bool> sendEmailVerification() async {
     try {
       if (_user != null && !_user!.emailVerified) {
         await _user!.sendEmailVerification();
         return true;
       }
+      return false;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'too-many-requests') {
+        _errorMessage = 'Too many requests. Please try again later.';
+      } else {
+        _errorMessage = 'Failed to send verification email.';
+      }
+      notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Failed to send verification email.';
@@ -192,13 +209,17 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Check if email is verified
-  Future<void> checkEmailVerified() async {
-    if (_user != null) {
-      await _user!.reload();
-      _user = _auth.currentUser;
-      notifyListeners();
+  Future<bool> checkEmailVerification() async {
+    try {
+      if (_user != null) {
+        await _user!.reload();
+        _user = _auth.currentUser;
+        notifyListeners();
+        return _user?.emailVerified ?? false;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
-
-  Future checkEmailVerification() async {}
 }

@@ -9,6 +9,7 @@ import 'package:secondsight/admin_main.dart';
 import 'package:secondsight/view/login/forgot_password_view.dart';
 import 'package:secondsight/view/login/login_view.dart';
 import 'package:secondsight/view/login/register_view.dart';
+import 'package:secondsight/view/login/verification_view.dart';
 import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -76,22 +77,26 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const AuthWrapper(
-        authenticatedWidget: MyHomePage(), // Replace with your home screen
+        authenticatedWidget: MyHomePage(),
       ),
       routes: {
         '/login': (context) => const LoginView(),
         '/register': (context) => const RegisterView(),
+        '/home': (context) => const MyHomePage(),
         '/forgot-password': (context) => const ForgotPasswordView(),
-        '/email-verification': (context) => const EmailVerificationScreen(),
-        '/home': (context) => const AuthWrapper(
-          authenticatedWidget: MyHomePage(), // Replace with your home screen
-        ),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/email-verification') {
+          final args = settings.arguments as String;
+          return MaterialPageRoute(
+            builder: (context) => EmailVerificationView(email: args),
+          );
+        }
+        return null;
       },
     );
   }
 }
-
-
 
 // Example Home Screen - Replace with your actual home screen
 class HomeScreen extends StatelessWidget {
@@ -161,7 +166,10 @@ class HomeScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: () {
-                          Navigator.of(context).pushNamed('/email-verification');
+                          Navigator.of(context).pushNamed(
+                            '/email-verification',
+                            arguments: user.email ?? '',
+                          );
                         },
                         child: const Text('Verify now'),
                       ),
