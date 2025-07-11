@@ -13,19 +13,67 @@ class EditProfileController {
   final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
+  final birthdateController = TextEditingController();
   File? imageFile;
   String? profilePicUrl;
+  String? selectedGender;
+  DateTime? selectedBirthdate;
   bool isLoading = false;
+
+  // Gender options
+  final List<String> genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
   EditProfileController(this.context, this.userId, this.profile) {
     nameController.text = profile.fullName;
     phoneController.text = profile.phoneNum > 0 ? profile.phoneNum.toString() : '';
     profilePicUrl = profile.profilePic;
+
+    // Initialize birthdate and gender if they exist in the profile
+    if (profile.birthdate != null) {
+      selectedBirthdate = profile.birthdate;
+      birthdateController.text = _formatDate(profile.birthdate!);
+    }
+    selectedGender = profile.gender;
   }
 
   void disposeControllers() {
     nameController.dispose();
     phoneController.dispose();
+    birthdateController.dispose();
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+  }
+
+  Future<void> selectBirthdate(Function setState) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedBirthdate ?? DateTime.now().subtract(const Duration(days: 6570)), // Default to 18 years ago
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF8E6CEF),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+            dialogBackgroundColor: Colors.white,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != selectedBirthdate) {
+      setState(() {
+        selectedBirthdate = picked;
+        birthdateController.text = _formatDate(picked);
+      });
+    }
   }
 
   Future<void> pickImage(Function setState) async {
@@ -125,13 +173,25 @@ class EditProfileController {
     try {
       final newProfilePicUrl = await _uploadImage();
       final phoneText = phoneController.text.trim();
+
       final Map<String, dynamic> updateData = {
         'fullName': nameController.text.trim(),
         'phoneNum': phoneText.isNotEmpty
             ? (int.tryParse(phoneText.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0)
             : 0,
       };
+
       if (newProfilePicUrl != null) updateData['profilePic'] = newProfilePicUrl;
+
+      // Add birthdate if selected
+      if (selectedBirthdate != null) {
+        updateData['birthdate'] = Timestamp.fromDate(selectedBirthdate!);
+      }
+
+      // Add gender if selected
+      if (selectedGender != null && selectedGender!.isNotEmpty) {
+        updateData['gender'] = selectedGender;
+      }
 
       await FirebaseFirestore.instance.collection('users').doc(userId).update(updateData);
 
@@ -228,6 +288,7 @@ class EditProfileController {
               },
             ),
             const SizedBox(height: 20),
+
             _label('Phone Number'),
             const SizedBox(height: 8),
             TextFormField(
@@ -237,15 +298,100 @@ class EditProfileController {
               decoration: _inputDecoration('Enter your phone number', Icons.phone_outlined),
               validator: (value) {
                 if (value != null && value.isNotEmpty) {
-                  if (!RegExp(r'^\d{11}$').hasMatch(value)) {
-                    return 'Please enter a valid 10-digit phone number';
+                  if (!RegExp(r'^\d{10,11}$').hasMatch(value)) {
+                    return 'Please enter a valid 10-11 digit phone number';
                   }
                 }
-
                 return null;
               },
             ),
+            const SizedBox(height: 20),
+
+            _label('Date of Birth (Optional)'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: birthdateController,
+              readOnly: true,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              decoration: _inputDecoration('Select your date of birth', Icons.calendar_today_outlined).copyWith(
+                suffixIcon: birthdateController.text.isNotEmpty
+                    ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey[600]),
+                  onPressed: () {
+                    setState(() {
+                      selectedBirthdate = null;
+                      birthdateController.clear();
+                    });
+                  },
+                )
+                    : null,
+              ),
+              onTap: () => selectBirthdate(setState),
+            ),
+            const SizedBox(height: 20),
+
+            _label('Gender (Optional)'),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedGender,
+                  hint: Row(
+                    children: [
+                      Icon(Icons.person_outline, color: Colors.grey[600], size: 22),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Select your gender',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontWeight: FontWeight.w400,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  icon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                  isExpanded: true,
+                  items: [
+                    DropdownMenuItem<String>(
+                      value: null,
+                      child: Text(
+                        'Select your gender',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    ...genderOptions.map((String gender) {
+                      return DropdownMenuItem<String>(
+                        value: gender,
+                        child: Text(
+                          gender,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedGender = newValue;
+                    });
+                  },
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
+
             SizedBox(
               width: double.infinity,
               height: 52,

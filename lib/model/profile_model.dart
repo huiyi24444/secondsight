@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ProfileModel {
   final String email;
   final String fullName;
@@ -9,6 +11,9 @@ class ProfileModel {
   final List<String> recommendations;
   final List<String> wishlist;
 
+  final String? gender;
+  final DateTime? birthdate;
+
   ProfileModel({
     required this.email,
     required this.fullName,
@@ -19,6 +24,8 @@ class ProfileModel {
     required this.order,
     required this.recommendations,
     required this.wishlist,
+    this.gender,
+    this.birthdate,
   });
 
   // Convert a JSON object to ProfileModel
@@ -39,6 +46,13 @@ class ProfileModel {
       return 0;
     }
 
+    DateTime? parseBirthdate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
     return ProfileModel(
       email: json['email'] ?? '',
       fullName: json['fullName'] ?? '',
@@ -49,6 +63,8 @@ class ProfileModel {
       order: List<String>.from(json['order'] ?? []),
       recommendations: List<String>.from(json['recommendations'] ?? []),
       wishlist: List<String>.from(json['wishlist'] ?? []),
+      gender: json['gender'],
+        birthdate: parseBirthdate(json['birthdate'])
     );
   }
 
@@ -64,6 +80,8 @@ class ProfileModel {
       'order': order,
       'recommendations': recommendations,
       'wishlist': wishlist,
+      if (gender != null) 'gender': gender,
+      if (birthdate != null) 'birthdate': birthdate!.toIso8601String(),
     };
   }
 
@@ -78,6 +96,8 @@ class ProfileModel {
     List<String>? order,
     List<String>? recommendations,
     List<String>? wishlist,
+    String? gender,
+    DateTime? birthdate,
   }) {
     return ProfileModel(
       email: email ?? this.email,
@@ -89,6 +109,8 @@ class ProfileModel {
       order: order ?? this.order,
       recommendations: recommendations ?? this.recommendations,
       wishlist: wishlist ?? this.wishlist,
+      gender: gender ?? this.gender,
+      birthdate: birthdate ?? this.birthdate,
     );
   }
 }

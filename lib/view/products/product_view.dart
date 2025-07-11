@@ -9,22 +9,43 @@ import 'package:secondsight/view/widgets/product_card.dart';
 class ProductView extends StatelessWidget {
   final DocumentReference? categoryRef;
   final bool isNewIn;
+  final bool isRecommendations; // Add this flag
+  final List<String>? recommendedProductIds; // Add this for product IDs
 
-  const ProductView({Key? key, this.categoryRef, this.isNewIn = false}) : super(key: key);
+  const ProductView({
+    Key? key,
+    this.categoryRef,
+    this.isNewIn = false,
+    this.isRecommendations = false,
+    this.recommendedProductIds,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final productStream = isNewIn
-        ? FirebaseFirestore.instance
-        .collection('products')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        : categoryRef == null
-        ? FirebaseFirestore.instance.collection('products').snapshots()
-        : FirebaseFirestore.instance
-        .collection('products')
-        .where('category', isEqualTo: categoryRef)
-        .snapshots();
+    Stream<QuerySnapshot> productStream;
+
+    if (isRecommendations && recommendedProductIds != null) {
+      // For recommendations, get products by their IDs
+      productStream = FirebaseFirestore.instance
+          .collection('products')
+          .where(FieldPath.documentId, whereIn: recommendedProductIds)
+          .snapshots();
+    } else if (isNewIn) {
+      // For New In products
+      productStream = FirebaseFirestore.instance
+          .collection('products')
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    } else if (categoryRef != null) {
+      // For category products
+      productStream = FirebaseFirestore.instance
+          .collection('products')
+          .where('category', isEqualTo: categoryRef)
+          .snapshots();
+    } else {
+      // For all products
+      productStream = FirebaseFirestore.instance.collection('products').snapshots();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -43,61 +64,91 @@ class ProductView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Show category title
-            if (categoryRef != null && !isNewIn)
-          FutureBuilder<DocumentSnapshot>(
-      future: categoryRef!.get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
-          );
-        }
+            // Show title based on view type
+            if (isRecommendations)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Recommended for You',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (isNewIn)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'New In',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (categoryRef != null && !isNewIn && !isRecommendations)
+              FutureBuilder(
+                future: categoryRef!.get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    );
+                  }
 
-        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Category'),
-          );
-        }
+                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('Category'),
+                    );
+                  }
 
-        final data = snapshot.data!.data() as Map<String, dynamic>;
-        final categoryName = data['catName'] ?? 'Category';
+                  final data = snapshot.data!.data() as Map;
+                  final categoryName = data['catName'] ?? 'Category';
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            categoryName,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-      },
-    ),
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      categoryName,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                },
+              ),
 
-
-    // Products Grid
+            // Products Grid
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
+              child: StreamBuilder(
                 stream: productStream,
                 builder: (context, snapshot) {
                   if (!snapshot.hasData)
                     return const Center(child: CircularProgressIndicator());
                   final docs = snapshot.data!.docs;
+
+                  if (docs.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No products found',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    );
+                  }
+
                   return GridView.count(
                     crossAxisCount: 2,
                     childAspectRatio: 0.60,
                     mainAxisSpacing: 5,
                     crossAxisSpacing: 1,
-                    children:
-                        docs.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final product = Product.fromDocument(data, doc.id);
-                          return ProductCard(product: product);
-                        }).toList(),
+                    children: docs.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final product = Product.fromDocument(data, doc.id);
+                      return ProductCard(product: product);
+                    }).toList(),
                   );
                 },
               ),

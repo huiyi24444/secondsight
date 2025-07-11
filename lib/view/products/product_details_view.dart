@@ -5,6 +5,7 @@ import '../../model/product_measurements_model.dart';
 import '../../model/product_model.dart';
 import '../../features/virtual_try_on/screens/virtual_try_on_screen.dart';
 import '../../services/auth_provider.dart';
+import '../../services/recommendation_service.dart';
 import '../checkout/cart_view.dart';
 import '../widgets/cart_icon_widget.dart';
 import '../widgets/string_extensions.dart';
@@ -13,6 +14,8 @@ class ProductDetailsView extends StatefulWidget {
   final String productId;
 
   const ProductDetailsView({super.key, required this.productId});
+
+
 
   @override
   State<ProductDetailsView> createState() => _ProductDetailsViewState();
@@ -23,10 +26,19 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
   int _currentImageIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Track product view
+    PersonalizedRecommendationService().trackProductView(widget.productId);
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
+
+
 
   @override
   Widget build(BuildContext context) {

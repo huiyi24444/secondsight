@@ -305,7 +305,7 @@ class _CheckoutViewState extends State<CheckoutView> {
         id: '', // Firestore will auto-generate
         customerId: user.uid,
         orderDate: DateTime.now(),
-        orderStatus: 'processing',
+        orderStatus: 'to_ship',
         totalAmount: widget.total,
         eligibilityForReturn: true,
         shipmentID: null, // Add later

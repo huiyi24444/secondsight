@@ -56,7 +56,7 @@ class OrderDetailsDialog {
                                 value: currentStatus,
                                 underline: const SizedBox(),
                                 isDense: true,
-                                items: ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+                                items: ['to_ship', 'to_receive', 'completed', 'canceled']
                                     .map((status) => DropdownMenuItem(
                                   value: status,
                                   child: Row(

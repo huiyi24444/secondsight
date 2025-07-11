@@ -8,7 +8,8 @@
   import 'package:secondsight/view/settings/profile_view.dart';
   import '../../model/product_model.dart';
   import '../../services/lazy_loading_grid.dart';
-  import '../chat/chat_order_selection.dart';
+  import '../../services/recommendation_service.dart';
+import '../chat/chat_order_selection.dart';
 import '../checkout/cart_view.dart';
   import 'package:provider/provider.dart';
   import '../../services/auth_provider.dart';
@@ -18,6 +19,7 @@ import '../checkout/cart_view.dart';
   import '../widgets/bottom_nav_bar.dart';
   import '../widgets/cart_icon_widget.dart';
 import '../widgets/product_card.dart';
+import '../widgets/rec_widget.dart';
 
   class MyHomePage extends StatefulWidget {
     const MyHomePage({super.key});
@@ -311,10 +313,22 @@ import '../widgets/product_card.dart';
 
                 const SizedBox(height: 20),
                 const Text(
-                  'Recommended',
+                  'Recommended For You',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
+
+                PersonalizedRecommendationsWidget(
+                  onProductTap: (productId) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProductView(isRecommendations: true),
+                      ),
+                    );
+                  },
+                  showDebugInfo: true, // Set to true for debugging
+                ),
 
                 const SizedBox(height: 20),
                 Row(
