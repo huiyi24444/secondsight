@@ -102,17 +102,25 @@ class MeasurementsWidget extends StatelessWidget {
         categoryName.contains('pant') ||
         categoryName.contains('trouser') ||
         categoryName.contains('jean') ||
-        categoryName.contains('short')) {
+        categoryName.contains('short') ||
+        categoryName.contains('skirt')) {
       return _buildBottomMeasurements();
     } else if (categoryName.contains('dress') ||
         categoryName.contains('gown') ||
-        categoryName.contains('frock')) {
+        categoryName.contains('frock') ||
+        categoryName.contains('overall')) {
       return _buildDressMeasurements();
+    } else if (categoryName.contains('outerwear') ||
+        categoryName.contains('jacket') ||
+        categoryName.contains('coat') ||
+        categoryName.contains('sweater')) {
+      return _buildTopMeasurements(); // Outerwear usually measured like tops
     } else {
       // Default to all measurements if category doesn't match
       return _buildAllMeasurements();
     }
   }
+
 
   Widget _buildTopMeasurements() {
     return Column(

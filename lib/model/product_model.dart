@@ -11,6 +11,7 @@ class Product {
   int stockQuantity;
   String description;
   String productSize;
+  String gender;
   Map<String, dynamic> virtualTryOn;
   ProductMeasurements measurements;
   DocumentReference category;
@@ -29,6 +30,7 @@ class Product {
     required this.stockQuantity,
     required this.description,
     required this.productSize,
+    required this.gender,
     required this.virtualTryOn,
     required this.measurements,
     required this.category,
@@ -64,6 +66,7 @@ class Product {
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
       productSize: data['productSize'] ?? '-', // safe default
+      gender: data['gender'] ?? 'unisex',
       virtualTryOn: (data['virtualTryOn'] ?? {}) is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['virtualTryOn'])
           : {},
@@ -89,6 +92,7 @@ class Product {
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
       productSize: data['productSize'] ?? '-', // safe default
+      gender: data['gender'] ?? 'unisex',
       virtualTryOn: Map<String, dynamic>.from(data['virtualTryOn'] ?? {}),
       measurements: ProductMeasurements.fromMap(
           (data['measurements'] ?? {}) as Map<String, dynamic>
@@ -119,6 +123,7 @@ class Product {
       stockQuantity: (data['stockQuantity'] as num?)?.toInt() ?? 0,
       description: data['productDesc'] ?? '',
       productSize: data['productSize'] ?? '-', // safe default
+      gender: data['gender'] ?? 'unisex',
       virtualTryOn: (data['virtualTryOn'] ?? {}) is Map<String, dynamic>
           ? Map<String, dynamic>.from(data['virtualTryOn'])
           : {},

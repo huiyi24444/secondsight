@@ -19,8 +19,7 @@ import '../checkout/cart_view.dart';
   import '../widgets/bottom_nav_bar.dart';
   import '../widgets/cart_icon_widget.dart';
 import '../widgets/product_card.dart';
-import '../widgets/rec_widget.dart';
-
+import '../widgets/rec_section.dart';
   class MyHomePage extends StatefulWidget {
     const MyHomePage({super.key});
 
@@ -31,7 +30,7 @@ import '../widgets/rec_widget.dart';
   class _MyHomePageState extends State<MyHomePage> {
     int _current = 0;
     late Future<DocumentSnapshot> _profileFuture;
-
+    late final String userId;
 
     final List<String> imageList = [
       'assets/images/banner1.jpg',
@@ -73,9 +72,10 @@ import '../widgets/rec_widget.dart';
     @override
     void didChangeDependencies() {
       super.didChangeDependencies();
-      final userId = Provider.of<AuthProvider>(context).userId;
+      final providerUserId = Provider.of<AuthProvider>(context).userId;
 
       if (userId != null) {
+        userId = providerUserId!;
         _profileFuture = FirebaseFirestore.instance.collection('users').doc(userId).get();
       }
     }
@@ -312,23 +312,43 @@ import '../widgets/rec_widget.dart';
                 ),
 
                 const SizedBox(height: 20),
-                const Text(
-                  'Recommended For You',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Recommended For You',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProductView(isRecommendations: true),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        alignment: Alignment.centerRight,
+                      ),
+                      child: const Text(
+                        'View More',
+                        style: TextStyle(
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
 
-                PersonalizedRecommendationsWidget(
-                  onProductTap: (productId) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProductView(isRecommendations: true),
-                      ),
-                    );
-                  },
-                  showDebugInfo: true, // Set to true for debugging
-                ),
+                // Then in your homepage, replace the entire FutureBuilder with:
+                RecommendationsSection(userId: userId),
 
                 const SizedBox(height: 20),
                 Row(

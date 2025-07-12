@@ -15,8 +15,6 @@ class ProductDetailsView extends StatefulWidget {
 
   const ProductDetailsView({super.key, required this.productId});
 
-
-
   @override
   State<ProductDetailsView> createState() => _ProductDetailsViewState();
 }

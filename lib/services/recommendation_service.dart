@@ -143,6 +143,7 @@ class PersonalizedRecommendationService {
   // Track product view with rate limiting
   Future<void> trackProductView(String productId) async {
     final user = _auth.currentUser;
+    debugPrint("Logged in user: ${_auth.currentUser?.uid}");
     if (user == null) return;
 
     try {
@@ -156,13 +157,13 @@ class PersonalizedRecommendationService {
         'viewedAt': FieldValue.serverTimestamp(),
       });
 
-      // Update product view count
-      //await _firestore
-      //           .collection('products')
-      //           .doc(productId)
-      //           .update({
-      //         'viewCount': FieldValue.increment(1),
-      //       });
+      //Update product view count
+      await _firestore
+                 .collection('products')
+                 .doc(productId)
+                 .update({
+               'viewCount': FieldValue.increment(1),
+             });
 
       // Throttle recommendation updates - only after 10 views
       final viewHistory = await _firestore
