@@ -248,11 +248,24 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 
   void _showAddressSelection() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be logged in to select an address.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => ShippingAddressSelection(
+        userId: currentUser.uid, // 👈 pass user ID
         onAddressSelected: (address) {
           setState(() {
             selectedAddress = address;
@@ -261,6 +274,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       ),
     );
   }
+
 
   void _showPaymentMethodSelection() {
     showModalBottomSheet(

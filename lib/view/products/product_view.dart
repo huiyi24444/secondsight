@@ -5,48 +5,87 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
 import 'package:secondsight/view/widgets/product_card.dart';
 
-// Main screen
-class ProductView extends StatelessWidget {
+class ProductView extends StatefulWidget {
   final DocumentReference? categoryRef;
   final bool isNewIn;
-  final bool isRecommendations; // Add this flag
-  final List<String>? recommendedProductIds; // Add this for product IDs
+  final bool isRecommendations;
+  final String? userId; // Add this to pass the userId
 
   const ProductView({
     Key? key,
     this.categoryRef,
     this.isNewIn = false,
     this.isRecommendations = false,
-    this.recommendedProductIds,
+    this.userId,
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    Stream<QuerySnapshot> productStream;
+  State<ProductView> createState() => _ProductViewState();
+}
 
-    if (isRecommendations && recommendedProductIds != null) {
-      // For recommendations, get products by their IDs
-      productStream = FirebaseFirestore.instance
-          .collection('products')
-          .where(FieldPath.documentId, whereIn: recommendedProductIds)
-          .snapshots();
-    } else if (isNewIn) {
-      // For New In products
-      productStream = FirebaseFirestore.instance
-          .collection('products')
-          .orderBy('createdAt', descending: true)
-          .snapshots();
-    } else if (categoryRef != null) {
-      // For category products
-      productStream = FirebaseFirestore.instance
-          .collection('products')
-          .where('category', isEqualTo: categoryRef)
-          .snapshots();
+class _ProductViewState extends State<ProductView> {
+  late Future<List<Product>> _recommendedProductsFuture;
+  late Stream<QuerySnapshot> _productStream;
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.isRecommendations && widget.userId != null) {
+      _recommendedProductsFuture = _fetchRankedRecommendedProducts(widget.userId!);
     } else {
-      // For all products
-      productStream = FirebaseFirestore.instance.collection('products').snapshots();
+      if (widget.isNewIn) {
+        _productStream = FirebaseFirestore.instance
+            .collection('products')
+            .orderBy('createdAt', descending: true)
+            .snapshots();
+      } else if (widget.categoryRef != null) {
+        _productStream = FirebaseFirestore.instance
+            .collection('products')
+            .where('category', isEqualTo: widget.categoryRef)
+            .snapshots();
+      } else {
+        _productStream = FirebaseFirestore.instance.collection('products').snapshots();
+      }
     }
+  }
 
+  Future<List<Product>> _fetchRankedRecommendedProducts(String userId) async {
+    final recommendationDocs = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('recommendations')
+        .orderBy('rank')
+        .limit(20)
+        .get();
+
+    final rankedProductIds = recommendationDocs.docs
+        .map((doc) => doc.data()['productId'] as String?)
+        .where((id) => id != null && id!.isNotEmpty)
+        .map((id) => id!)
+        .toList();
+
+    if (rankedProductIds.isEmpty) return [];
+
+    final productDocs = await FirebaseFirestore.instance
+        .collection('products')
+        .where(FieldPath.documentId, whereIn: rankedProductIds)
+        .get();
+
+    final productMap = {
+      for (var doc in productDocs.docs)
+        doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id)
+    };
+
+    // Sort according to rank order
+    return rankedProductIds
+        .where((id) => productMap.containsKey(id))
+        .map((id) => productMap[id]!)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -64,8 +103,8 @@ class ProductView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Show title based on view type
-            if (isRecommendations)
+            // Titles
+            if (widget.isRecommendations)
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
@@ -75,8 +114,8 @@ class ProductView extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            if (isNewIn)
+              )
+            else if (widget.isNewIn)
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
@@ -86,50 +125,83 @@ class ProductView extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            if (categoryRef != null && !isNewIn && !isRecommendations)
-              FutureBuilder(
-                future: categoryRef!.get(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
+              )
+            else if (widget.categoryRef != null)
+                FutureBuilder<DocumentSnapshot>(
+                  future: widget.categoryRef!.get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                  if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('Category'),
-                    );
-                  }
+                    if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text('Category'),
+                      );
+                    }
 
-                  final data = snapshot.data!.data() as Map;
-                  final categoryName = data['catName'] ?? 'Category';
+                    final data = snapshot.data!.data() as Map<String, dynamic>;
+                    final categoryName = data['catName'] ?? 'Category';
 
-                  return Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      categoryName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(
+                        categoryName,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
+                    );
+                  },
+                ),
+
+            // Product Grid
+            Expanded(
+              child: widget.isRecommendations
+                  ? FutureBuilder<List<Product>>(
+                future: _recommendedProductsFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+                  final products = snapshot.data!;
+                  if (products.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No recommended products found',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.60,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
                     ),
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      final product = products[index];
+                      return ProductCard(
+                        key: ValueKey(product.id),
+                        product: product,
+                      );
+                    },
                   );
                 },
-              ),
-
-            // Products Grid
-            Expanded(
-              child: StreamBuilder(
-                stream: productStream,
+              )
+                  : StreamBuilder<QuerySnapshot>(
+                stream: _productStream,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData)
-                    return const Center(child: CircularProgressIndicator());
-                  final docs = snapshot.data!.docs;
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
+                  final docs = snapshot.data!.docs;
                   if (docs.isEmpty) {
                     return const Center(
                       child: Text(
@@ -142,7 +214,7 @@ class ProductView extends StatelessWidget {
                   return GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 0.60, // Adjusted to match the 3:4 image ratio plus text space
+                      childAspectRatio: 0.60,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
                     ),

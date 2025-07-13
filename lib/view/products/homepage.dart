@@ -45,6 +45,10 @@ class _MyHomePageState extends State<MyHomePage> {
   final CarouselController _controller = CarouselController();
   late Future<List<Category>> _categoriesFuture;
 
+  // Add a key for the RecommendationsSection to force rebuild
+  Key _recommendationsKey = UniqueKey();
+  Key _newProductsKey = UniqueKey();
+
   Future<List<Category>> fetchCategories() async {
     final snapshot = await FirebaseFirestore.instance.collection('category').get();
     return snapshot.docs.map((doc) => Category.fromDocument(doc)).toList();
@@ -82,6 +86,31 @@ class _MyHomePageState extends State<MyHomePage> {
     _searchController.dispose();
     super.dispose();
   }
+
+
+  // Add refresh method
+  Future<void> _refreshData() async {
+    // Show loading indicator for at least 1 second for better UX
+    await Future.delayed(const Duration(seconds: 1));
+
+    setState(() {
+      // Refresh categories
+      _categoriesFuture = fetchCategories();
+
+      // Force rebuild of recommendation and new products sections by changing keys
+      _recommendationsKey = UniqueKey();
+      _newProductsKey = UniqueKey();
+
+      // Refresh profile if userId exists
+      if (_currentUserId != null) {
+        _profileFuture = FirebaseFirestore.instance
+            .collection('users')
+            .doc(_currentUserId)
+            .get();
+      }
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -184,6 +213,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          color: Theme.of(context).primaryColor,
+          backgroundColor: Colors.white,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
           child: Column(
@@ -278,7 +311,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const ProductView(isRecommendations: true),
+                          builder: (_) => ProductView(
+                            userId: userId,
+                            isRecommendations: true,
+                          ),
                         ),
                       );
                     },
@@ -301,7 +337,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     return const SizedBox();
                   }
                   return RecommendationsSection(userId: userId, showDebugInfo: true);
-
                 },
               ),
               const SizedBox(height: 20),
@@ -338,6 +373,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
         ),
+      ),
       ),
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 0,

@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../settings/add_address_view.dart';
+
 class ShippingAddressSelection extends StatefulWidget {
   final Function(String) onAddressSelected;
+  final String userId; // ✅ Accept the userId
 
-  const ShippingAddressSelection({required this.onAddressSelected, Key? key}) : super(key: key);
+  const ShippingAddressSelection({
+    required this.userId,
+    required this.onAddressSelected,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<ShippingAddressSelection> createState() => _ShippingAddressSelectionState();
@@ -14,7 +21,7 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
   int? selectedIndex;
 
   Future<List<String>> _fetchFormattedAddresses() async {
-    const userId = 'sBblLZO4yToH2lCJjw4N';
+    final userId = widget.userId; // ✅ Use the passed-in userId
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
@@ -67,11 +74,57 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No addresses found.'));
-                }
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'No addresses found.',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddAddressView(userId: widget.userId),
+                              ),
+                            );
 
+                            if (mounted) {
+                              setState(() {
+                                print('[DEBUG] Returned from AddAddressView, refreshing address list...');
+                              });
+                            }
+                          },
+
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8E6CEF),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.add, size: 20),
+                          label: const Text(
+                            'Add Address',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 final addresses = snapshot.data!;
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -84,10 +137,50 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
               },
             ),
           ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddAddressView(userId: widget.userId),
+                ),
+              );
+
+              if (mounted) {
+                setState(() {
+                  print('[DEBUG] Returned from AddAddressView, refreshing address list...');
+                });
+              }
+            },
+
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8E6CEF),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text(
+              'Add Address',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
         ],
       ),
     );
   }
+
+
 
   Widget _buildAddressOption(String address, int index) {
     final isSelected = selectedIndex == index;
@@ -120,4 +213,3 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
     );
   }
 }
-

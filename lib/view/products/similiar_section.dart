@@ -1,47 +1,54 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:secondsight/model/product_model.dart';
-import 'package:secondsight/view/widgets/product_card.dart';
-import 'package:secondsight/view/widgets/product_small_card.dart';
+import 'dart:ui';
 
-// Alternative: Horizontal scrolling version for homepage
-class NewProductsHorizontalSection extends StatelessWidget {
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+import '../../model/product_model.dart';
+import '../widgets/product_small_card.dart';
+
+class SimilarProductsSection extends StatelessWidget {
+  final DocumentReference categoryRef;
+  final String currentProductId;
   final int limit;
 
-  const NewProductsHorizontalSection({
+  const SimilarProductsSection({
     Key? key,
-    this.limit = 10,
+    required this.categoryRef,
+    required this.currentProductId, // To exclude the current product from the results
+    this.limit = 20,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    print('NewProductsHorizontalSection building at ${DateTime.now()}');
+    print('SimilarProductsSection building at ${DateTime.now()}');
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('products')
-          .orderBy('createdAt', descending: true)
+          .where('category', isEqualTo: categoryRef)
           .limit(limit)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(
+          return Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8E6CEF)),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8E6CEF)),
             ),
           );
         }
 
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs
+            .where((doc) => doc.id != currentProductId) // Exclude current product
+            .toList();
+
         if (docs.isEmpty) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(20.0),
               child: Text(
-                'No new products available',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
+                'No similar products found',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             ),
           );
@@ -54,20 +61,19 @@ class NewProductsHorizontalSection extends StatelessWidget {
           child: ListView.builder(
             itemCount: products.length,
             scrollDirection: Axis.horizontal,
-            // Performance optimizations
             addAutomaticKeepAlives: true,
             addRepaintBoundaries: true,
             cacheExtent: 500.0,
             itemBuilder: (context, index) {
-              // Show creation date for first few items (optional)
               final product = products[index];
               final createdAt = product.createdAt is Timestamp
                   ? (product.createdAt as Timestamp).toDate()
                   : product.createdAt as DateTime?;
 
-              final daysSinceCreation = DateTime.now().difference(
-                createdAt ?? DateTime.now(),
-              ).inDays;
+              final daysSinceCreation = DateTime.now()
+                  .difference(createdAt ?? DateTime.now())
+                  .inDays;
+
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: SizedBox(
@@ -78,16 +84,13 @@ class NewProductsHorizontalSection extends StatelessWidget {
                         key: ValueKey(product.id),
                         product: product,
                       ),
-                      // Optional: Show "NEW" badge for products less than 7 days old
                       if (daysSinceCreation <= 7)
                         Positioned(
                           left: 8,
                           top: 8,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            // You can style your "NEW" badge here
                           ),
                         ),
                     ],

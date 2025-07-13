@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:secondsight/view/products/product_view.dart';
+import 'package:secondsight/view/products/similiar_section.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
+import '../../model/category_model.dart';
 import '../../model/product_measurements_model.dart';
 import '../../model/product_model.dart';
 import '../../features/virtual_try_on/screens/virtual_try_on_screen.dart';
@@ -26,6 +29,7 @@ class ProductDetailsView extends StatefulWidget {
 class _ProductDetailsViewState extends State<ProductDetailsView> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
+  Category? _category;
 
   @override
   void initState() {
@@ -40,28 +44,49 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     super.dispose();
   }
 
+  // Method to fetch category data
+  Future<void> _fetchCategory(DocumentReference categoryRef) async {
+    try {
+      final categoryDoc = await categoryRef.get();
+      if (categoryDoc.exists) {
+        setState(() {
+          _category = Category.fromDocument(categoryDoc);
+        });
+      }
+    } catch (e) {
+      print('Error fetching category: $e');
+    }
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
-    final userId = Provider
-        .of<AuthProvider>(context)
-        .userId;
+    final userId = Provider.of<AuthProvider>(context).userId;
     return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('products').doc(
-          widget.productId).get(),
+      future: FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId)
+          .get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
             body: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF8E6CEF),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF8E6CEF)),
             ),
           );
         }
-
         // Convert to Product model
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final product = Product.fromDocument(data, widget.productId);
+
+        // Fetch category if it exists and hasn't been fetched yet
+        if (data['category'] != null && _category == null) {
+          final categoryRef = data['category'] as DocumentReference;
+          _fetchCategory(categoryRef);
+        }
+
+
         print('Measurements in Product model: ${product.measurements}');
 
         return Scaffold(
@@ -104,7 +129,8 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                             itemBuilder: (context, index) {
                               return Container(
                                 margin: const EdgeInsets.symmetric(
-                                    horizontal: 16),
+                                  horizontal: 16,
+                                ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: CachedNetworkImage(
@@ -112,28 +138,36 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                     fit: BoxFit.cover,
                                     memCacheWidth: 600,
                                     memCacheHeight: 800,
-                                    cacheManager: CustomCacheManager.instance, // 👈 add this line
+                                    cacheManager: CustomCacheManager.instance,
+                                    // 👈 add this line
                                     placeholder: (context, url) => Container(
                                       color: Colors.grey[200],
                                       child: const Center(
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8E6CEF)),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Color(0xFF8E6CEF),
+                                              ),
                                         ),
                                       ),
                                     ),
-                                    errorWidget: (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        Icons.image_not_supported,
-                                        size: 50,
-                                        color: Colors.grey,
-                                      ),
+                                    errorWidget: (context, url, error) =>
+                                        Container(
+                                          color: Colors.grey[200],
+                                          child: const Icon(
+                                            Icons.image_not_supported,
+                                            size: 50,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                    fadeInDuration: const Duration(
+                                      milliseconds: 200,
                                     ),
-                                    fadeInDuration: const Duration(milliseconds: 200),
-                                    fadeOutDuration: const Duration(milliseconds: 100),
+                                    fadeOutDuration: const Duration(
+                                      milliseconds: 100,
+                                    ),
                                   ),
-
                                 ),
                               );
                             },
@@ -145,14 +179,15 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                           bottom: 16,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.7),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_currentImageIndex + 1} / ${product.images
-                                  .length}',
+                              '${_currentImageIndex + 1} / ${product.images.length}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -163,31 +198,6 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                         ),
                       ],
                     ),
-
-                    // Image dots indicator
-                    //if (product.images.length > 1)
-                    //                       Container(
-                    //                         margin: const EdgeInsets.only(top: 12),
-                    //                         child: Row(
-                    //                           mainAxisAlignment: MainAxisAlignment.center,
-                    //                           children: List.generate(
-                    //                             product.images.length,
-                    //                                 (index) => AnimatedContainer(
-                    //                               duration: const Duration(milliseconds: 300),
-                    //                               margin: const EdgeInsets.symmetric(horizontal: 4),
-                    //                               height: 8,
-                    //                               width: _currentImageIndex == index ? 24 : 8,
-                    //                               decoration: BoxDecoration(
-                    //                                 color: _currentImageIndex == index
-                    //                                     ? const Color(0xFF8E6CEF)
-                    //                                     : Colors.grey[300],
-                    //                                 borderRadius: BorderRadius.circular(4),
-                    //                               ),
-                    //                             ),
-                    //                           ),
-                    //                         ),
-                    //                       ),
-
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -228,14 +238,15 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.red[50],
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  '-${((1 - product.price / product.oriPrice) *
-                                      100).toStringAsFixed(0)}%',
+                                  '-${((1 - product.price / product.oriPrice) * 100).toStringAsFixed(0)}%',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.red[700],
@@ -252,9 +263,13 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                             children: [
                               Expanded(
                                 child: _buildInfoBox(
-                                  label: OrderStatusUtils.formatCondition(product.condition),
-                                  conditionColor: OrderStatusUtils.getConditionColor(
-                                      product.condition),
+                                  label: OrderStatusUtils.formatCondition(
+                                    product.condition,
+                                  ),
+                                  conditionColor:
+                                      OrderStatusUtils.getConditionColor(
+                                        product.condition,
+                                      ),
                                   isCondition: true,
                                 ),
                               ),
@@ -277,37 +292,41 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                             decoration: BoxDecoration(
                               gradient: product.hasVirtualTryOn
                                   ? const LinearGradient(
-                                colors: [Color(0xFF8E6CEF), Color(0xFFA78BFA)],
-                              )
+                                      colors: [
+                                        Color(0xFF8E6CEF),
+                                        Color(0xFFA78BFA),
+                                      ],
+                                    )
                                   : null,
-                              color: product.hasVirtualTryOn ? null : Colors
-                                  .grey[300],
+                              color: product.hasVirtualTryOn
+                                  ? null
+                                  : Colors.grey[300],
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: product.hasVirtualTryOn
                                   ? [
-                                BoxShadow(
-                                  color: const Color(0xFF8E6CEF).withOpacity(
-                                      0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF8E6CEF,
+                                        ).withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
                                   : null,
                             ),
                             child: ElevatedButton.icon(
                               onPressed: product.hasVirtualTryOn
                                   ? () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        VirtualTryOnScreen(
-                                          productId: widget.productId,
-                                          product: product,
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => VirtualTryOnScreen(
+                                            productId: widget.productId,
+                                            product: product,
+                                          ),
                                         ),
-                                  ),
-                                );
-                              }
+                                      );
+                                    }
                                   : null,
                               icon: Icon(
                                 product.hasVirtualTryOn
@@ -353,25 +372,72 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                             title: 'Details',
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                              // Small spacing around the text
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                // Align text to the left
-                                child: Text(
-                                  product.description,
-                                  textAlign: TextAlign.left,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Category section
+                                  if (_category != null) ...[
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Category: ',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            _category!.catName,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  // Description section
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      product.description,
+                                      textAlign: TextAlign.left,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-
                           _buildExpandableSection(
-                              title: 'Measurements',
-                              child: _buildMeasurementsTable(
-                                  product.measurements)
+                            title: 'Measurements',
+                            child: _buildMeasurementsTable(
+                              product.measurements,
+                            ),
                           ),
 
                           const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Similiar Products',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SimilarProductsSection(
+                            categoryRef: product.category, // product.category should be a DocumentReference
+                            currentProductId: product.id,  // To avoid showing the current product again
+                          ),
                         ],
                       ),
                     ),
@@ -408,56 +474,58 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: StreamBuilder<DocumentSnapshot>(
-                              stream: userId != null
-                                  ? FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(userId)
-                                  .collection('wishlist')
-                                  .doc(widget.productId)
-                                  .snapshots()
-                                  : null,
-                              builder: (context, snapshot) {
-                                final isFavorite = snapshot.hasData &&
-                                    snapshot.data!.exists;
+                            stream: userId != null
+                                ? FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(userId)
+                                      .collection('wishlist')
+                                      .doc(widget.productId)
+                                      .snapshots()
+                                : null,
+                            builder: (context, snapshot) {
+                              final isFavorite =
+                                  snapshot.hasData && snapshot.data!.exists;
 
-                                return IconButton(
-                                  icon: Icon(
-                                    isFavorite ? Icons.favorite : Icons
-                                        .favorite_border,
-                                    color: isFavorite ? Colors.red : Colors
-                                        .grey[600],
-                                  ),
-                                  onPressed: () async {
-                                    if (userId == null || userId.isEmpty) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(content: Text(
-                                            'Please log in first.')),
-                                      );
-                                      return;
-                                    }
+                              return IconButton(
+                                icon: Icon(
+                                  isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: isFavorite
+                                      ? Colors.red
+                                      : Colors.grey[600],
+                                ),
+                                onPressed: () async {
+                                  if (userId == null || userId.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Please log in first.'),
+                                      ),
+                                    );
+                                    return;
+                                  }
 
-                                    final favRef = FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(userId)
-                                        .collection('wishlist')
-                                        .doc(widget.productId);
+                                  final favRef = FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(userId)
+                                      .collection('wishlist')
+                                      .doc(widget.productId);
 
-                                    if (isFavorite) {
-                                      // Remove from favorites
-                                      await favRef.delete();
-                                    } else {
-                                      // Add to favorites
-                                      await favRef.set({
-                                        'productRef': FirebaseFirestore.instance
-                                            .collection('products')
-                                            .doc(widget.productId),
-                                        'addedAt': FieldValue.serverTimestamp(),
-                                      });
-                                    }
-                                  },
-                                );
-                              }
+                                  if (isFavorite) {
+                                    // Remove from favorites
+                                    await favRef.delete();
+                                  } else {
+                                    // Add to favorites
+                                    await favRef.set({
+                                      'productRef': FirebaseFirestore.instance
+                                          .collection('products')
+                                          .doc(widget.productId),
+                                      'addedAt': FieldValue.serverTimestamp(),
+                                    });
+                                  }
+                                },
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -470,7 +538,8 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                 if (userId == null || userId.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                        content: Text('Please log in first.')),
+                                      content: Text('Please log in first.'),
+                                    ),
                                   );
                                   return;
                                 }
@@ -481,18 +550,22 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                     .collection('cart');
 
                                 final existingCart = await cartRef
-                                    .where('productID',
-                                    isEqualTo: FirebaseFirestore.instance
-                                        .collection('products')
-                                        .doc(widget.productId))
+                                    .where(
+                                      'productID',
+                                      isEqualTo: FirebaseFirestore.instance
+                                          .collection('products')
+                                          .doc(widget.productId),
+                                    )
                                     .limit(1)
                                     .get();
 
                                 if (existingCart.docs.isNotEmpty) {
                                   final existingDoc = existingCart.docs.first;
                                   await existingDoc.reference.update({
-                                    'cartQuantity': (existingDoc
-                                        .data()['cartQuantity'] ?? 1) + 1,
+                                    'cartQuantity':
+                                        (existingDoc.data()['cartQuantity'] ??
+                                            1) +
+                                        1,
                                   });
                                 } else {
                                   await cartRef.add({
@@ -538,8 +611,8 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                       ),
                                       content: Column(
                                         mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             product.name,
@@ -552,8 +625,7 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
-                                            'RM ${product.price.toStringAsFixed(
-                                                2)}',
+                                            'RM ${product.price.toStringAsFixed(2)}',
                                             style: TextStyle(
                                               color: Colors.grey[600],
                                               fontSize: 14,
@@ -593,8 +665,8 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.black,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius
-                                                  .circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                           ),
                                           child: const Text(
@@ -676,10 +748,7 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     TableRow buildRow(String label, double? value) {
       return TableRow(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(label),
-          ),
+          Padding(padding: const EdgeInsets.all(8.0), child: Text(label)),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(value != null ? '${value.toStringAsFixed(1)} cm' : '-'),
@@ -694,18 +763,18 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
         if (measurements.bust != null) buildRow('Bust', measurements.bust),
         if (measurements.waist != null) buildRow('Waist', measurements.waist),
         if (measurements.hip != null) buildRow('Hip', measurements.hip),
-        if (measurements.shoulderWidth != null) buildRow(
-            'Shoulder Width', measurements.shoulderWidth),
-        if (measurements.sleeveLength != null) buildRow(
-            'Sleeve Length', measurements.sleeveLength),
-        if (measurements.shirtLength != null) buildRow(
-            'Shirt Length', measurements.shirtLength),
-        if (measurements.inseam != null) buildRow(
-            'Inseam', measurements.inseam),
-        if (measurements.outseam != null) buildRow(
-            'Outseam', measurements.outseam),
-        if (measurements.totalLength != null) buildRow(
-            'Total Length', measurements.totalLength),
+        if (measurements.shoulderWidth != null)
+          buildRow('Shoulder Width', measurements.shoulderWidth),
+        if (measurements.sleeveLength != null)
+          buildRow('Sleeve Length', measurements.sleeveLength),
+        if (measurements.shirtLength != null)
+          buildRow('Shirt Length', measurements.shirtLength),
+        if (measurements.inseam != null)
+          buildRow('Inseam', measurements.inseam),
+        if (measurements.outseam != null)
+          buildRow('Outseam', measurements.outseam),
+        if (measurements.totalLength != null)
+          buildRow('Total Length', measurements.totalLength),
       ],
     );
   }
@@ -719,10 +788,7 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: textColor.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: textColor.withOpacity(0.2), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -740,8 +806,10 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     );
   }
 
-  Widget _buildExpandableSection(
-      {required String title, required Widget child}) {
+  Widget _buildExpandableSection({
+    required String title,
+    required Widget child,
+  }) {
     return Theme(
       data: ThemeData().copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(

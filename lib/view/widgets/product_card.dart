@@ -177,7 +177,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                       widget.product.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontSize: 13,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -188,7 +188,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                         Text(
                           'RM ${widget.product.price.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: Colors.green,
                             fontWeight: FontWeight.bold,
                           ),
@@ -197,7 +197,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                         Text(
                           'RM ${widget.product.oriPrice.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: Colors.grey,
                             decoration: TextDecoration.lineThrough,
                           ),

@@ -26,7 +26,6 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
   void initState() {
     super.initState();
     _currentUserId = widget.userId;
-    _productSnapshotsFuture = _getRecommendedProductSnapshots();
   }
 
   Future<List<String>> _getRecommendedProductIds() async {
@@ -37,8 +36,14 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
           .doc(widget.userId)
           .collection('recommendations')
           .orderBy('rank')
-          .limit(20)
+          .limit(10)
           .get();
+
+      print('Found ${snapshot.docs.length} recommendation docs');
+
+      for (final doc in snapshot.docs) {
+        print('Rec doc: ${doc.id} → ${doc.data()}');
+      }
 
       final productIds = snapshot.docs
           .map((doc) => doc.data()['productId'] as String?)
@@ -54,60 +59,61 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
     }
   }
 
-  Future<QuerySnapshot> _getRecommendedProductSnapshots() async {
-    final productIds = await _getRecommendedProductIds();
 
-    if (productIds.isEmpty) {
-      // Return empty query snapshot if no product IDs
-      return FirebaseFirestore.instance
-          .collection('products')
-          .where(FieldPath.documentId, whereIn: ['nonexistent']) // This will return empty results
-          .get();
-    }
-
-    return FirebaseFirestore.instance
-        .collection('products')
-        .where(FieldPath.documentId, whereIn: productIds.take(10).toList())
+  Future<List<Product>> _getRecommendedProducts() async {
+    final rankedIdsSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.userId)
+        .collection('recommendations')
+        .orderBy('rank')
+        .limit(20)
         .get();
+
+    final rankedProductIds = rankedIdsSnapshot.docs
+        .map((doc) => doc.data()['productId'] as String?)
+        .where((id) => id != null && id!.isNotEmpty)
+        .map((id) => id!)
+        .toList();
+
+    if (rankedProductIds.isEmpty) return [];
+
+    final productSnapshot = await FirebaseFirestore.instance
+        .collection('products')
+        .where(FieldPath.documentId, whereIn: rankedProductIds)
+        .get();
+
+    final productMap = {
+      for (var doc in productSnapshot.docs)
+        doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id),
+    };
+
+    return rankedProductIds
+        .where((id) => productMap.containsKey(id))
+        .map((id) => productMap[id]!)
+        .toList();
   }
 
   Future<Map<String, dynamic>> _getRecommendationStats() async {
     try {
-      // Get user's recommendation document
-      final userRecDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .get();
-
-      final data = userRecDoc.data() ?? {};
-
-      // Get counts from recommendations subcollection
-      final recsSnapshot = await FirebaseFirestore.instance
+      final metadataDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userId)
           .collection('recommendations')
+          .doc('_metadata')
           .get();
 
-      // Count recommendations by source
-      int basedOnViews = 0;
-      int basedOnPurchases = 0;
-
-      for (var doc in recsSnapshot.docs) {
-        final source = doc.data()['source'] as String?;
-        if (source == 'views') basedOnViews++;
-        if (source == 'purchases') basedOnPurchases++;
-      }
+      final data = metadataDoc.data() ?? {};
 
       return {
-        'totalViews': data['totalViews'] ?? 0,
-        'totalPurchases': data['totalPurchases'] ?? 0,
-        'totalRecommendations': recsSnapshot.docs.length,
-        'basedOnViews': basedOnViews,
-        'basedOnPurchases': basedOnPurchases,
-        'lastGenerated': data['lastRecommendationUpdate']?.toDate()?.toString(),
+        'totalViews': data['basedOnViews'] ?? 0,
+        'totalPurchases': data['basedOnPurchases'] ?? 0,
+        'totalRecommendations': data['totalRecommendations'] ?? 0,
+        'basedOnViews': data['basedOnViews'] ?? 0,
+        'basedOnPurchases': data['basedOnPurchases'] ?? 0,
+        'lastGenerated': data['generatedAt']?.toDate()?.toString(),
       };
     } catch (e) {
-      print('Error getting recommendation stats: $e');
+      print('Error getting recommendation stats from _metadata: $e');
       return {
         'totalViews': 0,
         'totalPurchases': 0,
@@ -118,6 +124,7 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
       };
     }
   }
+
 
   Widget _buildDebugInfo() {
     return FutureBuilder<Map<String, dynamic>>(
@@ -159,7 +166,6 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
     if (oldWidget.userId != widget.userId) {
       print('UserId changed from ${oldWidget.userId} to ${widget.userId}');
       _currentUserId = widget.userId;
-      _productSnapshotsFuture = _getRecommendedProductSnapshots();
     }
   }
 
@@ -170,7 +176,6 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
     // Only rebuild if userId has changed
     if (_currentUserId != widget.userId) {
       _currentUserId = widget.userId;
-      _productSnapshotsFuture = _getRecommendedProductSnapshots();
     }
 
     return Column(
@@ -180,8 +185,8 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
         if (widget.showDebugInfo) _buildDebugInfo(),
 
         // Main recommendations content
-        FutureBuilder<QuerySnapshot>(
-          future: _productSnapshotsFuture,
+        FutureBuilder<List<Product>>(
+          future: _getRecommendedProducts(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const SizedBox(
@@ -191,16 +196,15 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
             }
 
             if (snapshot.hasError) {
-              print('Error in RecommendationsSection FutureBuilder: ${snapshot.error}');
               return const SizedBox(
                 height: 270,
                 child: Center(child: Text('Error loading recommendations')),
               );
             }
 
-            final docs = snapshot.data?.docs ?? [];
+            final products = snapshot.data ?? [];
 
-            if (docs.isEmpty) {
+            if (products.isEmpty) {
               return const SizedBox(
                 height: 80,
                 child: Center(
@@ -221,32 +225,26 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
                 ),
               );
             }
+
             return SizedBox(
               height: 270,
               child: ListView.builder(
-                itemCount: docs.length,
+                itemCount: products.length,
                 scrollDirection: Axis.horizontal,
                 itemBuilder: (context, index) {
-                  try {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final product = Product.fromDocument(data, docs[index].id);
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: SizedBox(
-                        width: 160,
-                        child: ProductSmallCard(product: product),
-                      ),
-                    );
-                  } catch (e) {
-                    print('Error creating ProductCard at index $index: $e');
-                    return const SizedBox(width: 160);
-                  }
+                  final product = products[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: SizedBox(
+                      width: 160,
+                      child: ProductSmallCard(product: product),
+                    ),
+                  );
                 },
               ),
             );
           },
-        ),
+        )
       ],
     );
   }
