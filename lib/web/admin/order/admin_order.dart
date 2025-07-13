@@ -105,12 +105,10 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     if (selectedTab != 'All') {
       filtered = filtered.where((order) {
         switch (selectedTab) {
-          case 'Pending Payment':
-            return order.orderStatus.toLowerCase() == 'pending_payment';
-          case 'Processing':
-            return order.orderStatus.toLowerCase() == 'processing';
-          case 'Delivered':
-            return order.orderStatus.toLowerCase() == 'shipped';
+          case 'To Ship':
+            return order.orderStatus.toLowerCase() == 'to_ship';
+          case 'To Receive':
+            return order.orderStatus.toLowerCase() == 'to_receive';
           case 'Completed':
             return order.orderStatus.toLowerCase() == 'completed';
           case 'Cancelled':

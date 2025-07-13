@@ -387,7 +387,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                     )
                     : GridView.count(
                       crossAxisCount: 2,
-                  childAspectRatio: 0.65,
+                  childAspectRatio: 0.60,
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
                       crossAxisSpacing: 0,
                       children:

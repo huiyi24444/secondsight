@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:secondsight/services/lazy_loading.dart';
+import 'package:secondsight/view/products/homepage.dart';
 import '../../controller/order/orders_controller.dart';
 import '../../services/auth_provider.dart';
 import '../../model/order_model.dart';
@@ -54,7 +55,7 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        leading: const CustomBackButton(),
+        //leading: const CustomBackButton(),
         title: const Text(
           'My Orders',
           style: TextStyle(
@@ -63,7 +64,7 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
         bottom: PreferredSize(
@@ -112,9 +113,11 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 2,
         onItemTapped: (index) {
-          if (index == 0) return;
           Widget target;
           switch (index) {
+            case 0:
+              target = const MyHomePage();
+              break;
             case 1:
               target = const NotificationsView();
               break;

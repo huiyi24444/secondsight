@@ -24,6 +24,7 @@ class CartIconWithBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('CartIconWithBadge building at ${DateTime.now()}');
     final userId = Provider.of<AuthProvider>(context).userId;
 
     return StreamBuilder<QuerySnapshot>(

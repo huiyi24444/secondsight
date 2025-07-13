@@ -7,16 +7,16 @@ import 'package:secondsight/view/products/product_details_view.dart';
 import '../../services/CustomCacheManager.dart';
 import '../../services/auth_provider.dart';
 
-class ProductCard extends StatefulWidget {
+class ProductSmallCard extends StatefulWidget {
   final Product product;
 
-  const ProductCard({Key? key, required this.product}) : super(key: key);
+  const ProductSmallCard({Key? key, required this.product}) : super(key: key);
 
   @override
-  _ProductCardState createState() => _ProductCardState();
+  _ProductSmallCardState createState() => _ProductSmallCardState();
 }
 
-class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClientMixin {
+class _ProductSmallCardState extends State<ProductSmallCard> with AutomaticKeepAliveClientMixin {
   // This will keep the widget alive when scrolling
   @override
   bool get wantKeepAlive => true;
@@ -41,7 +41,6 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 1,
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: BoxDecoration(
           color: const Color(0xFFF4F4F4),
@@ -51,7 +50,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
           children: [
             // Image section
             Expanded(
-              flex: 8,
+              flex: 10,
               child: Stack(
                 children: [
                   ClipRRect(
@@ -167,7 +166,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
             ),
             // Text section
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
                 child: Column(
@@ -177,12 +176,12 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                       widget.product.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontSize: 12,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Text(

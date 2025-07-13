@@ -35,6 +35,12 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  @override
+  void notifyListeners() {
+    print('AuthProvider notifying listeners at ${DateTime.now()}');
+    super.notifyListeners();
+  }
+
   // Sign in with email and password
   Future<bool> signIn(String email, String password) async {
     try {

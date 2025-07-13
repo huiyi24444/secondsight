@@ -47,4 +47,42 @@ class OrderStatusUtils {
         return status;
     }
   }
+
+  static Color getConditionColor(String condition) {
+    switch (condition.toLowerCase()) {
+      case 'brand_new':
+        return Colors.green;
+      case 'like_new':
+        return Colors.lightGreen;
+      case 'good':
+        return Colors.orange;
+      case 'used':
+        return Colors.amber;
+      case 'well_worn':
+        return Colors.red;
+      default:
+        return Colors.grey;
+
+    }
+  }
+
+  static String formatCondition(String condition) {
+    switch (condition.toLowerCase()) {
+      case 'brand_new':
+        return 'Brand New';
+      case 'like_new':
+        return 'Like New';
+      case 'good':
+        return 'Good';
+      case 'used':
+        return 'Used';
+      case 'well_worn':
+        return 'Well Worn';
+      default:
+        return condition;
+
+    }
+  }
+
+
 }

@@ -329,11 +329,9 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                           ),
                         );
                       }
-
                       final product = productSnapshot.data!.data() as Map<String, dynamic>?;
                       final productURL = _controller.extractProductImageUrl(product);
                       final productName = _controller.extractProductName(product);
-
                       return _buildProductItem(orderProduct, productURL, productName);
                     },
                   );

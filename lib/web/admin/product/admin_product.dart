@@ -208,24 +208,21 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             clipBehavior: Clip.antiAlias,
-                                            child: () {
-                                              print('Image URL: ${product.images.first}');
-                                              return product.images.isNotEmpty
-                                                  ? ClipRRect(
-                                                borderRadius: BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  product.images.first,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) =>
-                                                  const Icon(Icons.broken_image, color: Colors.grey),
-                                                  loadingBuilder: (context, child, progress) {
-                                                    if (progress == null) return child;
-                                                    return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                                                  },
-                                                ),
-                                              )
-                                                  : const Icon(Icons.image, color: Colors.grey);
-                                            }(),
+                                            child: (product.images.isEmpty || product.images.first.isEmpty)
+                                                ? const Icon(Icons.broken_image, color: Colors.grey)
+                                                : ClipRRect(
+                                              borderRadius: BorderRadius.circular(8),
+                                              child: Image.network(
+                                                product.images.first,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) =>
+                                                const Icon(Icons.broken_image, color: Colors.grey),
+                                                loadingBuilder: (context, child, progress) {
+                                                  if (progress == null) return child;
+                                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                                },
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 10),
                                           Flexible(child: Text(product.name)),

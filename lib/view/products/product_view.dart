@@ -139,16 +139,23 @@ class ProductView extends StatelessWidget {
                     );
                   }
 
-                  return GridView.count(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.60,
-                    mainAxisSpacing: 5,
-                    crossAxisSpacing: 1,
-                    children: docs.map((doc) {
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.60, // Adjusted to match the 3:4 image ratio plus text space
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
                       final data = doc.data() as Map<String, dynamic>;
                       final product = Product.fromDocument(data, doc.id);
-                      return ProductCard(product: product);
-                    }).toList(),
+                      return ProductCard(
+                        key: ValueKey(product.id),
+                        product: product,
+                      );
+                    },
                   );
                 },
               ),

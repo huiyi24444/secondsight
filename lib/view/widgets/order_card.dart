@@ -2,21 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../model/order_model.dart';
+import '../../services/CustomCacheManager.dart';
 import '../order/order_details_view.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'order_status_utils.dart';
 
-
 class OrderCard extends StatelessWidget {
   final OrdersModel order;
   final String userId;
 
-  const OrderCard({
-    super.key,
-    required this.order,
-    required this.userId,
-  });
+  const OrderCard({super.key, required this.order, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +23,7 @@ class OrderCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => OrderDetailsView(
-              orderId: order.id,
-              userId: userId,
-            ),
+            builder: (_) => OrderDetailsView(orderId: order.id, userId: userId),
           ),
         );
       },
@@ -87,7 +80,9 @@ class OrderCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: OrderStatusUtils.getStatusColor(orderStatus).withOpacity(0.1),
+            color: OrderStatusUtils.getStatusColor(
+              orderStatus,
+            ).withOpacity(0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -164,7 +159,9 @@ class OrderCard extends StatelessWidget {
 
         if (productData != null) {
           previews.add({
-            'productURL': (productData['productURL'] is List && productData['productURL'].isNotEmpty)
+            'productURL':
+                (productData['productURL'] is List &&
+                    productData['productURL'].isNotEmpty)
                 ? productData['productURL'][0]
                 : '',
             'quantity': data['productQuantity'] ?? 1,
@@ -185,15 +182,15 @@ class OrderCard extends StatelessWidget {
     return Container(
       height: 80,
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!, width: 1),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       child: FutureBuilder<List<Map<String, dynamic>>>(
         future: _fetchProductPreviews(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
           }
 
           final previews = snapshot.data!;
@@ -203,7 +200,10 @@ class OrderCard extends StatelessWidget {
               Expanded(
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   itemCount: previews.length,
                   itemBuilder: (context, index) {
                     final productURL = previews[index]['productURL'];
@@ -219,37 +219,50 @@ class OrderCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             child: productURL != null && productURL.isNotEmpty
                                 ? CachedNetworkImage(
-                              imageUrl: productURL,
-                              fit: BoxFit.cover,
-                              width: 56,
-                              height: 56,
-                              placeholder: (context, url) => const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                width: 56,
-                                height: 56,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.broken_image, color: Colors.grey),
-                              ),
-                            )
+                                    imageUrl: productURL,
+                                    fit: BoxFit.cover,
+                                    width: 56,
+                                    height: 56,
+                                    cacheManager: CustomCacheManager.instance,
+                                    placeholder: (context, url) => const Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        Container(
+                                          width: 56,
+                                          height: 56,
+                                          color: Colors.grey[200],
+                                          child: const Icon(
+                                            Icons.broken_image,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                  )
                                 : Container(
-                              width: 56,
-                              height: 56,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                            ),
+                                    width: 56,
+                                    height: 56,
+                                    color: Colors.grey[200],
+                                    child: const Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                           ),
                           if (quantity > 1)
                             Positioned(
                               right: 4,
                               bottom: 4,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.black87,
                                   borderRadius: BorderRadius.circular(4),
@@ -280,5 +293,4 @@ class OrderCard extends StatelessWidget {
       ),
     );
   }
-
 }

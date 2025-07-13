@@ -1,6 +1,7 @@
 
 // notifications_view.dart
 import 'package:flutter/material.dart';
+import 'package:secondsight/view/products/homepage.dart';
 
 import '../settings/profile_view.dart';
 import '../widgets/bottom_nav_bar.dart';
@@ -13,9 +14,8 @@ class NotificationsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        leading: const CustomBackButton(),
+        //leading: const CustomBackButton(),
         title: const Text(
           'Notifications',
           style: TextStyle(
@@ -101,9 +101,11 @@ class NotificationsView extends StatelessWidget {
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 1,
         onItemTapped: (index) {
-          if (index == 0) return;
           Widget target;
           switch (index) {
+            case 0:
+              target = const MyHomePage();
+              break;
             case 1:
               target = const NotificationsView();
               break;

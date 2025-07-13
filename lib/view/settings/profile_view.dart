@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/products/homepage.dart';
 import 'package:secondsight/view/products/wishlist_view.dart';
 import '../../model/profile_model.dart';
 import '../../services/auth_provider.dart';
@@ -267,9 +268,11 @@ class _ProfileViewState extends State<ProfileView> {
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 3,
         onItemTapped: (index) {
-          if (index == 0) return;
           Widget target;
           switch (index) {
+            case 0:
+              target = const MyHomePage();
+              break;
             case 1:
               target = const NotificationsView();
               break;
@@ -338,16 +341,9 @@ class _ProfileViewState extends State<ProfileView> {
         ),
         _buildListTile(
           Icons.help_outline,
-          "Help",
+          "FAQ",
               () {
             // Add help functionality
-          },
-        ),
-        _buildListTile(
-          Icons.support_agent_outlined,
-          "Support",
-              () {
-            // Add support functionality
           },
         ),
         const SizedBox(height: 16),
