@@ -37,25 +37,47 @@ class AddAddressController extends ChangeNotifier {
   AddAddressController({required this.userId});
 
   Future<void> saveAddress(BuildContext context) async {
-    if (formKey.currentState!.validate()) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('address')
-          .add({
-        'fullName': fullNameController.text,
-        'phoneNum': int.tryParse(phoneNumController.text) ?? 0,
-        'isDefault': isDefault,
-        'streetone': streetOneController.text,
-        'streettwo': streetTwoController.text,
-        'city': cityController.text,
-        'state': selectedState,
-        'zipCode': int.tryParse(zipCodeController.text) ?? 0,
-      });
+    if (!formKey.currentState!.validate()) return;
 
-      Navigator.pop(context);
+    final addressRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('address');
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    if (isDefault) {
+      // Step 1: Find existing default address and unset it
+      final existingDefaultSnapshot =
+      await addressRef.where('isDefault', isEqualTo: true).get();
+
+      for (var doc in existingDefaultSnapshot.docs) {
+        batch.update(doc.reference, {'isDefault': false});
+      }
     }
+
+    // Step 2: Create a new address doc reference
+    final newAddressRef = addressRef.doc(); // auto-generated ID
+
+    // Step 3: Set the new address data
+    batch.set(newAddressRef, {
+      'fullName': fullNameController.text.trim(),
+      'phoneNum': int.tryParse(phoneNumController.text) ?? 0,
+      'isDefault': isDefault,
+      'streetone': streetOneController.text.trim(),
+      'streettwo': streetTwoController.text.trim(),
+      'city': cityController.text.trim(),
+      'state': selectedState,
+      'zipCode': int.tryParse(zipCodeController.text) ?? 0,
+    });
+
+    // Step 4: Commit all writes
+    await batch.commit();
+
+    // Step 5: Go back
+    Navigator.pop(context);
   }
+
 
   void updateSelectedState(String? value) {
     if (value != null) {

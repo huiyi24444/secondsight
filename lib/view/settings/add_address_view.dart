@@ -45,14 +45,18 @@ class _AddAddressForm extends StatelessWidget {
               _buildLabel("Full Name"),
               TextFormField(
                 controller: controller.fullNameController,
-                decoration: const InputDecoration(hintText: "Full Name"),
+                decoration: const InputDecoration(hintText: "Full Name", hintStyle: TextStyle(
+                  color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                ),),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               _buildLabel("Phone Number"),
               TextFormField(
                 controller: controller.phoneNumController,
-                decoration: const InputDecoration(hintText: "Phone Number"),
+                decoration: const InputDecoration(hintText: "Phone Number", hintStyle: TextStyle(
+                  color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                ),),
                 keyboardType: TextInputType.phone,
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
@@ -60,20 +64,26 @@ class _AddAddressForm extends StatelessWidget {
               _buildLabel("Address Line 1"),
               TextFormField(
                 controller: controller.streetOneController,
-                decoration: const InputDecoration(hintText: "Address Line 1"),
+                decoration: const InputDecoration(hintText: "Address Line 1", hintStyle: TextStyle(
+                  color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                ),),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               _buildLabel("Address Line 2"),
               TextFormField(
                 controller: controller.streetTwoController,
-                decoration: const InputDecoration(hintText: "Address Line 2"),
+                decoration: const InputDecoration(hintText: "Address Line 2", hintStyle: TextStyle(
+                  color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                ),),
               ),
               const SizedBox(height: 12),
               _buildLabel("City"),
               TextFormField(
                 controller: controller.cityController,
-                decoration: const InputDecoration(hintText: "City"),
+                decoration: const InputDecoration(hintText: "City", hintStyle: TextStyle(
+                  color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                ),),
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
@@ -87,7 +97,9 @@ class _AddAddressForm extends StatelessWidget {
                         DropdownButtonFormField<String>(
                           isExpanded: true,
                           value: controller.selectedState,
-                          decoration: const InputDecoration(hintText: "State"),
+                          decoration: const InputDecoration(hintText: "State", hintStyle: TextStyle(
+                            color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                          ),),
                           items: controller.malaysianStates
                               .map((state) => DropdownMenuItem(
                             value: state,
@@ -110,7 +122,9 @@ class _AddAddressForm extends StatelessWidget {
                         TextFormField(
                           controller: controller.zipCodeController,
                           decoration:
-                          const InputDecoration(hintText: "Zip Code"),
+                          const InputDecoration(hintText: "Zip Code", hintStyle: TextStyle(
+                            color: Color(0xFF7C7D7C), // 👈 lighter hint text color
+                          ),),
                           keyboardType: TextInputType.number,
                           validator: (v) => v!.isEmpty ? 'Required' : null,
                         ),

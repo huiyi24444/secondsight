@@ -10,7 +10,7 @@ import '../order/orders_view.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/custom_back_button.dart';
 import 'address_list_view.dart';
-import 'payment_method_view.dart';
+import 'cards_list_view.dart';
 import 'edit_profile_view.dart';
 
 class ProfileView extends StatefulWidget {
@@ -328,16 +328,23 @@ class _ProfileViewState extends State<ProfileView> {
           Icons.payment_outlined,
           "Payment",
               () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const PaymentMethodView(
-                  cards: [],
-                  paypalEmail: 'Cloth@gmail.com',
-                ),
-              ),
-            );
-          },
+                if (userId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('User not logged in'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CardListView(userId: userId!),
+                  ),
+                );
+              },
         ),
         _buildListTile(
           Icons.help_outline,

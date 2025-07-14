@@ -1,17 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
-import '../../controller/settings/address_list_controller.dart';
-import 'add_address_view.dart';
-import 'edit_address_view.dart';
+import '../../controller/settings/cards_list_controller.dart';
+import '../../model/payment_cards_model.dart';
+import 'add_card_view.dart';
 
 
-class AddressListView extends StatelessWidget {
+class CardListView extends StatelessWidget {
   final String userId;
-  final AddressListController controller;
+  final CardListController controller;
 
-  AddressListView({super.key, required this.userId})
-      : controller = AddressListController(userId: userId);
+  CardListView({super.key, required this.userId})
+      : controller = CardListController(userId: userId);
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +20,7 @@ class AddressListView extends StatelessWidget {
       appBar: AppBar(
         leading: const CustomBackButton(),
         title: const Text(
-          "My Addresses",
+          "Payment Cards",
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -32,7 +32,7 @@ class AddressListView extends StatelessWidget {
         foregroundColor: Colors.black87,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: controller.getAddresses(),
+        stream: controller.getPaymentCards(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -45,27 +45,27 @@ class AddressListView extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
+                  Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'Error loading addresses',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    'Error loading payment cards',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}', // 👈 shows actual error
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.red),
                   ),
                 ],
               ),
             );
           }
 
-          final addresses = snapshot.data?.docs ?? [];
 
-          if (addresses.isEmpty) {
+          final cardDocs = snapshot.data?.docs ?? [];
+
+          if (cardDocs.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -77,14 +77,14 @@ class AddressListView extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.location_on_outlined,
+                      Icons.credit_card_outlined,
                       size: 48,
                       color: const Color(0xFF8E6CEF).withOpacity(0.6),
                     ),
                   ),
                   const SizedBox(height: 24),
                   const Text(
-                    'No addresses yet',
+                    'No payment cards yet',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -93,7 +93,7 @@ class AddressListView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Add your first delivery address',
+                    'Add your first payment card',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -105,7 +105,7 @@ class AddressListView extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddAddressView(userId: userId),
+                          builder: (_) => AddCardView(userId: userId),
                         ),
                       );
                     },
@@ -123,7 +123,7 @@ class AddressListView extends StatelessWidget {
                     ),
                     icon: const Icon(Icons.add, size: 20),
                     label: const Text(
-                      'Add Address',
+                      'Add Card',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -135,25 +135,17 @@ class AddressListView extends StatelessWidget {
             );
           }
 
+          // Convert documents to PaymentCard objects
+          final cards = cardDocs.map((doc) => PaymentCard.fromDocument(doc)).toList();
+
           return Column(
             children: [
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: addresses.length,
+                  itemCount: cards.length,
                   itemBuilder: (context, index) {
-                    final doc = addresses[index];
-                    final data = doc.data() as Map<String, dynamic>;
-
-                    final fullName = data['fullName'] ?? 'Unnamed';
-                    final phoneNum = data['phoneNum']?.toString() ?? '-';
-                    final isDefault = data['isDefault'] ?? false;
-
-                    final streetOne = data['streetone'] ?? '';
-                    final streetTwo = data['streettwo'] ?? '';
-                    final city = data['city'] ?? '';
-                    final state = data['state'] ?? '';
-                    final zipCode = data['zipCode'] ?? '';
+                    final card = cards[index];
 
                     return Container(
                       margin: const EdgeInsets.symmetric(
@@ -163,7 +155,7 @@ class AddressListView extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: isDefault
+                        border: card.isDefault
                             ? Border.all(
                           color: const Color(0xFF8E6CEF).withOpacity(0.3),
                           width: 2,
@@ -184,6 +176,9 @@ class AddressListView extends StatelessWidget {
                           children: [
                             Row(
                               children: [
+                                // Card brand icon
+                                _buildCardBrandIcon(card.brand),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,14 +186,14 @@ class AddressListView extends StatelessWidget {
                                       Row(
                                         children: [
                                           Text(
-                                            fullName,
+                                            card.cardHolderName,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w700,
                                               fontSize: 16,
                                               letterSpacing: -0.3,
                                             ),
                                           ),
-                                          if (isDefault) ...[
+                                          if (card.isDefault) ...[
                                             const SizedBox(width: 8),
                                             Container(
                                               padding: const EdgeInsets.symmetric(
@@ -223,23 +218,14 @@ class AddressListView extends StatelessWidget {
                                         ],
                                       ),
                                       const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.phone_outlined,
-                                            size: 16,
-                                            color: Colors.grey[600],
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            phoneNum,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ],
+                                      Text(
+                                        _formatCardNumber(card.cardNumber),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[700],
+                                          letterSpacing: 0.5,
+                                          fontFamily: 'monospace',
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -255,24 +241,6 @@ class AddressListView extends StatelessWidget {
                                   ),
                                   elevation: 2,
                                   onSelected: (value) {
-                                    if (value == 'edit') {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => EditAddressView(
-                                            userId: userId,
-                                            addressId: doc.id,
-                                            initialData: data,
-                                          ),
-                                        ),
-                                      );
-                                    } else if (value == 'delete') {
-                                      controller.deleteAddress(
-                                        context: context,
-                                        addressId: doc.id,
-                                        addressName: fullName,
-                                      );
-                                    }
                                   },
                                   itemBuilder: (context) => [
                                     const PopupMenuItem(
@@ -289,7 +257,7 @@ class AddressListView extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    if (!isDefault)
+                                    if (!card.isDefault)
                                       const PopupMenuItem(
                                         value: 'delete',
                                         child: Row(
@@ -319,50 +287,33 @@ class AddressListView extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Icon(
-                                    Icons.location_on_outlined,
-                                    size: 18,
-                                    color: Colors.grey[600],
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Expires ${card.expiryDate}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[700],
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        if (streetOne.isNotEmpty)
-                                          Text(
-                                            streetOne,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              height: 1.4,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        if (streetTwo.isNotEmpty)
-                                          Text(
-                                            streetTwo,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              height: 1.4,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        if (city.isNotEmpty ||
-                                            state.isNotEmpty ||
-                                            zipCode.toString().isNotEmpty)
-                                          Text(
-                                            '${city.toString().isNotEmpty ? '$city, ' : ''}'
-                                                '${state.toString().isNotEmpty ? '$state ' : ''}'
-                                                '${zipCode.toString().isNotEmpty ? zipCode.toString() : ''}'.trim(),
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              height: 1.4,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                      ],
+                                  Text(
+                                    card.brand.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey[600],
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ],
@@ -377,12 +328,12 @@ class AddressListView extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-                child: OutlinedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => AddAddressView(userId: userId),
+                        builder: (_) => AddCardView(userId: userId),
                       ),
                     );
                   },
@@ -396,14 +347,12 @@ class AddressListView extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.add, size: 20),
                   label: const Text(
-                    'Add New Address',
+                    'Add New Card',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white, // Explicitly set white text
                     ),
                   ),
-
                 ),
               ),
             ],
@@ -411,5 +360,56 @@ class AddressListView extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Widget _buildCardBrandIcon(String brand) {
+    IconData iconData;
+    Color iconColor;
+
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFF1A1F71);
+        break;
+      case 'mastercard':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFFEB001B);
+        break;
+      case 'amex':
+      case 'american express':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFF006FCF);
+        break;
+      case 'discover':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFFFF6000);
+        break;
+      default:
+        iconData = Icons.credit_card_outlined;
+        iconColor = Colors.grey[600]!;
+    }
+
+    return Container(
+      width: 48,
+      height: 36,
+      decoration: BoxDecoration(
+        color: iconColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        iconData,
+        color: iconColor,
+        size: 24,
+      ),
+    );
+  }
+
+  String _formatCardNumber(String cardNumber) {
+    // Show only last 4 digits
+    if (cardNumber.length >= 4) {
+      final lastFour = cardNumber.substring(cardNumber.length - 4);
+      return '•••• •••• •••• $lastFour';
+    }
+    return '•••• •••• •••• ••••';
   }
 }
