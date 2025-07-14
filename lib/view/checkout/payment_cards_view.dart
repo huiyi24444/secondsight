@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../model/payment_cards_model.dart'; // Adjust path if needed
+import '../../model/payment_cards_model.dart';
+import '../settings/add_card_view.dart'; // Adjust path if needed
 
 class PaymentMethodSheet extends StatefulWidget {
   final Function(PaymentCard) onPaymentMethodSelected;
+  final String userId;
 
-  const PaymentMethodSheet({super.key, required this.onPaymentMethodSelected});
+  const PaymentMethodSheet({super.key, required this.onPaymentMethodSelected, required this.userId});
 
   @override
   State<PaymentMethodSheet> createState() => _PaymentMethodSheetState();
@@ -100,6 +102,46 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
               },
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddCardView(userId: widget.userId),
+                  ),
+                );
+
+                if (mounted) {
+                  setState(() {
+                    // Refresh the address list
+                  });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8E6CEF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text(
+                'Add Card',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 10)
         ],
       ),
     );
@@ -120,7 +162,28 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
       ),
       child: ListTile(
         leading: _buildCardBrandBadge(card.brand),
-        title: Text(card.cardNumber),
+        title: Row(
+          children: [
+            Text(card.cardNumber),
+            const SizedBox(width: 12),
+            if (card.isDefault)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8E6CEF),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Default',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
         subtitle: Text(card.cardHolderName),
         trailing: isSelected
             ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
@@ -130,12 +193,13 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
     );
   }
 
+
   Widget _buildCardBrandBadge(String brand) {
     return Container(
       width: 50,
       height: 30,
       decoration: BoxDecoration(
-        color: const Color(0xFF8B5CF6),
+        color: const Color(0xFF2663D4),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Center(

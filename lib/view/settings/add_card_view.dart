@@ -222,20 +222,11 @@ class _AddCardForm extends StatelessWidget {
     switch (brand.toLowerCase()) {
       case 'visa':
         iconData = Icons.credit_card;
-        iconColor = const Color(0xFF1A1F71);
+        iconColor = const Color(0xFF2663D4);
         break;
       case 'mastercard':
         iconData = Icons.credit_card;
         iconColor = const Color(0xFFEB001B);
-        break;
-      case 'amex':
-      case 'american express':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFF006FCF);
-        break;
-      case 'discover':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFFFF6000);
         break;
       default:
         iconData = Icons.credit_card;

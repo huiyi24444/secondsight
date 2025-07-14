@@ -267,11 +267,15 @@ class _CheckoutViewState extends State<CheckoutView> {
 
 
   void _showPaymentMethodSelection() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => PaymentMethodSheet(
+        userId: userId,
         onPaymentMethodSelected: (PaymentCard card) {
           setState(() {
             selectedPaymentCard = card;
@@ -280,6 +284,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       ),
     );
   }
+
 
   Future<void> _processPayment() async {
     setState(() => _isProcessingPayment = true);

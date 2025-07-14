@@ -201,6 +201,7 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
               ),
             ),
           ),
+          SizedBox(height: 10)
         ],
       ),
     );
