@@ -21,7 +21,7 @@ class EditProfileController {
   bool isLoading = false;
 
   // Gender options
-  final List<String> genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  final List<String> genderOptions = ['Male', 'Female'];
 
   EditProfileController(this.context, this.userId, this.profile) {
     nameController.text = profile.fullName;

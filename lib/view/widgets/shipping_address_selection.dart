@@ -84,43 +84,7 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
                           style: TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                         const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AddAddressView(userId: widget.userId),
-                              ),
-                            );
 
-                            if (mounted) {
-                              setState(() {
-                                print('[DEBUG] Returned from AddAddressView, refreshing address list...');
-                              });
-                            }
-                          },
-
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8E6CEF),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          icon: const Icon(Icons.add, size: 20),
-                          label: const Text(
-                            'Add Address',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   );
@@ -174,7 +138,7 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
               ),
             ),
           ),
-          SizedBox(height: 20),
+          SizedBox(height: 30),
         ],
       ),
     );

@@ -63,6 +63,13 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _categoriesFuture = fetchCategories();
 
+
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+    if (userId != null) {
+      OfflineRecommendationService().generateRecommendations(showProgress: true);
+      debugPrint('[OfflineRecommendationService] generateRecommendations() triggered');
+    }
+
     _searchController.addListener(() {
       final newText = _searchController.text.trim();
       // Only update state if the text actually changed
@@ -92,6 +99,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _refreshData() async {
     // Show loading indicator for at least 1 second for better UX
     await Future.delayed(const Duration(seconds: 1));
+
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+    if (userId != null) {
+      await OfflineRecommendationService().generateRecommendations(showProgress: true);
+    }
 
     setState(() {
       // Refresh categories
@@ -172,8 +184,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     radius: 20,
                     backgroundImage: imageUrl.isNotEmpty
                         ? NetworkImage(imageUrl)
-                        : const AssetImage('assets/images/default_avatar.png')
-                    as ImageProvider,
+                        : NetworkImage('https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/temp_profile_icon.jpg?alt=media&token=6ba2703e-e802-4738-bcb5-eaa796488294'),
                     backgroundColor: Colors.grey,
                   );
                 },

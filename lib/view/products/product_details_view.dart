@@ -31,11 +31,12 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
   int _currentImageIndex = 0;
   Category? _category;
 
+  //product_details_view.dart
   @override
   void initState() {
     super.initState();
     // Track product view
-    PersonalizedRecommendationService().trackProductView(widget.productId);
+    OfflineRecommendationService().trackProductView(widget.productId);
   }
 
   @override

@@ -135,13 +135,11 @@ class OrderDetailsController extends ChangeNotifier {
   }
   int _getOrderStep(String status) {
     switch (status.toLowerCase()) {
-      case 'processing':
-        return 0;
-      case 'shipped':
+      case 'to_ship':
         return 1;
-      case 'completed':
+      case 'to_receive':
         return 2;
-      case 'returned':
+      case 'completed':
         return 3;
       default:
         return 3;

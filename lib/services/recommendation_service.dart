@@ -1,22 +1,50 @@
-// personalized_recommendation_service.dart
+// offline_recommendation_service.dart
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class PersonalizedRecommendationService {
+class OfflineRecommendationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Replace with your actual Cloud Function URL
-  static const String _cloudFunctionUrl = 'https://batch-update-recommendations-d2z2wc7shq-et.a.run.app';
-
-  // Cache recommendations with better management
+  // Cache for recommendations and user data
   List<PersonalizedRecommendation>? _cachedRecommendations;
   DateTime? _lastFetched;
-  bool _isCurrentlyFetching = false; // Prevent multiple simultaneous calls
+  bool _isCurrentlyGenerating = false;
+
+  // Cache for products and user preferences
+  List<Map<String, dynamic>>? _cachedProducts;
+  UserPreferences? _cachedUserPreferences;
+
+  // ✅ Add category cache here
+  final Map<String, String> _categoryCache = {};
+
+  // ✅ Add resolver function here
+  Future<String> resolveCategory(dynamic catField) async {
+    if (catField is String) return catField;
+
+    if (catField is DocumentReference) {
+      if (_categoryCache.containsKey(catField.path)) {
+        return _categoryCache[catField.path]!;
+      }
+      try {
+        final snap = await catField.get();
+        if (snap.exists) {
+          final data = snap.data() as Map<String, dynamic>?;
+          final name = data?['catName'] ?? catField.id;
+          _categoryCache[catField.path] = name;
+          return name;
+        }
+        return catField.id;
+      } catch (_) {
+        return catField.id;
+      }
+    }
+    return 'unknown';
+  }
 
   /// Get personalized recommendations for current user
   Future<List<PersonalizedRecommendation>> getPersonalizedRecommendations({
@@ -28,9 +56,8 @@ class PersonalizedRecommendationService {
     }
 
     // Prevent multiple simultaneous calls
-    if (_isCurrentlyFetching && !forceRefresh) {
-      // Wait for current operation to complete
-      while (_isCurrentlyFetching) {
+    if (_isCurrentlyGenerating && !forceRefresh) {
+      while (_isCurrentlyGenerating) {
         await Future.delayed(const Duration(milliseconds: 100));
       }
       return _cachedRecommendations ?? [];
@@ -44,106 +71,587 @@ class PersonalizedRecommendationService {
       return _cachedRecommendations!;
     }
 
-    _isCurrentlyFetching = true;
+    _isCurrentlyGenerating = true;
+    try {
+      // Generate recommendations offline
+      final recommendations = await _generateOfflineRecommendations(user.uid);
+
+      // Save to Firestore for persistence
+      await _saveRecommendationsToFirestore(user.uid, recommendations);
+
+      _cachedRecommendations = recommendations;
+      _lastFetched = DateTime.now();
+
+      return recommendations;
+    } catch (e) {
+      debugPrint('Error generating offline recommendations: $e');
+      // Fallback to cached or Firestore recommendations
+      return await _getFallbackRecommendations(user.uid);
+    } finally {
+      _isCurrentlyGenerating = false;
+    }
+  }
+
+  /// Generate recommendations using offline machine learning
+  Future<List<PersonalizedRecommendation>> _generateOfflineRecommendations(String userId) async {
+    debugPrint('Generating offline recommendations for user: $userId');
+
+    // Get user preferences
+    final preferences = await _getUserPreferences(userId);
+    debugPrint("viewedProducts count: ${preferences.viewedProducts.length}");
+    debugPrint("purchasedProducts count: ${preferences.purchasedProducts.length}");
+
+
+    // If no interaction history, return popular items
+    if (preferences.viewedProducts.isEmpty && preferences.purchasedProducts.isEmpty) {
+      return await _generateDefaultRecommendations(userId);
+    }
+
+    // Get all available products
+    final allProducts = await _getAllProducts();
+
+    if (allProducts.length < 2) {
+      debugPrint('Not enough products for recommendations');
+      return [];
+    }
+
+    // Generate recommendations using content-based filtering
+    final recommendations = await _generateContentBasedRecommendations(
+        preferences,
+        allProducts
+    );
+
+    return recommendations;
+  }
+
+  /// Get user preferences from interaction history
+  Future<UserPreferences> _getUserPreferences(String userId) async {
+    // Check cache first
+    if (_cachedUserPreferences != null) {
+      return _cachedUserPreferences!;
+    }
+
+    final preferences = UserPreferences();
 
     try {
-      // First, check if we have recent recommendations
+      // Get user's view history
+      final viewHistory = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('viewHistory')
+          .orderBy('viewedAt', descending: true)
+          .limit(50)
+          .get();
+
+      List<String> viewedProductIds = [];
+      for (var view in viewHistory.docs) {
+        final productId = view.data()['productId'] as String?;
+        if (productId != null) {
+          viewedProductIds.add(productId);
+        }
+      }
+
+      // Get user's purchase history
+      final orders = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .get();
+
+      List<String> purchasedProductIds = [];
+      for (var order in orders.docs) {
+        final orderProducts = await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('order')
+            .doc(order.id)
+            .collection('orderProducts')
+            .get();
+
+        for (var orderProduct in orderProducts.docs) {
+          final productRef = orderProduct.data()['productID'];
+          String? productId;
+
+          if (productRef is DocumentReference) {
+            productId = productRef.id;
+          } else if (productRef is String) {
+            productId = productRef;
+          }
+
+          if (productId != null) {
+            purchasedProductIds.add(productId);
+          }
+        }
+
+      }
+
+      // Fetch product details for viewed and purchased items
+      final combinedProductIds = [...viewedProductIds, ...purchasedProductIds].toSet().toList();
+
+      if (combinedProductIds.isNotEmpty) {
+        // Fetch products in batches (Firestore limit: 10 per query)
+        for (int i = 0; i < combinedProductIds.length; i += 10) {
+          final batchIds = combinedProductIds.skip(i).take(10).toList();
+
+          final products = await _firestore
+              .collection('products')
+              .where(FieldPath.documentId, whereIn: batchIds)
+              .get();
+
+          for (var product in products.docs) {
+            final productData = product.data();
+            productData['id'] = product.id;
+
+
+            // Track categories
+            final categoryId = await resolveCategory(productData['category']);
+
+
+            preferences.favoriteCategories[categoryId] =
+                (preferences.favoriteCategories[categoryId] ?? 0) + 1;
+
+
+            // Track conditions
+            final condition = productData['productCondition'] as String? ?? 'unknown';
+            preferences.preferredConditions[condition] =
+                (preferences.preferredConditions[condition] ?? 0) + 1;
+
+            // Track tags
+            final tags = productData['tags'] as List<dynamic>? ?? [];
+            for (var tag in tags) {
+              if (tag is String) {
+                preferences.preferredTags[tag] =
+                    (preferences.preferredTags[tag] ?? 0) + 1;
+              }
+            }
+
+            // Track price range
+            final price = (productData['productPrice'] as num?)?.toDouble() ?? 0.0;
+            if (price > 0) {
+              if (preferences.priceRange['min'] == null || price < preferences.priceRange['min']!) {
+                preferences.priceRange['min'] = price;
+              }
+              if (preferences.priceRange['max'] == null || price > preferences.priceRange['max']!) {
+                preferences.priceRange['max'] = price;
+              }
+            }
+
+            // Add to appropriate lists
+            if (viewedProductIds.contains(product.id)) {
+              preferences.viewedProducts.add(ProductInfo(
+                id: product.id,
+                data: productData,
+              ));
+            }
+            if (purchasedProductIds.contains(product.id)) {
+              preferences.purchasedProducts.add(ProductInfo(
+                id: product.id,
+                data: productData,
+              ));
+            }
+          }
+        }
+      }
+
+      _cachedUserPreferences = preferences;
+      return preferences;
+    } catch (e) {
+      debugPrint('Error getting user preferences: $e');
+      return preferences;
+    }
+  }
+
+  /// Get all available products
+  Future<List<Map<String, dynamic>>> _getAllProducts() async {
+    // Check cache first
+    if (_cachedProducts != null) {
+      return _cachedProducts!;
+    }
+
+    try {
+      final productsSnapshot = await _firestore
+          .collection('products')
+          .where('productStatus', isEqualTo: 'available')
+          .get();
+
+      final products = productsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      _cachedProducts = products;
+      return products;
+    } catch (e) {
+      debugPrint('Error getting all products: $e');
+      return [];
+    }
+  }
+
+  /// Generate content-based recommendations
+  Future<List<PersonalizedRecommendation>> _generateContentBasedRecommendations(
+      UserPreferences preferences,
+      List<Map<String, dynamic>> allProducts
+      ) async {
+    // Create user preference vector
+    final userVector = _createUserPreferenceVector(preferences);
+
+
+    // Get already interacted products to exclude
+    final interactedIds = <String>{};
+    for (var product in preferences.purchasedProducts) {
+      interactedIds.add(product.id);
+    }
+
+    // Calculate similarity scores for all products
+    final List<ProductSimilarity> productSimilarities = [];
+
+    for (var product in allProducts) {
+      final productId = product['id'] as String;
+
+      // Skip already interacted products
+      if (interactedIds.contains(productId)) {
+        continue;
+      }
+
+      // Create product vector
+      final productVector = await _createProductVector(product);
+
+      // Calculate cosine similarity
+      final similarity = _calculateCosineSimilarity(userVector, productVector);
+
+      if (similarity > 0.01) { // Threshold for relevance
+        productSimilarities.add(ProductSimilarity(
+          product: product,
+          similarity: similarity,
+        ));
+      }
+    }
+
+
+    // Sort by similarity score
+    productSimilarities.sort((a, b) => b.similarity.compareTo(a.similarity));
+
+    // Apply preference boosts and create recommendations
+    final recommendations = <PersonalizedRecommendation>[];
+
+    for (int i = 0; i < min(20, productSimilarities.length); i++) {
+      final productSim = productSimilarities[i];
+      final product = productSim.product;
+      double score = productSim.similarity;
+
+      final category = await resolveCategory(product['category']);
+
+      if (category != null && preferences.favoriteCategories.containsKey(category)) {
+        score *= 1.2;
+      }
+
+      final condition = product['productCondition'] as String?;
+      if (condition != null && preferences.preferredConditions.containsKey(condition)) {
+        score *= 1.1;
+      }
+
+      // Check tag overlap
+      final productTags = (product['tags'] as List<dynamic>?)?.cast<String>() ?? [];
+      final commonTags = productTags.where((tag) => preferences.preferredTags.containsKey(tag)).toList();
+      if (commonTags.isNotEmpty) {
+        score *= 1.15;
+      }
+
+      // Handle productURL
+      final urls = product['productURL'];
+      final productUrl = urls is List && urls.isNotEmpty ? urls[0] : '';
+
+      recommendations.add(PersonalizedRecommendation(
+        productId: product['id'] as String,
+        productName: product['productName'] as String? ?? '',
+        productPrice: (product['productPrice'] as num?)?.toDouble() ?? 0.0,
+        productURL: productUrl,
+        similarityScore: score,
+        category: category ?? '',
+        tags: productTags,
+        rank: i + 1,
+        reason: await _getRecommendationReason(product, preferences),
+      ));
+    }
+    debugPrint("Total available products: ${allProducts.length}");
+    debugPrint("Filtered product similarities: ${productSimilarities.length}");
+
+
+
+    return recommendations;
+  }
+
+  /// Create user preference vector from interaction history
+  Map<String, double> _createUserPreferenceVector(UserPreferences preferences) {
+    final vector = <String, double>{};
+
+    // Weight purchased items highest
+    for (var product in preferences.purchasedProducts) {
+      final productName = product.data['productName'] as String?;
+      if (productName != null) {
+        _addToVector(vector, productName.toLowerCase().split(' '), 5.0);
+      }
+
+      final tags = product.data['tags'] as List<dynamic>?;
+      if (tags != null) {
+        _addToVector(vector, tags.cast<String>(), 3.0);
+      }
+    }
+
+    // Weight viewed items
+    for (var product in preferences.viewedProducts.take(20)) {
+      final productName = product.data['productName'] as String?;
+      if (productName != null) {
+        _addToVector(vector, productName.toLowerCase().split(' '), 2.0);
+      }
+
+      final tags = product.data['tags'] as List<dynamic>?;
+      if (tags != null) {
+        _addToVector(vector, tags.cast<String>(), 1.0);
+      }
+    }
+
+    // Add preferred tags with weights
+    for (var entry in preferences.preferredTags.entries) {
+      final weight = min(entry.value.toDouble(), 5.0);
+      vector[entry.key.toLowerCase()] = (vector[entry.key.toLowerCase()] ?? 0) + weight;
+    }
+
+    // Add preferred conditions
+    for (var entry in preferences.preferredConditions.entries) {
+      final weight = min(entry.value.toDouble(), 3.0);
+      vector[entry.key.toLowerCase()] = (vector[entry.key.toLowerCase()] ?? 0) + weight;
+    }
+
+    return vector;
+  }
+
+  /// Create product vector for similarity calculation
+  Future<Map<String, double>> _createProductVector(Map<String, dynamic> product) async {
+    final vector = <String, double>{};
+
+    // Product name (highest weight)
+    final productName = product['productName'] as String?;
+    if (productName != null) {
+      _addToVector(vector, productName.toLowerCase().split(' '), 3.0);
+    }
+
+    // Product description
+    final productDesc = product['productDesc'] as String?;
+    if (productDesc != null) {
+      _addToVector(vector, productDesc.toLowerCase().split(' '), 1.0);
+    }
+
+    // Tags (high weight)
+    final tags = product['tags'] as List<dynamic>?;
+    if (tags != null) {
+      _addToVector(vector, tags.cast<String>(), 2.0);
+    }
+
+    // Product condition
+    final condition = product['productCondition'] as String?;
+    if (condition != null) {
+      vector[condition.toLowerCase()] = (vector[condition.toLowerCase()] ?? 0) + 1.0;
+    }
+
+    // Category (medium weight)
+    final dynamic categoryField = product['category'];
+    final resolvedCategory = await resolveCategory(categoryField);
+    if (resolvedCategory.isNotEmpty && resolvedCategory != 'unknown') {
+      vector[resolvedCategory.toLowerCase()] =
+          (vector[resolvedCategory.toLowerCase()] ?? 0) + 2.0;
+    }
+
+
+    return vector;
+  }
+
+  /// Add terms to vector with specified weight
+  void _addToVector(Map<String, double> vector, List<String> terms, double weight) {
+    for (var term in terms) {
+      final cleanTerm = term.toLowerCase().trim();
+      if (cleanTerm.isNotEmpty) {
+        vector[cleanTerm] = (vector[cleanTerm] ?? 0) + weight;
+      }
+    }
+  }
+
+  /// Calculate cosine similarity between two vectors
+  double _calculateCosineSimilarity(Map<String, double> vectorA, Map<String, double> vectorB) {
+    if (vectorA.isEmpty || vectorB.isEmpty) return 0.0;
+
+    // Get all unique terms
+    final allTerms = <String>{...vectorA.keys, ...vectorB.keys};
+
+    double dotProduct = 0.0;
+    double magnitudeA = 0.0;
+    double magnitudeB = 0.0;
+
+    for (var term in allTerms) {
+      final valueA = vectorA[term] ?? 0.0;
+      final valueB = vectorB[term] ?? 0.0;
+
+      dotProduct += valueA * valueB;
+      magnitudeA += valueA * valueA;
+      magnitudeB += valueB * valueB;
+    }
+
+    if (magnitudeA == 0.0 || magnitudeB == 0.0) return 0.0;
+
+    return dotProduct / (sqrt(magnitudeA) * sqrt(magnitudeB));
+  }
+
+  /// Generate recommendation reason
+  Future<String> _getRecommendationReason(Map<String, dynamic> product, UserPreferences preferences) async {
+    final reasons = <String>[];
+
+    // Check category match
+    final category = await resolveCategory(product['category']);
+
+    if (category != null && preferences.favoriteCategories.containsKey(category)) {
+      reasons.add('Similar to your favorite category');
+    }
+
+    // Check tag overlap
+    final productTags = (product['tags'] as List<dynamic>?)?.cast<String>() ?? [];
+    final commonTags = productTags.where((tag) => preferences.preferredTags.containsKey(tag)).toList();
+    if (commonTags.isNotEmpty) {
+      reasons.add('Matches your interests: ${commonTags.take(2).join(', ')}');
+    }
+
+    // Price range
+    if (preferences.purchasedProducts.isNotEmpty) {
+      final avgPrice = preferences.purchasedProducts
+          .map((p) => (p.data['productPrice'] as num?)?.toDouble() ?? 0.0)
+          .where((price) => price > 0)
+          .fold(0.0, (sum, price) => sum + price) /
+          preferences.purchasedProducts.length;
+
+      final productPrice = (product['productPrice'] as num?)?.toDouble() ?? 0.0;
+      if ((productPrice - avgPrice).abs() < avgPrice * 0.3) {
+        reasons.add('In your price range');
+      }
+    }
+
+    return reasons.isNotEmpty ? reasons.first : 'Based on your browsing history';
+  }
+
+  /// Generate default recommendations for new users
+  Future<List<PersonalizedRecommendation>> _generateDefaultRecommendations(String userId) async {
+    try {
+      final popularProducts = await _firestore
+          .collection('products')
+          .where('productStatus', isEqualTo: 'available')
+          .orderBy('viewCount', descending: true)
+          .limit(20)
+          .get();
+
+      final recommendations = <PersonalizedRecommendation>[];
+
+      for (int i = 0; i < popularProducts.docs.length; i++) {
+        final product = popularProducts.docs[i];
+        final productData = product.data();
+
+        final urls = productData['productURL'];
+        final productUrl = urls is List && urls.isNotEmpty ? urls[0] : '';
+
+        recommendations.add(PersonalizedRecommendation(
+          productId: product.id,
+          productName: productData['productName'] as String? ?? '',
+          productPrice: (productData['productPrice'] as num?)?.toDouble() ?? 0.0,
+          productURL: productUrl,
+          similarityScore: 0.01,
+          reason: 'Popular item',
+          rank: i + 1,
+          tags: (productData['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+          category: await resolveCategory(productData['category']),
+        ));
+      }
+
+      return recommendations;
+    } catch (e) {
+      debugPrint('Error generating default recommendations: $e');
+      return [];
+    }
+  }
+
+  /// Save recommendations to Firestore for persistence
+  Future<void> _saveRecommendationsToFirestore(String userId, List<PersonalizedRecommendation> recommendations) async {
+
+    debugPrint("Saving ${recommendations.length} recommendations to Firestore");
+
+    try {
+      final userRef = _firestore.collection('users').doc(userId);
+      final recommendationsRef = userRef.collection('recommendations');
+
+      // Clear old recommendations
+      final oldRecs = await recommendationsRef.get();
+      final batch = _firestore.batch();
+
+      for (var doc in oldRecs.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Save metadata
+      final metaRef = recommendationsRef.doc('_metadata');
+      batch.set(metaRef, {
+        'generatedAt': FieldValue.serverTimestamp(),
+        'totalRecommendations': recommendations.length,
+        'basedOnViews': _cachedUserPreferences?.viewedProducts.length ?? 0,
+        'basedOnPurchases': _cachedUserPreferences?.purchasedProducts.length ?? 0,
+        'version': '3.0-offline',
+      });
+
+      // Save individual recommendations
+      for (int i = 0; i < recommendations.length; i++) {
+        final rec = recommendations[i];
+        final recRef = recommendationsRef.doc('rec_${i.toString().padLeft(3, '0')}');
+        batch.set(recRef, {
+          'productId': rec.productId,
+          'productName': rec.productName,
+          'productPrice': rec.productPrice,
+          'productURL': rec.productURL,
+          'similarityScore': rec.similarityScore,
+          'reason': rec.reason,
+          'rank': rec.rank,
+          'tags': rec.tags,
+          'category': rec.category,
+          'generatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      debugPrint('Saved ${recommendations.length} offline recommendations for user $userId');
+    } catch (e) {
+      debugPrint('Error saving recommendations to Firestore: $e');
+    }
+  }
+
+  /// Get fallback recommendations from Firestore
+  Future<List<PersonalizedRecommendation>> _getFallbackRecommendations(String userId) async {
+    try {
       final snapshot = await _firestore
           .collection('users')
-          .doc(user.uid)
+          .doc(userId)
           .collection('recommendations')
           .where('rank', isLessThanOrEqualTo: 20)
           .orderBy('rank')
           .get();
 
-      // Check if recommendations are stale (older than 24 hours)
-      bool shouldUpdateRecommendations = false;
-
-      if (snapshot.docs.isNotEmpty) {
-        final metadataDoc = await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('recommendations')
-            .doc('_metadata')
-            .get();
-
-        if (metadataDoc.exists) {
-          final generatedAt = (metadataDoc.data()!['generatedAt'] as Timestamp).toDate();
-          final hoursSinceGeneration = DateTime.now().difference(generatedAt).inHours;
-
-          if (hoursSinceGeneration > 24) {
-            shouldUpdateRecommendations = true;
-          }
-        }
-      } else {
-        shouldUpdateRecommendations = true;
-      }
-
-      // If we need fresh recommendations, call the Cloud Function
-      if (shouldUpdateRecommendations) {
-        // Generate in background, don't wait for it to complete
-        _generateRecommendationsViaAPI(user.uid);
-
-        // Return existing recommendations if available
-        if (snapshot.docs.isNotEmpty) {
-          final recommendations = snapshot.docs
-              .where((doc) => doc.id != '_metadata')
-              .map((doc) => PersonalizedRecommendation.fromFirestore(doc))
-              .toList();
-
-          _cachedRecommendations = recommendations;
-          _lastFetched = DateTime.now();
-          return recommendations;
-        }
-
-        // Wait for new recommendations if none exist
-        await Future.delayed(const Duration(seconds: 3));
-
-        final updatedSnapshot = await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('recommendations')
-            .where('rank', isLessThanOrEqualTo: 20)
-            .orderBy('rank')
-            .get();
-
-        if (updatedSnapshot.docs.isNotEmpty) {
-          final recommendations = updatedSnapshot.docs
-              .where((doc) => doc.id != '_metadata')
-              .map((doc) => PersonalizedRecommendation.fromFirestore(doc))
-              .toList();
-
-          _cachedRecommendations = recommendations;
-          _lastFetched = DateTime.now();
-          return recommendations;
-        }
-      }
-
-      // Return existing recommendations
-      if (snapshot.docs.isNotEmpty) {
-        final recommendations = snapshot.docs
-            .where((doc) => doc.id != '_metadata')
-            .map((doc) => PersonalizedRecommendation.fromFirestore(doc))
-            .toList();
-
-        _cachedRecommendations = recommendations;
-        _lastFetched = DateTime.now();
-        return recommendations;
-      }
-
-      return [];
+      return snapshot.docs
+          .where((doc) => doc.id != '_metadata')
+          .map((doc) => PersonalizedRecommendation.fromFirestore(doc))
+          .toList();
     } catch (e) {
-      debugPrint('Error fetching personalized recommendations: $e');
-      return _cachedRecommendations ?? [];
-    } finally {
-      _isCurrentlyFetching = false;
+      debugPrint('Error getting fallback recommendations: $e');
+      return [];
     }
   }
 
-  // Track product view with rate limiting
+  /// Track product view (same as before)
   Future<void> trackProductView(String productId) async {
     final user = _auth.currentUser;
-    debugPrint("Logged in user: ${_auth.currentUser?.uid}");
     if (user == null) return;
 
     try {
@@ -157,102 +665,49 @@ class PersonalizedRecommendationService {
         'viewedAt': FieldValue.serverTimestamp(),
       });
 
-      //Update product view count
+      // Update product view count
       await _firestore
-                 .collection('products')
-                 .doc(productId)
-                 .update({
-               'viewCount': FieldValue.increment(1),
-             });
+          .collection('products')
+          .doc(productId)
+          .update({
+        'viewCount': FieldValue.increment(1),
+      });
 
-      // Throttle recommendation updates - only after 10 views
-      final viewHistory = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('viewHistory')
-          .orderBy('viewedAt', descending: true)
-          .limit(10)
-          .get();
+      // Clear cache to trigger regeneration
+      _cachedUserPreferences = null;
+      _cachedRecommendations = null;
 
-      // If user has viewed 10 products recently, refresh recommendations
-      if (viewHistory.docs.length >= 10) {
-        // Generate in background without waiting
-        _generateRecommendationsViaAPI(user.uid);
-      }
     } catch (e) {
       debugPrint('Error tracking product view: $e');
     }
   }
 
-  /// Clear cache and force refresh
+  /// Clear all caches
   void clearCache() {
     _cachedRecommendations = null;
+    _cachedUserPreferences = null;
+    _cachedProducts = null;
     _lastFetched = null;
   }
 
-  /// Generate recommendations via Cloud Function API
-  Future<bool> _generateRecommendationsViaAPI(String userId) async {
-    try {
-      debugPrint('Calling Cloud Function to generate recommendations for user: $userId');
-
-      final response = await http.post(
-        Uri.parse(_cloudFunctionUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({
-          'user_id': userId,
-        }),
-      ).timeout(const Duration(seconds: 30));
-
-      debugPrint('Cloud Function response status: ${response.statusCode}');
-      debugPrint('Cloud Function response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        if (responseData['status'] == 'success') {
-          return true;
-        } else {
-          debugPrint('Cloud Function returned error: ${responseData['message']}');
-          return false;
-        }
-      } else {
-        debugPrint('Cloud Function HTTP error: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error calling Cloud Function: $e');
-      return false;
-    }
-  }
-
-  /// Manually trigger recommendation generation (for testing or admin purposes)
+  /// Manually trigger recommendation generation
   Future<bool> generateRecommendations({bool showProgress = false}) async {
     final user = _auth.currentUser;
     if (user == null) return false;
 
     try {
       if (showProgress) {
-        debugPrint('Generating recommendations...');
+        debugPrint('Generating offline recommendations...');
       }
 
-      final success = await _generateRecommendationsViaAPI(user.uid);
+      clearCache();
+      final recommendations = await getPersonalizedRecommendations(forceRefresh: true);
 
-      if (success) {
-        // Clear cache to force fresh fetch
-        clearCache();
-
-        if (showProgress) {
-          debugPrint('Recommendations generated successfully');
-        }
-        return true;
-      } else {
-        if (showProgress) {
-          debugPrint('Failed to generate recommendations');
-        }
-        return false;
+      if (showProgress) {
+        debugPrint('Generated ${recommendations.length} offline recommendations');
       }
+
+      return recommendations.isNotEmpty;
     } catch (e) {
       debugPrint('Error generating recommendations: $e');
       return false;
@@ -281,16 +736,6 @@ class PersonalizedRecommendationService {
     }
   }
 
-
-
-  /// Request recommendation update via API
-  Future<void> requestRecommendationUpdate() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    await _generateRecommendationsViaAPI(user.uid);
-  }
-
   /// Check if recommendations are available
   Future<bool> hasRecommendations() async {
     final user = _auth.currentUser;
@@ -310,7 +755,7 @@ class PersonalizedRecommendationService {
     }
   }
 
-  /// Get recommendation stats for debugging
+  /// Get recommendation stats
   Future<Map<String, dynamic>> getRecommendationStats() async {
     final user = _auth.currentUser;
     if (user == null) return {};
@@ -349,7 +794,31 @@ class PersonalizedRecommendationService {
   }
 }
 
-// Models (keeping the existing ones)
+// Supporting classes
+class UserPreferences {
+  final List<ProductInfo> viewedProducts = [];
+  final List<ProductInfo> purchasedProducts = [];
+  final Map<String, int> favoriteCategories = {};
+  final Map<String, int> preferredConditions = {};
+  final Map<String, int> preferredTags = {};
+  final Map<String, double?> priceRange = {'min': null, 'max': null};
+}
+
+class ProductInfo {
+  final String id;
+  final Map<String, dynamic> data;
+
+  ProductInfo({required this.id, required this.data});
+}
+
+class ProductSimilarity {
+  final Map<String, dynamic> product;
+  final double similarity;
+
+  ProductSimilarity({required this.product, required this.similarity});
+}
+
+// Keep existing model classes
 class PersonalizedRecommendation {
   final String productId;
   final String productName;
@@ -410,7 +879,7 @@ class RecommendationMetadata {
       totalRecommendations: map['totalRecommendations'] ?? 0,
       basedOnViews: map['basedOnViews'] ?? 0,
       basedOnPurchases: map['basedOnPurchases'] ?? 0,
-      version: map['version'] ?? '2.0',
+      version: map['version'] ?? '3.0-offline',
     );
   }
 }

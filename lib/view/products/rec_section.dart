@@ -11,7 +11,7 @@ class RecommendationsSection extends StatefulWidget {
   const RecommendationsSection({
     Key? key,
     required this.userId,
-    this.showDebugInfo = false, // Default to false in production
+    this.showDebugInfo = true, // Default to false in production
   }) : super(key: key);
 
   @override
@@ -84,7 +84,7 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
 
     final productMap = {
       for (var doc in productSnapshot.docs)
-        doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id),
+        doc.id: Product.fromDocument(doc.data(), doc.id),
     };
 
     return rankedProductIds
@@ -220,6 +220,7 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
                         'Check back later or explore more items',
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
+
                     ],
                   ),
                 ),

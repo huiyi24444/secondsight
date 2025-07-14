@@ -94,17 +94,6 @@ class OrderSuccessScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Home Indicator
-                  Container(
-                    width: 134,
-                    height: 5,
-                    margin: EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(2.5),
-                    ),
-                  ),
                 ],
               ),
             ),

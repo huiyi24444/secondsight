@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/adapters.dart';
 import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/services/auth_wrapper.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
@@ -20,6 +22,16 @@ import 'package:secondsight/web/admin/dashboard/admin_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive
+  await Hive.initFlutter();
+
+  // Open boxes for offline storage
+  await Hive.openBox('recommendations');
+  await Hive.openBox('user_preferences');
+  await Hive.openBox('products_cache');
+  await Hive.openBox('view_history');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
