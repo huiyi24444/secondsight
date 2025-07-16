@@ -55,29 +55,34 @@ class OrderDetailsController extends ChangeNotifier {
       return null;
     }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('order')
-        .doc(orderId)
-        .collection('shipment')
-        .doc(shipmentId)
-        .get();
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .collection('shipment')
+          .doc(shipmentId)
+          .get();
 
-    if (!snapshot.exists) {
-      print("Shipment document not found.");
+      if (!snapshot.exists) {
+        print("Shipment document not found.");
+        return null;
+      }
+
+      final data = snapshot.data();
+      if (data == null) {
+        print("Shipment data is null.");
+        return null;
+      }
+
+      return ShipmentModel.fromMap(data, snapshot.id);
+    } catch (e) {
+      print("Error fetching shipment: $e");
       return null;
     }
-
-    final data = snapshot.data();
-    if (data == null) {
-      print("Shipment data is null.");
-      return null;
-    }
-
-    // Don't return null even if some fields are null
-    return ShipmentModel.fromMap(data, snapshot.id);
   }
+
 
 
 

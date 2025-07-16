@@ -501,8 +501,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
           // Shipment Details
           if (shipment != null) ...[
             // Shipping Address with special layout
-            _buildShippingAddressSection(shipment.shipAddress),
-            const SizedBox(height: 16),
+
 
             // Other shipment details in a grid layout
             Row(
@@ -512,7 +511,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                   child: _buildCompactInfoCard(
                     'Shipped Date',
                     shipment.shippedDate != null
-                        ? _controller.getFormattedDate(shipment.shippedDate!)
+                        ? DateFormat('MMM d, yyyy').format(shipment.shippedDate!)
                         : 'To be updated',
                     isPlaceholder: shipment.shippedDate == null,
                     icon: Icons.calendar_today_outlined,
@@ -535,6 +534,9 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
             _buildTrackingNumberCard(
               shipment.trackingNumber,
             ),
+            const SizedBox(height: 16),
+            _buildShippingAddressSection(shipment),
+
           ] else ...[
             // If no shipment, just show return eligibility
             _buildCompactInfoCard(
@@ -549,52 +551,242 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-// Special widget for shipping address
-  Widget _buildShippingAddressSection(String address) {
+
+  Widget _buildShippingAddressSection(ShipmentModel shipment) {
+    final fullName = shipment.fullName?.trim() ?? '';
+    final phoneNum = shipment.phoneNum ?? 0;
+
+    final street = shipment.street?.trim() ?? '';
+    final city = shipment.city?.trim() ?? '';
+    final state = shipment.state?.trim() ?? '';
+    final zipCode = shipment.zipCode?.trim() ?? '';
+
+    final hasStructuredAddress = street.isNotEmpty || city.isNotEmpty || state.isNotEmpty || zipCode.isNotEmpty;
+    final fallbackAddress = shipment.shipAddress.trim();
+
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF8E6CEF).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF8E6CEF).withOpacity(0.08),
+            const Color(0xFF8E6CEF).withOpacity(0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF8E6CEF).withOpacity(0.1),
+          color: const Color(0xFF8E6CEF).withOpacity(0.2),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.location_on_outlined,
-                size: 18,
-                color: Colors.grey[600],
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8E6CEF).withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Shipping Address',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping,
+                    size: 20,
+                    color: Color(0xFF8E6CEF),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                const Text(
+                  'Delivery Information',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            address,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              height: 1.5,
+
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Recipient Name
+                _buildInfoRow(
+                  icon: Icons.person_outline,
+                  label: 'Recipient',
+                  value: fullName.isNotEmpty ? fullName : 'No name provided',
+                  iconColor: const Color(0xFF8E6CEF),
+                  isHighlighted: true,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Phone Number
+                _buildInfoRow(
+                  icon: Icons.phone_outlined,
+                  label: 'Contact',
+                  value: phoneNum > 0 ? '+60${phoneNum.toString()}' : 'No phone number',
+                  iconColor: Colors.blue,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Full Address (structured or fallback)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.location_on_outlined,
+                          size: 20,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Delivery Address',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              hasStructuredAddress
+                                  ? street
+                                  : fallbackAddress.isNotEmpty
+                                  ? fallbackAddress
+                                  : 'No address provided',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                height: 1.4,
+                              ),
+                            ),
+                            if (hasStructuredAddress) ...[
+                              Text(
+                                '$city, $state $zipCode',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+
+// Helper widget for info rows
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color iconColor,
+    bool isHighlighted = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? iconColor.withOpacity(0.05)
+            : Colors.grey.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 18,
+              color: iconColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 // Compact info card for other details
   Widget _buildCompactInfoCard(

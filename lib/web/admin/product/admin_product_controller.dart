@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/product_model.dart';
 
 class ProductManagementController {
+
+
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   final TextEditingController searchController = TextEditingController();
 
@@ -73,10 +75,6 @@ class ProductManagementController {
     currentPage = 1;
     onUpdate();
   }
-
-
-
-
 
   Future<void> deleteProduct(String productId, VoidCallback onUpdate) async {
     try {

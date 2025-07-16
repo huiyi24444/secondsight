@@ -4,10 +4,12 @@ import 'package:secondsight/view/widgets/product_status_utils.dart';
 import 'package:secondsight/view/widgets/string_extensions.dart';
 
 import '../../../model/product_model.dart';
+import '../../../view/widgets/string_extensions.dart';
 import '../widget/topbar.dart';
 import 'admin_product_addition.dart';
 import 'admin_product_controller.dart';
 import 'admin_product_details.dart';
+import '../../../view/widgets/order_status_utils.dart';
 
 class ProductManagementPage extends StatefulWidget {
   const ProductManagementPage({Key? key}) : super(key: key);
@@ -190,6 +192,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 DataColumn(label: Text('Condition')),
                                 DataColumn(label: Text('Price')),
                                 DataColumn(label: Text('Status')),
+                                DataColumn(label: Text('Qty')),
                                 DataColumn(label: Text('Added')),
                                 DataColumn(label: Text('Action')),
                               ],
@@ -209,17 +212,26 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                             ),
                                             clipBehavior: Clip.antiAlias,
                                             child: (product.images.isEmpty || product.images.first.isEmpty)
-                                                ? const Icon(Icons.broken_image, color: Colors.grey)
+                                                ? const Icon(Icons.broken_image, color: Colors.grey, size: 24)
                                                 : ClipRRect(
                                               borderRadius: BorderRadius.circular(8),
                                               child: Image.network(
                                                 product.images.first,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (context, error, stackTrace) =>
-                                                const Icon(Icons.broken_image, color: Colors.grey),
-                                                loadingBuilder: (context, child, progress) {
-                                                  if (progress == null) return child;
-                                                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                                const Icon(Icons.broken_image, color: Colors.grey, size: 24),
+                                                loadingBuilder: (context, child, loadingProgress) {
+                                                  if (loadingProgress == null) return child;
+                                                  return Center(
+                                                    child: SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                                                      ),
+                                                    ),
+                                                  );
                                                 },
                                               ),
                                             ),
@@ -227,14 +239,32 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                           const SizedBox(width: 10),
                                           Flexible(child: Text(product.name)),
                                         ],
+
                                       ),
                                     ),
 
-                                    DataCell(Text(product.id.substring(0, 8))),
+                                    DataCell(Text(product.id.substring(0, 8).toUpperCase())),
                                     DataCell(
                                       Text(controller.getCategoryName(product.category.id)),
                                     ),
-                                    DataCell(Text(product.condition.capitalize())),
+                                    DataCell(
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: OrderStatusUtils.getConditionColor(product.condition).withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          OrderStatusUtils.formatCondition(product.condition),
+                                          style: TextStyle(
+                                            color: OrderStatusUtils.getConditionColor(product.condition),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+
                                     DataCell(Text('RM${product.price.toStringAsFixed(2)}')),
                                     DataCell(
                                       Container(
@@ -252,6 +282,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                         ),
                                       ),
                                     ),
+                                    DataCell(Text(product.stockQuantity.toString())),
                                     DataCell(Text(_formatDate(product.createdAt))),
                                     DataCell(
                                       Row(

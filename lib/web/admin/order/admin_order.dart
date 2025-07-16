@@ -324,7 +324,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                                                     borderRadius: BorderRadius.circular(12),
                                                   ),
                                                   child: Text(
-                                                    _formatStatus(order.orderStatus),
+                                                  OrderStatusUtils.formatStatus(order.orderStatus),
                                                     style: TextStyle(
                                                       color: OrderStatusUtils.getStatusColor(order.orderStatus),
                                                       fontSize: 12,

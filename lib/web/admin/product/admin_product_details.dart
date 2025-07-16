@@ -1,7 +1,10 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/model/product_model.dart';
 import 'package:secondsight/model/product_measurements_model.dart';
+import 'package:secondsight/view/widgets/order_status_utils.dart';
 
 import 'admin_product_image.dart';
 import 'measurements_widget.dart';
@@ -62,7 +65,7 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
   List<QueryDocumentSnapshot> _categories = [];
 
   // Define options for dropdowns
-  final List<String> _conditions = ['new', 'like new', 'good', 'fair', 'poor'];
+  final List<String> _conditions = ['brand_new', 'like_new', 'good', 'used', 'well_worn'];
   final List<String> _statuses = ['available', 'sold', 'inactive'];
   final List<String> _sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'Freesize', '-'];
   final List<String> _tryOnTypes = ['upper', 'lower', 'full'];
@@ -106,6 +109,57 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
     // Load categories
     _loadCategories();
   }
+
+  Future<void> _uploadTryOnImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true,
+    );
+
+    if (result != null && result.files.single.bytes != null) {
+      final bytes = result.files.single.bytes!;
+      final fileName =
+          'tryon_${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
+
+      final ref = FirebaseStorage.instance.ref().child('virtual_try_on/$fileName');
+
+      final metadata = SettableMetadata(contentType: 'image/png');
+
+      try {
+        final task = await ref.putData(bytes, metadata);
+        final downloadUrl = await task.ref.getDownloadURL();
+
+        setState(() {
+          _tryOnDataController.text = downloadUrl;
+          widget.product.virtualTryOn = {
+            ...widget.product.virtualTryOn,
+            'tryOnData': downloadUrl,
+            'enabled': true,
+            'type': widget.product.virtualTryOn['type'] ?? 'upper',
+          };
+        });
+
+        await FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.product.id)
+            .update({
+          'virtualTryOn': widget.product.virtualTryOn,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Try-on image uploaded successfully')),
+        );
+      } catch (e) {
+        print('Upload failed: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image')),
+        );
+      }
+    }
+  }
+
 
   Future<void> _loadCategories() async {
     try {
@@ -483,8 +537,7 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                                   items: _conditions.map((condition) {
                                     return DropdownMenuItem(
                                       value: condition,
-                                      child: Text(condition.split(' ').map((word) =>
-                                      word[0].toUpperCase() + word.substring(1)).join(' ')),
+                                        child: Text(OrderStatusUtils.formatCondition(condition))
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -552,46 +605,69 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                       _buildSectionHeader('Virtual Try-On'),
                       const SizedBox(height: 10),
 
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Try-On Image URL'),
-                                TextFormField(
-                                  controller: _tryOnDataController,
-                                  decoration: _buildInputDecoration('Enter image URL'),
-                                ),
-                              ],
+                      // Only show the Try-On Row if _tryOnEnabled is true
+                      if (_tryOnEnabled)
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildLabel('Try-On Image'),
+                                  Row(
+                                    children: [
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextFormField(
+                                              controller: _tryOnDataController,
+                                              readOnly: true,
+                                              decoration: InputDecoration(labelText: 'Try-On Image URL'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          ElevatedButton.icon(
+                                            onPressed: _uploadTryOnImage,
+                                            icon: const Icon(Icons.upload),
+                                            label: const Text('Upload'),
+                                          ),
+                                        ],
+                                      ),
+
+
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('Try-On Type'),
-                                DropdownButtonFormField<String>(
-                                  value: _tryOnType,
-                                  decoration: _buildInputDecoration('Select type'),
-                                  items: _tryOnTypes.map((type) {
-                                    return DropdownMenuItem(
-                                      value: type,
-                                      child: Text(type[0].toUpperCase() + type.substring(1)),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() => _tryOnType = value!);
-                                  },
-                                ),
-                              ],
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildLabel('Try-On Type'),
+                                  DropdownButtonFormField<String>(
+                                    value: _tryOnType,
+                                    decoration: _buildInputDecoration('Select type'),
+                                    items: _tryOnTypes.map((type) {
+                                      return DropdownMenuItem(
+                                        value: type,
+                                        child: Text(type[0].toUpperCase() + type.substring(1)),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() => _tryOnType = value!);
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       const SizedBox(height: 15),
+
                       CheckboxListTile(
                         title: const Text('Enable Virtual Try-On'),
                         value: _tryOnEnabled,
@@ -602,6 +678,7 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                         contentPadding: EdgeInsets.zero,
                       ),
                       const SizedBox(height: 30),
+
 
                       // Section: Tags
                       _buildSectionHeader('Tags'),

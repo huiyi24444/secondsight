@@ -303,15 +303,37 @@ class _CheckoutViewState extends State<CheckoutView> {
 
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
+      // 👇 Generate shipment ID manually
+      final shipmentId = FirebaseFirestore.instance.collection('shipment_id').doc().id;
+
+      // 👇 Create the order with the shipmentID included
       final orderRef = await userRef.collection('order').add({
         'orderDate': Timestamp.fromDate(DateTime.now()),
         'orderStatus': 'to_ship',
         'totalAmount': widget.total,
         'eligibilityForReturn': true,
-        'shipmentID': '',
+        'shipmentID': shipmentId,
         'payment': result.transactionId ?? 'unknown',
       });
 
+      // 👇 Create shipment using the new ShipmentModel (with DateTime? shippedDate)
+      final shipment = ShipmentModel(
+        id: shipmentId,
+        shippedDate: null,
+        trackingNumber: null,
+        shipAddress: selectedAddress != null ? _formatAddress(selectedAddress!) : 'Unknown address',
+        fullName: selectedAddress?.fullName,
+        phoneNum: selectedAddress?.phoneNum,
+        street: selectedAddress?.street,
+        city: selectedAddress?.city,
+        state: selectedAddress?.state,
+        zipCode: selectedAddress?.zipCode,
+      );
+
+      // 👇 Add shipment document to subcollection under order with specific ID
+      await orderRef.collection('shipment').doc(shipmentId).set(shipment.toMap());
+
+      // 👇 Add ordered products and update stock
       for (final item in widget.cartItems) {
         final productRef = FirebaseFirestore.instance.collection('products').doc(item.product.id);
 
@@ -335,16 +357,7 @@ class _CheckoutViewState extends State<CheckoutView> {
         });
       }
 
-      final shipment = ShipmentModel(
-        id: '',
-        shipAddress: selectedAddress != null ? _formatAddress(selectedAddress!) : 'Unknown address',
-        shippedDate: null,
-        trackingNumber: null,
-      );
-
-      final shipmentRef = await orderRef.collection('shipment').add(shipment.toMap());
-      await orderRef.update({'shipmentID': shipmentRef.id});
-
+      // 👇 Navigate to success screen
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -363,4 +376,6 @@ class _CheckoutViewState extends State<CheckoutView> {
       if (mounted) setState(() => _isProcessingPayment = false);
     }
   }
+
+
 }

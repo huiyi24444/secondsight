@@ -21,7 +21,7 @@ class OrderStatusUtils {
   static String getStatusText(String status) {
     switch (status.toLowerCase()) {
       case 'to_ship':
-        return 'Processing';
+        return 'To Ship';
       case 'completed':
         return 'Completed';
       case 'cancelled':

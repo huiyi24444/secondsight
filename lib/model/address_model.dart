@@ -45,4 +45,16 @@ class AddressModel {
   String toString() {
     return "$fullName, $phoneNum, ${isDefault ? "Default" : "Non-default"}, $street, $city, $state $zipCode";
   }
+
+  Map<String, dynamic> toShipmentMap() {
+    return {
+      'fullName': fullName,
+      'phoneNum': phoneNum,
+      'street': street,
+      'city': city,
+      'state': state,
+      'zipCode': zipCode,
+    };
+  }
+
 }
