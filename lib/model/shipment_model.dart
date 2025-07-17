@@ -7,7 +7,8 @@ class ShipmentModel {
   final String shipAddress; // Keep this for backward compatibility
   final String? fullName;
   final int? phoneNum;
-  final String? street;
+  final String? streetone;
+  final String? streettwo;
   final String? city;
   final String? state;
   final String? zipCode;
@@ -19,13 +20,16 @@ class ShipmentModel {
     required this.shipAddress,
     this.fullName,
     this.phoneNum,
-    this.street,
+    this.streetone,
+    this.streettwo,
     this.city,
     this.state,
     this.zipCode,
   });
 
   factory ShipmentModel.fromMap(Map<String, dynamic> map, String id) {
+    print("fullName from Firestore: ${map['fullName']}");
+    print("phoneNum from Firestore: ${map['phoneNum']} (${map['phoneNum']?.runtimeType})");
     return ShipmentModel(
       id: id,
       shippedDate: map['shippedDate'] != null
@@ -35,7 +39,8 @@ class ShipmentModel {
       shipAddress: map['shipAddress'] ?? '',
       fullName: map['fullName'],
       phoneNum: map['phoneNum'],
-      street: map['street'],
+      streetone: map['streetone'],
+      streettwo: map['streettwo'],
       city: map['city'],
       state: map['state'],
       zipCode: map['zipCode'],
@@ -50,7 +55,8 @@ class ShipmentModel {
       'shipAddress': shipAddress,
       'fullName': fullName,
       'phoneNum': phoneNum,
-      'street': street,
+      'streetone': streetone,
+      'streettwo': streettwo,
       'city': city,
       'state': state,
       'zipCode': zipCode,

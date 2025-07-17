@@ -1,14 +1,21 @@
 // FILE: order_details_dialog.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
-
+import '../../../model/shipment_model.dart';
 
 class OrderDetailsDialog {
+  // Define allowed status transitions
+  static const Map<String, List<String>> allowedTransitions = {
+    'to_ship': ['to_receive', 'canceled'],
+    'to_receive': ['completed', 'canceled'],
+    'completed': [], // No transitions allowed
+    'canceled': [], // No transitions allowed
+  };
+
   static Future<void> show(
       BuildContext context, {
         required OrdersModel order,
@@ -20,6 +27,28 @@ class OrderDetailsDialog {
       }) async {
     String currentStatus = order.orderStatus;
 
+    print('Fetching shipment for orderId: ${order.id}, customerId: ${order.customerId}');
+    // Fetch shipment information
+    ShipmentModel? shipment;
+    try {
+      final shipmentSnapshot = await firestore
+          .collection('users')
+          .doc(order.customerId)
+          .collection('order')
+          .doc(order.id)
+          .collection('shipment')
+          .get();
+
+      if (shipmentSnapshot.docs.isNotEmpty) {
+        shipment = ShipmentModel.fromMap(
+          shipmentSnapshot.docs.first.data(),
+          shipmentSnapshot.docs.first.id,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching shipment: $e');
+    }
+
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -28,93 +57,136 @@ class OrderDetailsDialog {
             return Dialog(
               child: Container(
                 width: 700,
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Order #${order.shortOrderId}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text('Customer: ${customerNames[order.customerId] ?? 'Unknown'}', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[300]!),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButton<String>(
-                                value: currentStatus,
-                                underline: const SizedBox(),
-                                isDense: true,
-                                items: ['to_ship', 'to_receive', 'completed', 'canceled']
-                                    .map((status) => DropdownMenuItem(
-                                  value: status,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        margin: const EdgeInsets.only(right: 8),
-                                        decoration: BoxDecoration(
-                                          color: OrderStatusUtils.getStatusColor(status),
-                                          shape: BoxShape.circle,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Order #${order.shortOrderId}',
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text('Customer: ${customerNames[order.customerId] ?? 'Unknown'}',
+                                  style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: DropdownButton<String>(
+                                  value: currentStatus,
+                                  underline: const SizedBox(),
+                                  isDense: true,
+                                  items: _getAvailableStatuses(currentStatus)
+                                      .map((status) => DropdownMenuItem(
+                                    value: status,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            color: OrderStatusUtils.getStatusColor(status),
+                                            shape: BoxShape.circle,
+                                          ),
                                         ),
-                                      ),
-                                      Text(_formatStatus(status)),
-                                    ],
-                                  ),
-                                ))
-                                    .toList(),
-                                onChanged: (newStatus) async {
-                                  if (newStatus != null) {
-                                    if (newStatus == 'shipped' && currentStatus != 'shipped') {
-                                      final confirmed = await _showShippingConfirmationDialog(context, order, firestore);
-                                      if (confirmed) {
+                                        Text(OrderStatusUtils.formatStatus(status)),
+                                      ],
+                                    ),
+                                  ))
+                                      .toList(),
+                                  onChanged: (newStatus) async {
+                                    if (newStatus != null && newStatus != currentStatus) {
+                                      // Check if transition is allowed
+                                      if (!_isTransitionAllowed(currentStatus, newStatus)) {
+                                        _showTransitionError(context, currentStatus, newStatus);
+                                        return;
+                                      }
+
+                                      // Handle specific transitions
+                                      bool proceedWithUpdate = false;
+
+                                      switch ('$currentStatus->$newStatus') {
+                                        case 'to_ship->to_receive':
+                                          proceedWithUpdate = await _handleShipToReceive(
+                                              context, order, shipment, firestore
+                                          );
+                                          break;
+
+                                        case 'to_receive->completed':
+                                          proceedWithUpdate = await _handleReceiveToCompleted(
+                                              context, order, firestore
+                                          );
+                                          break;
+
+                                        case 'to_ship->canceled':
+                                        case 'to_receive->canceled':
+                                          proceedWithUpdate = await _handleCancellation(
+                                              context, order, currentStatus, firestore
+                                          );
+                                          break;
+
+                                        default:
+                                        // For any other allowed transitions
+                                          proceedWithUpdate = true;
+                                      }
+
+                                      if (proceedWithUpdate) {
                                         setState(() => currentStatus = newStatus);
                                         await updateOrderStatus(order, newStatus, firestore, onOrdersReload, context);
+
+                                        // Refresh shipment data if needed
+                                        if (newStatus == 'to_receive') {
+                                          await _refreshShipmentData(setState, firestore, order);
+                                        }
                                       }
-                                    } else {
-                                      setState(() => currentStatus = newStatus);
-                                      await updateOrderStatus(order, newStatus, firestore, onOrdersReload, context);
                                     }
-                                  }
-                                },
+                                  },
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 12),
+                              IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      _buildOrderInfoRow(order),
+                      if (shipment != null) ...[
+                        const SizedBox(height: 20),
+                        _buildShipmentInfo(shipment!),
                       ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    _buildOrderInfoRow(order),
-                    const SizedBox(height: 20),
-
-                    Text('Products (${products.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
-                    _buildProductList(products, productDetails),
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    _buildTotalAmount(order),
-                    const SizedBox(height: 20),
-                    _buildDeleteButton(context, firestore, order, onOrdersReload),
-                  ],
+                      const SizedBox(height: 20),
+                      Text('Products (${products.length})',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 12),
+                      _buildProductList(products, productDetails),
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      _buildTotalAmount(order),
+                      const SizedBox(height: 20),
+                      _buildDeleteButton(context, firestore, order, onOrdersReload),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -124,14 +196,392 @@ class OrderDetailsDialog {
     );
   }
 
-  static String _formatStatus(String status) {
-    return status[0].toUpperCase() + status.substring(1);
+  static List<String> _getAvailableStatuses(String currentStatus) {
+    // Always show current status
+    List<String> statuses = [currentStatus];
+
+    // Add allowed transitions
+    statuses.addAll(allowedTransitions[currentStatus] ?? []);
+
+    return statuses;
+  }
+
+  static bool _isTransitionAllowed(String fromStatus, String toStatus) {
+    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
+  }
+
+  static void _showTransitionError(BuildContext context, String fromStatus, String toStatus) {
+    String message = '';
+
+    if (fromStatus == 'completed') {
+      message = 'Completed orders cannot be modified.';
+    } else if (fromStatus == 'canceled') {
+      message = 'Canceled orders cannot be reactivated.';
+    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
+      message = 'Cannot revert to "To Ship" once tracking number is provided.';
+    } else {
+      message = 'This status transition is not allowed.';
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  static Future<bool> _handleShipToReceive(
+      BuildContext context,
+      OrdersModel order,
+      ShipmentModel? shipment,
+      FirebaseFirestore firestore,
+      ) async {
+    // Proceed only if payment is null
+    if (order.payment == null) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Payment Not Confirmed'),
+          content: const Text(
+              'This order does not have a recorded payment method. Are you sure you want to ship it?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('Proceed Anyway'),
+            ),
+          ],
+        ),
+      ) ?? false;
+
+      if (!proceed) return false;
+    }
+
+    // Check address completeness
+    bool isAddressComplete = shipment != null &&
+        (shipment.fullName?.isNotEmpty ?? false) &&
+        (shipment.phoneNum != null && shipment.phoneNum! > 0) &&
+        (shipment.streetone?.isNotEmpty ?? false) &&
+        (shipment.city?.isNotEmpty ?? false) &&
+        (shipment.state?.isNotEmpty ?? false) &&
+        (shipment.zipCode?.isNotEmpty ?? false);
+
+    if (!isAddressComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Shipping address is incomplete. Please update customer information first.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
+    // Check tracking number
+    if (shipment?.trackingNumber == null || shipment!.trackingNumber!.isEmpty) {
+      return await _showTrackingNumberDialog(context, order, firestore);
+    }
+
+    return true;
+  }
+
+  static Future<bool> _handleReceiveToCompleted(
+      BuildContext context,
+      OrdersModel order,
+      FirebaseFirestore firestore,
+      ) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mark this order as completed?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.amber[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone. The order will be marked as delivered.',
+                      style: TextStyle(fontSize: 13, color: Colors.amber[900]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Update completion date
+              await firestore
+                  .collection('users')
+                  .doc(order.customerId)
+                  .collection('order')
+                  .doc(order.id)
+                  .update({
+                'completedDate': Timestamp.now(),
+              });
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Complete Order'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  static Future<bool> _handleCancellation(
+      BuildContext context,
+      OrdersModel order,
+      String currentStatus,
+      FirebaseFirestore firestore,
+      ) async {
+    final reasonController = TextEditingController();
+
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (currentStatus == 'to_receive')
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This order has already been shipped. Cancellation may require return shipping.',
+                        style: TextStyle(fontSize: 13, color: Colors.red[900]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Cancellation Reason *',
+                hintText: 'Enter reason for cancellation',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Back'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please provide a cancellation reason')),
+                );
+                return;
+              }
+
+              // Save cancellation reason
+              await firestore
+                  .collection('users')
+                  .doc(order.customerId)
+                  .collection('order')
+                  .doc(order.id)
+                  .update({
+                'cancellationReason': reasonController.text.trim(),
+                'canceledDate': Timestamp.now(),
+              });
+
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  static Future<void> _refreshShipmentData(
+      StateSetter setState,
+      FirebaseFirestore firestore,
+      OrdersModel order,
+      ) async {
+    try {
+      final updatedShipmentSnapshot = await firestore
+          .collection('users')
+          .doc(order.customerId)
+          .collection('order')
+          .doc(order.id)
+          .collection('shipment')
+          .get();
+
+      if (updatedShipmentSnapshot.docs.isNotEmpty) {
+        setState(() {
+          ShipmentModel.fromMap(
+            updatedShipmentSnapshot.docs.first.data(),
+            updatedShipmentSnapshot.docs.first.id,
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing shipment data: $e');
+    }
+  }
+
+  static Widget _buildShipmentInfo(ShipmentModel shipment) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_shipping, color: Colors.blue[700], size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Shipment Information',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[900],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Show tracking number status
+          if (shipment.trackingNumber?.isNotEmpty ?? false) ...[
+            _buildShipmentRow('Tracking Number', shipment.trackingNumber!),
+            const SizedBox(height: 8),
+          ] else ...[
+            _buildShipmentRow('Tracking Number', 'Not yet provided', valueColor: Colors.orange),
+            const SizedBox(height: 8),
+          ],
+
+          if (shipment.shippedDate != null) ...[
+            _buildShipmentRow('Shipped Date', _formatDate(shipment.shippedDate!)),
+            const SizedBox(height: 8),
+          ] else ...[
+            _buildShipmentRow('Shipped Date', 'Not yet shipped', valueColor: Colors.orange),
+            const SizedBox(height: 8),
+          ],
+
+          if (shipment.fullName?.isNotEmpty ?? false) ...[
+            _buildShipmentRow('Recipient', shipment.fullName!),
+            const SizedBox(height: 8),
+          ] else ...[
+            _buildShipmentRow('Recipient', 'Missing name', valueColor: Colors.red),
+            const SizedBox(height: 8),
+          ],
+
+          if (shipment.phoneNum != null && shipment.phoneNum! > 0) ...[
+            _buildShipmentRow('Phone', shipment.phoneNum.toString()),
+            const SizedBox(height: 8),
+          ] else ...[
+            _buildShipmentRow('Phone', 'Missing or invalid number', valueColor: Colors.red),
+            const SizedBox(height: 8),
+          ],
+
+          // Full address row in single line
+          if ((shipment.streetone?.isNotEmpty ?? false) &&
+              (shipment.city?.isNotEmpty ?? false) &&
+              (shipment.state?.isNotEmpty ?? false) &&
+              (shipment.zipCode?.isNotEmpty ?? false)) ...[
+            _buildShipmentRow(
+              'Shipping Address',
+              [
+                shipment.streetone,
+                shipment.streettwo,
+                shipment.city,
+                shipment.state,
+                shipment.zipCode,
+              ]
+                  .where((part) => part != null && part!.trim().isNotEmpty)
+                  .join(', '),
+            ),
+            const SizedBox(height: 8),
+          ] else ...[
+            _buildShipmentRow(
+              'Shipping Address',
+              'Missing or invalid address data',
+              valueColor: Colors.red,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildShipmentRow(String label, String value, {Color? valueColor}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            '$label:',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 14, color: valueColor),
+          ),
+        ),
+      ],
+    );
   }
 
   static Widget _buildOrderInfoRow(OrdersModel order) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8)
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -172,6 +622,8 @@ class OrderDetailsDialog {
           final product = products[index];
           final productId = (product.productID as DocumentReference).id;
           final details = productDetails[productId] ?? {};
+          final imageUrl = details['imageUrl'] as String?;
+          final productName = details['name'] as String? ?? 'Unknown Product';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -185,11 +637,19 @@ class OrderDetailsDialog {
                 Container(
                   width: 60,
                   height: 60,
-                  decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                  child: details['imageUrl'] != ''
+                  decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8)
+                  ),
+                  child: (imageUrl?.isNotEmpty ?? false)
                       ? ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(details['imageUrl'], fit: BoxFit.cover),
+                    child: Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.image, color: Colors.grey),
+                    ),
                   )
                       : const Icon(Icons.image, color: Colors.grey),
                 ),
@@ -198,18 +658,22 @@ class OrderDetailsDialog {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(details['name'] ?? 'Unknown Product', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                      Text(productName,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
-                      Text('Quantity: ${product.productQuantity}', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                      Text('Quantity: ${product.productQuantity}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('RM ${product.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text('RM ${product.totalPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     if (product.productQuantity > 1)
-                      Text('RM ${product.price.toStringAsFixed(2)} each', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text('RM ${product.price.toStringAsFixed(2)} each',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                   ],
                 ),
               ],
@@ -233,25 +697,53 @@ class OrderDetailsDialog {
     );
   }
 
-  static Widget _buildDeleteButton(BuildContext context, FirebaseFirestore firestore, OrdersModel order, Future<void> Function() reloadCallback) {
+  static Widget _buildDeleteButton(BuildContext context, FirebaseFirestore firestore,
+      OrdersModel order, Future<void> Function() reloadCallback) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         TextButton(
           onPressed: () {
+            // Check if order can be deleted
+            if (order.orderStatus == 'completed' || order.orderStatus == 'to_receive') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Cannot delete ${OrderStatusUtils.formatStatus(order.orderStatus)} orders'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
                 title: const Text('Delete Order'),
                 content: const Text('Are you sure you want to delete this order?'),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel')
+                  ),
                   ElevatedButton(
                     onPressed: () async {
                       Navigator.pop(context);
                       Navigator.pop(context);
-                      await firestore.collection('users').doc(order.customerId).collection('order').doc(order.id).delete();
-                      await reloadCallback();
+                      try {
+                        await firestore
+                            .collection('users')
+                            .doc(order.customerId)
+                            .collection('order')
+                            .doc(order.id)
+                            .delete();
+                        await reloadCallback();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting order: $e'))
+                          );
+                        }
+                      }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                     child: const Text('Delete'),
@@ -266,50 +758,98 @@ class OrderDetailsDialog {
     );
   }
 
-  static Future<bool> _showShippingConfirmationDialog(BuildContext context, OrdersModel order, FirebaseFirestore firestore) async {
+  static Future<bool> _showTrackingNumberDialog(BuildContext context,
+      OrdersModel order, FirebaseFirestore firestore) async {
+    final trackingNumberController = TextEditingController();
+
     return await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Shipping'),
+        title: const Text('Enter Tracking Number'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('This will mark the order as shipped and generate tracking information.'),
+            const Text(
+              'A tracking number is required to update the status to "To Receive".',
+              style: TextStyle(fontSize: 14),
+            ),
             const SizedBox(height: 16),
-            Text('A tracking number will be generated and the shipped date will be set to today.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+            TextField(
+              controller: trackingNumberController,
+              decoration: const InputDecoration(
+                labelText: 'Tracking Number *',
+                hintText: 'Enter tracking number',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The shipped date will be set to current date/time.',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
-              final trackingNumber = 'SS${DateTime.now().millisecondsSinceEpoch}';
-              final shipmentRef = firestore.collection('users').doc(order.customerId).collection('order').doc(order.id).collection('shipment');
-              final snapshot = await shipmentRef.get();
-
-              if (snapshot.docs.isNotEmpty) {
-                await snapshot.docs.first.reference.update({
-                  'trackingNumber': trackingNumber,
-                  'shippedDate': Timestamp.now(),
-                });
-              } else {
-                await shipmentRef.add({
-                  'trackingNumber': trackingNumber,
-                  'shippedDate': Timestamp.now(),
-                  'shipAddress': 'Customer Address',
-                });
+              if (trackingNumberController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a tracking number')),
+                );
+                return;
               }
 
-              Navigator.pop(context, true);
+              try {
+                final shipmentRef = firestore
+                    .collection('users')
+                    .doc(order.customerId)
+                    .collection('order')
+                    .doc(order.id)
+                    .collection('shipment');
+
+                final snapshot = await shipmentRef.get();
+
+                final updateData = {
+                  'trackingNumber': trackingNumberController.text.trim(),
+                  'shippedDate': Timestamp.now(),
+                };
+
+                if (snapshot.docs.isNotEmpty) {
+                  await snapshot.docs.first.reference.update(updateData);
+                } else {
+                  // This shouldn't happen based on your description, but handling just in case
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Shipment document not found')),
+                  );
+                  Navigator.pop(context, false);
+                  return;
+                }
+
+                if (context.mounted) {
+                  Navigator.pop(context, true);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating tracking number: $e')),
+                  );
+                  Navigator.pop(context, false);
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
-            child: const Text('Confirm Shipping'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
-    ) ??
-        false;
+    ) ?? false;
   }
 
   static Future<void> updateOrderStatus(
@@ -320,15 +860,28 @@ class OrderDetailsDialog {
       BuildContext context,
       ) async {
     try {
-      await firestore.collection('users').doc(order.customerId).collection('order').doc(order.id).update({'orderStatus': newStatus});
+      await firestore
+          .collection('users')
+          .doc(order.customerId)
+          .collection('order')
+          .doc(order.id)
+          .update({'orderStatus': newStatus});
       await reloadCallback();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Order status updated successfully')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Order status updated successfully'))
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating order: $e')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating order: $e'))
+        );
+      }
     }
   }
 
-  static _formatDate(DateTime dateTime) {
+  static String _formatDate(DateTime dateTime) {
     final formatter = DateFormat('dd MMM yyyy');
     return formatter.format(dateTime);
   }

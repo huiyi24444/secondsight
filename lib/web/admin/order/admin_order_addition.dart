@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+
+// Create Order Dialog remains the same
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 class CreateOrderDialog extends StatefulWidget {
   final Function onOrderCreated;
@@ -15,13 +18,13 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
   final _formKey = GlobalKey<FormState>();
 
   String? selectedCustomerId;
-  String? selectedProductId;
+  String orderType = 'General';
   String orderStatus = 'Pending';
-  final TextEditingController _quantityController = TextEditingController(text: '1');
+  final TextEditingController _noteController = TextEditingController();
 
   List<Map<String, dynamic>> customers = [];
   List<Map<String, dynamic>> products = [];
-  Map<String, dynamic> selectedProductDetails = {};
+  List<Map<String, dynamic>> selectedProducts = [];
   bool isLoading = true;
 
   @override
@@ -46,7 +49,7 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
           'id': doc.id,
           'name': doc.data()['productName'] ?? 'Unknown Product',
           'price': doc.data()['price'] ?? 0.0,
-          'sku': doc.data()['sku'] ?? '',
+          'stock': doc.data()['stockQuantity'] ?? 0,
         }).toList();
 
         isLoading = false;
@@ -57,52 +60,86 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
     }
   }
 
-  Future<void> _createOrder() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _addProduct() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String? selectedProductId;
+        int quantity = 1;
 
-    try {
-      final quantity = int.parse(_quantityController.text);
-      final total = selectedProductDetails['price'] * quantity;
-
-      final orderData = {
-        'orderId': 'ORD${DateTime.now().millisecondsSinceEpoch}'.substring(0, 10),
-        'customerId': selectedCustomerId,
-        'items': [{
-          'productId': selectedProductId,
-          'productName': selectedProductDetails['name'],
-          'quantity': quantity,
-          'price': selectedProductDetails['price'],
-        }],
-        'total': total,
-        'orderStatus': orderStatus.toLowerCase(),
-        'paymentMethod': 'Mastercard',
-        'orderDate': FieldValue.serverTimestamp(),
-      };
-
-      await _firestore
-          .collection('users')
-          .doc(selectedCustomerId)
-          .collection('order')
-          .add(orderData);
-
-      Navigator.pop(context);
-      widget.onOrderCreated();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order created successfully!')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating order: $e')),
-      );
-    }
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Add Product'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedProductId,
+                    decoration: InputDecoration(
+                      labelText: 'Select Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: products.map<DropdownMenuItem<String>>((product) {
+                      return DropdownMenuItem<String>(
+                        value: product['id'],
+                        child: Text('${product['name']} - RM${product['price']}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedProductId = value;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: '1',
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Quantity',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      quantity = int.tryParse(value) ?? 1;
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedProductId != null ? () {
+                    final product = products.firstWhere((p) => p['id'] == selectedProductId);
+                    this.setState(() {
+                      selectedProducts.add({
+                        'id': product['id'],
+                        'name': product['name'],
+                        'price': product['price'],
+                        'quantity': quantity,
+                        'total': product['price'] * quantity,
+                      });
+                    });
+                    Navigator.pop(context);
+                  } : null,
+                  child: Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       child: Container(
-        width: 600,
+        width: 700,
         padding: EdgeInsets.all(30),
         child: Form(
           key: _formKey,
@@ -113,14 +150,26 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Create New Order', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close)),
+                  Text(
+                    'Create New Order',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close),
+                  ),
                 ],
               ),
               SizedBox(height: 30),
               if (isLoading)
                 Center(child: CircularProgressIndicator())
               else ...[
+                // Order Details
+                Text('Order Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                SizedBox(height: 15),
                 DropdownButtonFormField<String>(
                   value: selectedCustomerId,
                   decoration: InputDecoration(
@@ -133,89 +182,183 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                       child: Text('${customer['name']} (${customer['email']})'),
                     );
                   }).toList(),
-                  onChanged: (value) => setState(() => selectedCustomerId = value),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedCustomerId = value;
+                    });
+                  },
                   validator: (value) => value == null ? 'Please select a customer' : null,
                 ),
                 SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        initialValue: DateTime.now().toString().split(' ')[0],
-                        readOnly: true,
+                      child: DropdownButtonFormField<String>(
+                        value: orderType,
                         decoration: InputDecoration(
-                          labelText: 'Order Date',
+                          labelText: 'Order Type',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          suffixIcon: Icon(Icons.calendar_today),
                         ),
+                        items: ['General', 'Express', 'Return'].map((type) {
+                          return DropdownMenuItem(value: type, child: Text(type));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            orderType = value!;
+                          });
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 20),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: orderStatus,
+                        decoration: InputDecoration(
+                          labelText: 'Order Status',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        items: ['Pending', 'Processing', 'Delivered', 'Cancelled'].map((status) {
+                          return DropdownMenuItem(value: status, child: Text(status));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            orderStatus = value!;
+                          });
+                        },
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
-
                 SizedBox(height: 30),
-                DropdownButtonFormField<String>(
-                  value: selectedProductId,
-                  decoration: InputDecoration(
-                    labelText: 'Search product name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  items: products.map<DropdownMenuItem<String>>((product) {
-                    return DropdownMenuItem<String>(
-                      value: product['id'],
-                      child: Text('${product['name']} - \$${product['price']}'),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedProductId = value;
-                      selectedProductDetails = products.firstWhere((p) => p['id'] == value);
-                    });
-                  },
-                  validator: (value) => value == null ? 'Please select a product' : null,
+
+                // Products Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    TextButton.icon(
+                      onPressed: _addProduct,
+                      icon: Icon(Icons.add),
+                      label: Text('Add Product'),
+                    ),
+                  ],
                 ),
+                SizedBox(height: 15),
+
+                Container(
+                  constraints: BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: selectedProducts.isEmpty
+                      ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Text(
+                        'No products added yet',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                  )
+                      : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: selectedProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = selectedProducts[index];
+                      return ListTile(
+                        title: Text(product['name']),
+                        subtitle: Text('Qty: ${product['quantity']} × RM${product['price']}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'RM${product['total'].toStringAsFixed(2)}',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  selectedProducts.removeAt(index);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                if (selectedProducts.isNotEmpty) ...[
+                  SizedBox(height: 16),
+                  Divider(),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Amount:',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          'RM${selectedProducts.fold(0.0, (sum, product) => sum + product['total']).toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF7C3AED),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 SizedBox(height: 20),
                 TextFormField(
-                  controller: _quantityController,
-                  keyboardType: TextInputType.number,
+                  controller: _noteController,
+                  maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Quantity',
+                    labelText: 'Order Note (Optional)',
+                    hintText: 'Add note about order',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter quantity';
-                    if (int.tryParse(value) == null) return 'Please enter a valid number';
-                    return null;
-                  },
                 ),
                 SizedBox(height: 30),
-                DropdownButtonFormField<String>(
-                  value: orderStatus,
-                  decoration: InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  items: ['Pending', 'Processing', 'Delivered', 'Cancelled']
-                      .map((status) => DropdownMenuItem(value: status, child: Text(status)))
-                      .toList(),
-                  onChanged: (value) => setState(() => orderStatus = value!),
-                ),
-                SizedBox(height: 30),
+
+                // Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
                       child: Text('Cancel'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      ),
                     ),
                     SizedBox(width: 10),
                     ElevatedButton(
-                      onPressed: _createOrder,
-                      child: Text('Create Order'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF7C3AED)),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => CreateOrderDialog(
+                            onOrderCreated: () {
+                              // Call any reload or state update logic here
+                              // e.g., setState(() => ...) or fetchOrders();
+                            },
+                          ),
+                        );
+                      },
+                      child: const Text('Create Order'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
+                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      ),
                     ),
+
                   ],
                 ),
               ],

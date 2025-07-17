@@ -39,7 +39,8 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
         fullName: data['fullName'] ?? '',
         phoneNum: data['phoneNum'] ?? 0,
         isDefault: data['isDefault'] ?? false,
-        street: '${data['streetone'] ?? ''} ${data['streettwo'] ?? ''}'.trim(),
+        streetone: data['streetone'] ?? '',
+        streettwo: data['streettwo'] ?? '',
         city: data['city'] ?? '',
         state: data['state'] ?? '',
         zipCode: data['zipCode']?.toString() ?? data['zipcode']?.toString() ?? '',
@@ -51,7 +52,8 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
       if (widget.initiallySelectedAddress != null) {
         final existingIndex = addresses.indexWhere((addr) =>
         addr.fullName == widget.initiallySelectedAddress!.fullName &&
-            addr.street == widget.initiallySelectedAddress!.street &&
+            addr.streetone == widget.initiallySelectedAddress!.streetone &&
+            addr.streettwo == widget.initiallySelectedAddress!.streettwo &&
             addr.city == widget.initiallySelectedAddress!.city &&
             addr.zipCode == widget.initiallySelectedAddress!.zipCode
         );
@@ -85,7 +87,8 @@ class _ShippingAddressSelectionState extends State<ShippingAddressSelection> {
     // Format address for display
     final parts = <String>[];
 
-    if (address.street.isNotEmpty) parts.add(address.street);
+    if (address.streetone.isNotEmpty) parts.add(address.streetone);
+    if (address.streettwo.isNotEmpty) parts.add(address.streettwo);
     if (address.city.isNotEmpty) parts.add(address.city);
     if (address.state.isNotEmpty) parts.add(address.state);
     if (address.zipCode.isNotEmpty) parts.add(address.zipCode);

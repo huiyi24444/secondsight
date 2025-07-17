@@ -556,12 +556,13 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     final fullName = shipment.fullName?.trim() ?? '';
     final phoneNum = shipment.phoneNum ?? 0;
 
-    final street = shipment.street?.trim() ?? '';
+    final streetone = shipment.streetone?.trim() ?? '';
+    final streettwo = shipment.streettwo?.trim() ?? '';
     final city = shipment.city?.trim() ?? '';
     final state = shipment.state?.trim() ?? '';
     final zipCode = shipment.zipCode?.trim() ?? '';
 
-    final hasStructuredAddress = street.isNotEmpty || city.isNotEmpty || state.isNotEmpty || zipCode.isNotEmpty;
+    final hasStructuredAddress = streetone.isNotEmpty || streettwo.isNotEmpty || city.isNotEmpty || state.isNotEmpty || zipCode.isNotEmpty;
     final fallbackAddress = shipment.shipAddress.trim();
 
     return Container(
@@ -691,16 +692,15 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                             const SizedBox(height: 4),
                             Text(
                               hasStructuredAddress
-                                  ? street
-                                  : fallbackAddress.isNotEmpty
-                                  ? fallbackAddress
-                                  : 'No address provided',
+                                  ? '${streetone ?? ''} ${streettwo ?? ''}'.trim()
+                                  : (fallbackAddress.isNotEmpty ? fallbackAddress : 'No address provided'),
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 height: 1.4,
                               ),
                             ),
+
                             if (hasStructuredAddress) ...[
                               Text(
                                 '$city, $state $zipCode',

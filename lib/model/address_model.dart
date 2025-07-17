@@ -2,7 +2,8 @@ class AddressModel {
   String fullName;
   int phoneNum;
   bool isDefault;
-  String street;
+  String streetone;
+  String streettwo;
   String city;
   String state;
   String zipCode;
@@ -11,7 +12,8 @@ class AddressModel {
     required this.fullName,
     required this.phoneNum,
     required this.isDefault,
-    required this.street,
+    required this.streetone,
+    required this.streettwo,
     required this.city,
     required this.state,
     required this.zipCode,
@@ -22,7 +24,8 @@ class AddressModel {
       fullName: json['fullName'] ?? '',
       phoneNum: json['phoneNum'] ?? 0,
       isDefault: json['isDefault'] ?? false,
-      street: json['street'] ?? '',
+      streetone: json['streetone'] ?? '',
+      streettwo: json['streettwo'] ?? '',
       city: json['city'] ?? '',
       state: json['state'] ?? '',
       zipCode: json['zipCode'] ?? '',
@@ -34,7 +37,8 @@ class AddressModel {
       'fullName': fullName,
       'phoneNum': phoneNum,
       'isDefault': isDefault,
-      'street': street,
+      'streetone': streetone,
+      'streettwo': streettwo,
       'city': city,
       'state': state,
       'zipCode': zipCode,
@@ -43,14 +47,15 @@ class AddressModel {
 
   @override
   String toString() {
-    return "$fullName, $phoneNum, ${isDefault ? "Default" : "Non-default"}, $street, $city, $state $zipCode";
+    return "$fullName, $phoneNum, ${isDefault ? "Default" : "Non-default"}, $streetone, $streettwo, $city, $state $zipCode";
   }
 
   Map<String, dynamic> toShipmentMap() {
     return {
       'fullName': fullName,
       'phoneNum': phoneNum,
-      'street': street,
+      'streetone': streetone,
+      'streettwo': streettwo,
       'city': city,
       'state': state,
       'zipCode': zipCode,

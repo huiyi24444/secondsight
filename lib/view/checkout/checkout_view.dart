@@ -65,7 +65,8 @@ class _CheckoutViewState extends State<CheckoutView> {
         fullName: data['fullName'] ?? '',
         phoneNum: data['phoneNum'] ?? 0,
         isDefault: data['isDefault'] ?? false,
-        street: '${data['streetone'] ?? ''} ${data['streettwo'] ?? ''}'.trim(),
+        streetone: data['streetone'] ?? '',
+        streettwo: data['streettwo'] ?? '',
         city: data['city'] ?? '',
         state: data['state'] ?? '',
         zipCode: data['zipCode']?.toString() ?? data['zipcode']?.toString() ?? '',
@@ -102,7 +103,8 @@ class _CheckoutViewState extends State<CheckoutView> {
 
   String _formatAddress(AddressModel address) {
     final parts = <String>[];
-    if (address.street.isNotEmpty) parts.add(address.street);
+    if (address.streetone.isNotEmpty) parts.add(address.streetone);
+    if (address.streettwo.isNotEmpty) parts.add(address.streettwo);
     if (address.city.isNotEmpty) parts.add(address.city);
     if (address.state.isNotEmpty) parts.add(address.state);
     if (address.zipCode.isNotEmpty) parts.add(address.zipCode);
@@ -324,7 +326,8 @@ class _CheckoutViewState extends State<CheckoutView> {
         shipAddress: selectedAddress != null ? _formatAddress(selectedAddress!) : 'Unknown address',
         fullName: selectedAddress?.fullName,
         phoneNum: selectedAddress?.phoneNum,
-        street: selectedAddress?.street,
+        streetone: selectedAddress?.streetone,
+        streettwo: selectedAddress?.streettwo,
         city: selectedAddress?.city,
         state: selectedAddress?.state,
         zipCode: selectedAddress?.zipCode,
