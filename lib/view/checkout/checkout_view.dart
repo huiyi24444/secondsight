@@ -144,7 +144,7 @@ class _CheckoutViewState extends State<CheckoutView> {
                     _buildCheckoutOption(
                       'Payment Method',
                       selectedPaymentCard != null
-                          ? '**** ${selectedPaymentCard!.cardNumber.substring(selectedPaymentCard!.cardNumber.length - 4)}'
+                          ? '**** ${selectedPaymentCard!.displayName.substring(selectedPaymentCard!.displayName.length - 4)}'
                           : 'Add Payment Method',
                       Icons.chevron_right,
                       onTap: _showPaymentMethodSelection,

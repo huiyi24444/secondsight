@@ -1,17 +1,167 @@
+// cards_list_view.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../controller/settings/cards_list_controller.dart';
 import '../../model/payment_cards_model.dart';
-import 'add_card_view.dart';
+import '../../services/stripe_service.dart';
+import '../widgets/format_card.dart'; // Import your StripeService
 
-
-class CardListView extends StatelessWidget {
+class CardListView extends StatefulWidget {
   final String userId;
-  final CardListController controller;
 
-  CardListView({super.key, required this.userId})
-      : controller = CardListController(userId: userId);
+  const CardListView({super.key, required this.userId});
+
+  @override
+  State<CardListView> createState() => _CardListViewState();
+}
+
+class _CardListViewState extends State<CardListView> {
+  late final CardListController controller;
+  bool isAddingCard = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = CardListController(userId: widget.userId);
+  }
+
+  // Add payment method using Stripe Setup Intent
+  Future<void> _addPaymentMethod() async {
+    setState(() {
+      isAddingCard = true;
+    });
+
+    try {
+      // Get or create Stripe customer
+      final customerId = await _getOrCreateStripeCustomer();
+
+      // Use StripeService to save payment method
+      final result = await StripeService.savePaymentMethod(
+        userId: widget.userId,
+        customerId: customerId,
+      );
+
+      if (result.success && result.paymentMethodDetails != null) {
+        // Save payment method reference to Firestore
+        await _savePaymentMethodToFirestore(result.paymentMethodDetails!);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Payment method added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted && result.message.toLowerCase() != 'setup cancelled') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isAddingCard = false;
+        });
+      }
+    }
+  }
+
+  // Get or create Stripe customer
+  Future<String> _getOrCreateStripeCustomer() async {
+    try {
+      // Check if user already has a Stripe customer ID
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (userDoc.exists && userDoc.data()?['stripeCustomerId'] != null) {
+        return userDoc.data()!['stripeCustomerId'];
+      }
+
+      // Create new Stripe customer using StripeService
+      final customerId = await StripeService.createCustomer(
+        userId: widget.userId,
+        email: userDoc.data()?['email'] ?? '',
+        name: userDoc.data()?['name'] ?? '',
+      );
+
+      // Save customer ID to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .update({'stripeCustomerId': customerId});
+
+      return customerId;
+    } catch (e) {
+      throw Exception('Error with Stripe customer: $e');
+    }
+  }
+
+  // Save payment method reference to Firestore
+  Future<void> _savePaymentMethodToFirestore(Map<String, dynamic> paymentMethodData) async {
+    try {
+      // Check if this should be the first/default card
+      final existingCards = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .collection('paymentMethods')
+          .get();
+
+      final isFirstCard = existingCards.docs.isEmpty;
+
+      if (isFirstCard) {
+        // If this is the first card, make it default
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .collection('paymentMethods')
+            .add({
+          'stripePaymentMethodId': paymentMethodData['id'],
+          'lastFour': paymentMethodData['card']['last4'],
+          'brand': paymentMethodData['card']['brand'],
+          'expMonth': paymentMethodData['card']['exp_month'],
+          'expYear': paymentMethodData['card']['exp_year'],
+          'isDefault': true,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Just add the payment method as non-default
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .collection('paymentMethods')
+            .add({
+          'stripePaymentMethodId': paymentMethodData['id'],
+          'lastFour': paymentMethodData['card']['last4'],
+          'brand': paymentMethodData['card']['brand'],
+          'expMonth': paymentMethodData['card']['exp_month'],
+          'expYear': paymentMethodData['card']['exp_year'],
+          'isDefault': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error saving payment method to Firestore: $e');
+      rethrow;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +189,6 @@ class CardListView extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             );
           }
-
           if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -53,18 +202,15 @@ class CardListView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${snapshot.error}', // 👈 shows actual error
+                    '${snapshot.error}',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.red),
+                    style: const TextStyle(fontSize: 12, color: Colors.red),
                   ),
                 ],
               ),
             );
           }
-
-
           final cardDocs = snapshot.data?.docs ?? [];
-
           if (cardDocs.isEmpty) {
             return Center(
               child: Column(
@@ -93,22 +239,19 @@ class CardListView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Add your first payment card',
+                    'Add your first payment card securely with Stripe',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+
+                  const SizedBox(height: 16),
+
                   ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddCardView(userId: userId),
-                        ),
-                      );
-                    },
+                    onPressed: isAddingCard ? null : _addPaymentMethod,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8E6CEF),
                       foregroundColor: Colors.white,
@@ -121,15 +264,27 @@ class CardListView extends StatelessWidget {
                       ),
                       elevation: 0,
                     ),
-                    icon: const Icon(Icons.add, size: 20),
-                    label: const Text(
-                      'Add Card',
-                      style: TextStyle(
+                    icon: isAddingCard
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Icon(Icons.add, size: 20),
+                    label: Text(
+                      isAddingCard ? 'Processing...' : 'Add Card',
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 16),
+
                 ],
               ),
             );
@@ -137,7 +292,6 @@ class CardListView extends StatelessWidget {
 
           // Convert documents to PaymentCard objects
           final cards = cardDocs.map((doc) => PaymentCard.fromDocument(doc)).toList();
-
           return Column(
             children: [
               Expanded(
@@ -146,7 +300,6 @@ class CardListView extends StatelessWidget {
                   itemCount: cards.length,
                   itemBuilder: (context, index) {
                     final card = cards[index];
-
                     return Container(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -185,14 +338,6 @@ class CardListView extends StatelessWidget {
                                     children: [
                                       Row(
                                         children: [
-                                          Text(
-                                            card.cardHolderName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16,
-                                              letterSpacing: -0.3,
-                                            ),
-                                          ),
                                           if (card.isDefault) ...[
                                             const SizedBox(width: 8),
                                             Container(
@@ -219,7 +364,7 @@ class CardListView extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        _formatCardNumber(card.cardNumber),
+                                        formatCardNumber(card.lastFour),
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey[700],
@@ -241,22 +386,9 @@ class CardListView extends StatelessWidget {
                                   ),
                                   elevation: 2,
                                   onSelected: (value) {
+                                    // Handle menu actions
                                   },
                                   itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.edit_outlined,
-                                            size: 18,
-                                            color: Colors.black87,
-                                          ),
-                                          SizedBox(width: 12),
-                                          Text('Edit'),
-                                        ],
-                                      ),
-                                    ),
                                     if (!card.isDefault)
                                       const PopupMenuItem(
                                         value: 'delete',
@@ -277,6 +409,7 @@ class CardListView extends StatelessWidget {
                                       ),
                                   ],
                                 ),
+
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -298,7 +431,7 @@ class CardListView extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Expires ${card.expiryDate}',
+                                        'Expires ${card.expMonth.toString().padLeft(2, '0')}/${card.expYear}',
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey[700],
@@ -329,14 +462,7 @@ class CardListView extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AddCardView(userId: userId),
-                      ),
-                    );
-                  },
+                  onPressed: isAddingCard ? null : _addPaymentMethod,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8E6CEF),
                     foregroundColor: Colors.white,
@@ -345,10 +471,19 @@ class CardListView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  icon: const Icon(Icons.add, size: 20),
-                  label: const Text(
-                    'Add New Card',
-                    style: TextStyle(
+                  icon: isAddingCard
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                      : const Icon(Icons.add, size: 20),
+                  label: Text(
+                    isAddingCard ? 'Processing...' : 'Add New Card',
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -365,7 +500,6 @@ class CardListView extends StatelessWidget {
   Widget _buildCardBrandIcon(String brand) {
     IconData iconData;
     Color iconColor;
-
     switch (brand.toLowerCase()) {
       case 'visa':
         iconData = Icons.credit_card;
@@ -388,7 +522,6 @@ class CardListView extends StatelessWidget {
         iconData = Icons.credit_card_outlined;
         iconColor = Colors.grey[600]!;
     }
-
     return Container(
       width: 48,
       height: 36,
@@ -402,14 +535,5 @@ class CardListView extends StatelessWidget {
         size: 24,
       ),
     );
-  }
-
-  String _formatCardNumber(String cardNumber) {
-    // Show only last 4 digits
-    if (cardNumber.length >= 4) {
-      final lastFour = cardNumber.substring(cardNumber.length - 4);
-      return '•••• •••• •••• $lastFour';
-    }
-    return '•••• •••• •••• ••••';
   }
 }

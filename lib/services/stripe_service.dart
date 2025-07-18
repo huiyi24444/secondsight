@@ -13,7 +13,9 @@ class StripeService {
     await Stripe.instance.applySettings();
   }
 
-  // Create payment intent on your server (for demo, direct call)
+  // ======= EXISTING PAYMENT METHODS =======
+
+  // Create payment intent (existing method for actual payments)
   static Future<Map<String, String>> createPaymentIntent(double amount, String currency) async {
     try {
       final response = await http.post(
@@ -32,7 +34,7 @@ class StripeService {
         final data = json.decode(response.body);
         return {
           'client_secret': data['client_secret'],
-          'id': data['id'], // <-- this is your paymentIntentId
+          'id': data['id'],
         };
       } else {
         throw Exception('Failed to create payment intent: ${response.body}');
@@ -42,8 +44,7 @@ class StripeService {
     }
   }
 
-
-  // Process payment using PaymentSheet
+  // Process payment using PaymentSheet (existing method)
   static Future<PaymentResult> processPaymentWithPaymentSheet({
     required double amount,
     required String currency,
@@ -52,7 +53,7 @@ class StripeService {
     try {
       final intent = await createPaymentIntent(amount, currency);
       final clientSecret = intent['client_secret']!;
-      final paymentIntentId = intent['id']; // Extracted here
+      final paymentIntentId = intent['id'];
 
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
@@ -67,7 +68,7 @@ class StripeService {
       return PaymentResult(
         success: true,
         message: 'Payment successful',
-        transactionId: paymentIntentId, // <-- Use this for order model
+        transactionId: paymentIntentId,
       );
     } on StripeException catch (e) {
       return PaymentResult(
@@ -83,6 +84,196 @@ class StripeService {
     }
   }
 
+  // ======= NEW SETUP INTENT METHODS FOR SAVING CARDS =======
+
+  // Create Stripe customer directly
+  static Future<String> createCustomer({
+    required String userId,
+    required String email,
+    required String name,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.stripe.com/v1/customers'),
+        headers: {
+          'Authorization': 'Bearer $_secretKey',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: {
+          'email': email,
+          'name': name,
+          'metadata[user_id]': userId,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['id'];
+      } else {
+        throw Exception('Failed to create customer: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error creating customer: $e');
+    }
+  }
+
+  // Create setup intent directly
+  static Future<Map<String, String>> createSetupIntent({String? customerId}) async {
+    try {
+      final body = <String, String>{
+        'payment_method_types[]': 'card',
+        'usage': 'off_session',
+      };
+
+      if (customerId != null) {
+        body['customer'] = customerId;
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.stripe.com/v1/setup_intents'),
+        headers: {
+          'Authorization': 'Bearer $_secretKey',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'client_secret': data['client_secret'],
+          'setup_intent_id': data['id'],
+        };
+      } else {
+        throw Exception('Failed to create setup intent: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error creating setup intent: $e');
+    }
+  }
+
+  // Get payment method details after setup
+  static Future<Map<String, dynamic>> getPaymentMethodDetails(String setupIntentId) async {
+    try {
+      // First get the setup intent
+      final setupResponse = await http.get(
+        Uri.parse('https://api.stripe.com/v1/setup_intents/$setupIntentId'),
+        headers: {
+          'Authorization': 'Bearer $_secretKey',
+        },
+      );
+
+      if (setupResponse.statusCode == 200) {
+        final setupData = json.decode(setupResponse.body);
+        final paymentMethodId = setupData['payment_method'];
+
+        if (paymentMethodId == null) {
+          throw Exception('No payment method found');
+        }
+
+        // Now get the payment method details
+        final pmResponse = await http.get(
+          Uri.parse('https://api.stripe.com/v1/payment_methods/$paymentMethodId'),
+          headers: {
+            'Authorization': 'Bearer $_secretKey',
+          },
+        );
+
+        if (pmResponse.statusCode == 200) {
+          final pmData = json.decode(pmResponse.body);
+          return {
+            'id': pmData['id'],
+            'type': pmData['type'],
+            'card': {
+              'brand': pmData['card']['brand'],
+              'last4': pmData['card']['last4'],
+              'exp_month': pmData['card']['exp_month'],
+              'exp_year': pmData['card']['exp_year'],
+            },
+          };
+        }
+      }
+
+      throw Exception('Failed to get payment method details');
+    } catch (e) {
+      throw Exception('Error getting payment method details: $e');
+    }
+  }
+
+  // Save payment method using Setup Intent (main method for adding cards)
+  static Future<SetupResult> savePaymentMethod({
+    required String userId,
+    String? customerId,
+  }) async {
+    try {
+      // Create setup intent
+      final setupIntent = await createSetupIntent(customerId: customerId);
+      final clientSecret = setupIntent['client_secret']!;
+      final setupIntentId = setupIntent['setup_intent_id']!;
+
+      // Initialize payment sheet for setup (no payment)
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          setupIntentClientSecret: clientSecret,
+          merchantDisplayName: 'SecondSight Store',
+          customerId: customerId,
+          style: ThemeMode.system,
+          appearance: const PaymentSheetAppearance(
+            primaryButton: PaymentSheetPrimaryButtonAppearance(
+              colors: PaymentSheetPrimaryButtonTheme(
+                light: PaymentSheetPrimaryButtonThemeColors(
+                  background: Color(0xFF8E6CEF),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Present payment sheet
+      await Stripe.instance.presentPaymentSheet();
+
+      // Get payment method details
+      final paymentMethodDetails = await getPaymentMethodDetails(setupIntentId);
+
+      return SetupResult(
+        success: true,
+        message: 'Payment method saved successfully',
+        paymentMethodDetails: paymentMethodDetails,
+      );
+    } on StripeException catch (e) {
+      return SetupResult(
+        success: false,
+        message: e.error.message ?? 'Setup cancelled',
+        errorCode: e.error.code?.toString(),
+      );
+    } catch (e) {
+      return SetupResult(
+        success: false,
+        message: 'Setup failed: $e',
+      );
+    }
+  }
+
+  // Delete payment method
+  static Future<bool> deletePaymentMethod(String paymentMethodId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.stripe.com/v1/payment_methods/$paymentMethodId/detach'),
+        headers: {
+          'Authorization': 'Bearer $_secretKey',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error deleting payment method: $e');
+      return false;
+    }
+  }
+
+  // ======= VALIDATION METHODS =======
 
   // Validate card number using Luhn algorithm
   static bool isValidCardNumber(String cardNumber) {
@@ -127,6 +318,8 @@ class StripeService {
   }
 }
 
+// ======= RESULT CLASSES =======
+
 class PaymentResult {
   final bool success;
   final String message;
@@ -137,6 +330,20 @@ class PaymentResult {
     required this.success,
     required this.message,
     this.transactionId,
+    this.errorCode,
+  });
+}
+
+class SetupResult {
+  final bool success;
+  final String message;
+  final Map<String, dynamic>? paymentMethodDetails;
+  final String? errorCode;
+
+  SetupResult({
+    required this.success,
+    required this.message,
+    this.paymentMethodDetails,
     this.errorCode,
   });
 }

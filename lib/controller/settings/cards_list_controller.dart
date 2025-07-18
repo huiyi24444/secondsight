@@ -1,5 +1,7 @@
+// cards_list_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../services/stripe_service.dart';
 
 class CardListController {
   final String userId;
@@ -7,22 +9,23 @@ class CardListController {
 
   CardListController({required this.userId});
 
-  // Get payment cards stream
+  // Get payment cards stream - updated to use new collection name
   Stream<QuerySnapshot> getPaymentCards() {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('paymentCards')
+        .collection('paymentMethods') // Changed from 'paymentCards' to 'paymentMethods'
         .orderBy('isDefault', descending: true)
-        .orderBy('cardHolderName')
+        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
-  // Delete payment card
+  // Delete payment card with Stripe integration
   Future<void> deleteCard({
     required BuildContext context,
     required String cardId,
     required String cardNumber,
+    required String? stripePaymentMethodId,
   }) async {
     // Show confirmation dialog
     final shouldDelete = await showDialog<bool>(
@@ -51,10 +54,16 @@ class CardListController {
 
     if (shouldDelete == true) {
       try {
+        // Delete from Stripe first (if we have the payment method ID)
+        if (stripePaymentMethodId != null) {
+          await StripeService.deletePaymentMethod(stripePaymentMethodId);
+        }
+
+        // Then delete from Firestore
         await _firestore
             .collection('users')
             .doc(userId)
-            .collection('paymentCards')
+            .collection('paymentMethods')
             .doc(cardId)
             .delete();
 
@@ -84,11 +93,10 @@ class CardListController {
     try {
       // First, remove default status from all cards
       final batch = _firestore.batch();
-
       final cardsSnapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('paymentCards')
+          .collection('paymentMethods')
           .get();
 
       for (var doc in cardsSnapshot.docs) {
@@ -100,7 +108,7 @@ class CardListController {
         _firestore
             .collection('users')
             .doc(userId)
-            .collection('paymentCards')
+            .collection('paymentMethods')
             .doc(cardId),
         {'isDefault': true},
       );
@@ -108,6 +116,65 @@ class CardListController {
       await batch.commit();
     } catch (e) {
       throw Exception('Error setting default card: $e');
+    }
+  }
+
+  // Get all saved payment methods for a user
+  Future<List<Map<String, dynamic>>> getSavedPaymentMethods() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('paymentMethods')
+          .orderBy('isDefault', descending: true)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // Add document ID
+        return data;
+      }).toList();
+    } catch (e) {
+      throw Exception('Error getting saved payment methods: $e');
+    }
+  }
+
+  // Check if user has any saved payment methods
+  Future<bool> hasPaymentMethods() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('paymentMethods')
+          .limit(1)
+          .get();
+
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Get default payment method
+  Future<Map<String, dynamic>?> getDefaultPaymentMethod() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('paymentMethods')
+          .where('isDefault', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        data['id'] = snapshot.docs.first.id;
+        return data;
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
   }
 }

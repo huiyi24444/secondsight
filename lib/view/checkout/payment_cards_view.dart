@@ -164,7 +164,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
         leading: _buildCardBrandBadge(card.brand),
         title: Row(
           children: [
-            Text(card.cardNumber),
+            Text(card.displayName),
             const SizedBox(width: 12),
             if (card.isDefault)
               Container(
@@ -184,7 +184,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
               ),
           ],
         ),
-        subtitle: Text(card.cardHolderName),
+        subtitle: Text(card.displayName),
         trailing: isSelected
             ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
             : null,

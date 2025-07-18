@@ -6,6 +6,7 @@ import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
+import '../../../model/payment_cards_model.dart'; // Add this import
 
 class OrderDetailsDialog {
   // Define allowed status transitions
@@ -26,8 +27,8 @@ class OrderDetailsDialog {
         required Future<void> Function() onOrdersReload,
       }) async {
     String currentStatus = order.orderStatus;
-
     print('Fetching shipment for orderId: ${order.id}, customerId: ${order.customerId}');
+
     // Fetch shipment information
     ShipmentModel? shipment;
     try {
@@ -38,7 +39,6 @@ class OrderDetailsDialog {
           .doc(order.id)
           .collection('shipment')
           .get();
-
       if (shipmentSnapshot.docs.isNotEmpty) {
         shipment = ShipmentModel.fromMap(
           shipmentSnapshot.docs.first.data(),
@@ -47,6 +47,41 @@ class OrderDetailsDialog {
       }
     } catch (e) {
       debugPrint('Error fetching shipment: $e');
+    }
+
+    // Fetch payment card information
+    // Fetch payment card information
+    PaymentCard? paymentCard;
+    try {
+      if (order.payment != null && order.payment != 'Pending') {
+        // Try to find the payment method used for this order
+        final paymentMethodsSnapshot = await firestore
+            .collection('users')
+            .doc(order.customerId)
+            .collection('paymentMethods')
+            .get();
+
+        if (paymentMethodsSnapshot.docs.isNotEmpty) {
+          // For now, get the default payment method
+          // You might want to store the specific payment method ID used for each order
+          QueryDocumentSnapshot<Map<String, dynamic>>? defaultPaymentDoc;
+
+          // Try to find default payment method
+          for (var doc in paymentMethodsSnapshot.docs) {
+            if (doc.data()['isDefault'] == true) {
+              defaultPaymentDoc = doc;
+              break;
+            }
+          }
+
+          // If no default found, use the first one
+          defaultPaymentDoc ??= paymentMethodsSnapshot.docs.first;
+
+          paymentCard = PaymentCard.fromDocument(defaultPaymentDoc);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching payment card: $e');
     }
 
     await showDialog(
@@ -117,39 +152,32 @@ class OrderDetailsDialog {
                                         _showTransitionError(context, currentStatus, newStatus);
                                         return;
                                       }
-
                                       // Handle specific transitions
                                       bool proceedWithUpdate = false;
-
                                       switch ('$currentStatus->$newStatus') {
                                         case 'to_ship->to_receive':
                                           proceedWithUpdate = await _handleShipToReceive(
                                               context, order, shipment, firestore
                                           );
                                           break;
-
                                         case 'to_receive->completed':
                                           proceedWithUpdate = await _handleReceiveToCompleted(
                                               context, order, firestore
                                           );
                                           break;
-
                                         case 'to_ship->canceled':
                                         case 'to_receive->canceled':
                                           proceedWithUpdate = await _handleCancellation(
                                               context, order, currentStatus, firestore
                                           );
                                           break;
-
                                         default:
                                         // For any other allowed transitions
                                           proceedWithUpdate = true;
                                       }
-
                                       if (proceedWithUpdate) {
                                         setState(() => currentStatus = newStatus);
                                         await updateOrderStatus(order, newStatus, firestore, onOrdersReload, context);
-
                                         // Refresh shipment data if needed
                                         if (newStatus == 'to_receive') {
                                           await _refreshShipmentData(setState, firestore, order);
@@ -169,7 +197,7 @@ class OrderDetailsDialog {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      _buildOrderInfoRow(order),
+                      _buildOrderInfoRow(order, paymentCard, context), // Pass paymentCard and context
                       if (shipment != null) ...[
                         const SizedBox(height: 20),
                         _buildShipmentInfo(shipment!),
@@ -196,13 +224,383 @@ class OrderDetailsDialog {
     );
   }
 
+  // Updated _buildOrderInfoRow to handle payment details
+  static Widget _buildOrderInfoRow(OrdersModel order, PaymentCard? paymentCard, BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8)
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildInfoColumn('Order Date', _formatDate(order.orderDate)),
+          _verticalDivider(),
+          _buildPaymentStatusColumn(order, paymentCard, context), // Updated payment column
+          _verticalDivider(),
+          _buildInfoColumn(
+            'Return Eligible',
+            order.eligibilityForReturn ? 'Yes' : 'No',
+            color: order.eligibilityForReturn ? Colors.green : Colors.red,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // New method to build clickable payment status column
+  static Widget _buildPaymentStatusColumn(OrdersModel order, PaymentCard? paymentCard, BuildContext context) {
+    final paymentStatus = order.payment ?? 'Pending';
+    final hasPaymentDetails = paymentCard != null;
+
+    return GestureDetector(
+      onTap: hasPaymentDetails ? () => _showPaymentDetailsDialog(context, order, paymentCard) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: hasPaymentDetails ? Colors.blue[50] : null,
+          borderRadius: BorderRadius.circular(4),
+          border: hasPaymentDetails ? Border.all(color: Colors.blue[200]!) : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Payment Status', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  paymentStatus,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: hasPaymentDetails ? Colors.blue[700] : null,
+                  ),
+                ),
+                if (hasPaymentDetails) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: Colors.blue[600],
+                  ),
+                ],
+              ],
+            ),
+            if (hasPaymentDetails)
+              Text(
+                'Tap for details',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.blue[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // New method to show payment details dialog
+  static void _showPaymentDetailsDialog(BuildContext context, OrdersModel order, PaymentCard paymentCard) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Payment Details',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Order information
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Order #${order.shortOrderId}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _getPaymentStatusColor(order.payment ?? 'Pending'),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              order.payment ?? 'Pending',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Total Amount: RM ${order.totalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Payment method information
+                const Text(
+                  'Payment Method Used',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      // Card brand icon
+                      _buildCardBrandIcon(paymentCard.brand),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              paymentCard.displayName.isNotEmpty
+                                  ? paymentCard.displayName
+                                  : '${paymentCard.brand.toUpperCase()} Card',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '•••• •••• •••• ${paymentCard.lastFour}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Expires ${paymentCard.expMonth.toString().padLeft(2, '0')}/${paymentCard.expYear.toString().substring(2)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (paymentCard.isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8E6CEF),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Default',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Payment timestamp (if available)
+                if (order.orderDate != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule, color: Colors.blue[700], size: 20),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Payment Processed',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              _formatDateTime(order.orderDate),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 24),
+
+                // Close button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8E6CEF),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method to build card brand icon
+  static Widget _buildCardBrandIcon(String brand) {
+    IconData iconData;
+    Color iconColor;
+
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFF1A1F71);
+        break;
+      case 'mastercard':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFFEB001B);
+        break;
+      case 'amex':
+      case 'american express':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFF006FCF);
+        break;
+      case 'discover':
+        iconData = Icons.credit_card;
+        iconColor = const Color(0xFFFF6000);
+        break;
+      default:
+        iconData = Icons.credit_card_outlined;
+        iconColor = Colors.grey[600]!;
+    }
+
+    return Container(
+      width: 48,
+      height: 36,
+      decoration: BoxDecoration(
+        color: iconColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        iconData,
+        color: iconColor,
+        size: 24,
+      ),
+    );
+  }
+
+  // Helper method to get payment status color
+  static Color _getPaymentStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'paid':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Helper method to format date and time
+  static String _formatDateTime(DateTime dateTime) {
+    final formatter = DateFormat('dd MMM yyyy, HH:mm');
+    return formatter.format(dateTime);
+  }
+
+  // Rest of your existing methods remain the same...
   static List<String> _getAvailableStatuses(String currentStatus) {
-    // Always show current status
     List<String> statuses = [currentStatus];
-
-    // Add allowed transitions
     statuses.addAll(allowedTransitions[currentStatus] ?? []);
-
     return statuses;
   }
 
@@ -212,7 +610,6 @@ class OrderDetailsDialog {
 
   static void _showTransitionError(BuildContext context, String fromStatus, String toStatus) {
     String message = '';
-
     if (fromStatus == 'completed') {
       message = 'Completed orders cannot be modified.';
     } else if (fromStatus == 'canceled') {
@@ -222,7 +619,6 @@ class OrderDetailsDialog {
     } else {
       message = 'This status transition is not allowed.';
     }
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -237,7 +633,6 @@ class OrderDetailsDialog {
       ShipmentModel? shipment,
       FirebaseFirestore firestore,
       ) async {
-    // Proceed only if payment is null
     if (order.payment == null) {
       final proceed = await showDialog<bool>(
         context: context,
@@ -258,11 +653,9 @@ class OrderDetailsDialog {
           ],
         ),
       ) ?? false;
-
       if (!proceed) return false;
     }
 
-    // Check address completeness
     bool isAddressComplete = shipment != null &&
         (shipment.fullName?.isNotEmpty ?? false) &&
         (shipment.phoneNum != null && shipment.phoneNum! > 0) &&
@@ -281,11 +674,9 @@ class OrderDetailsDialog {
       return false;
     }
 
-    // Check tracking number
     if (shipment?.trackingNumber == null || shipment!.trackingNumber!.isEmpty) {
       return await _showTrackingNumberDialog(context, order, firestore);
     }
-
     return true;
   }
 
@@ -333,7 +724,6 @@ class OrderDetailsDialog {
           ),
           ElevatedButton(
             onPressed: () async {
-              // Update completion date
               await firestore
                   .collection('users')
                   .doc(order.customerId)
@@ -359,7 +749,6 @@ class OrderDetailsDialog {
       FirebaseFirestore firestore,
       ) async {
     final reasonController = TextEditingController();
-
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -414,8 +803,6 @@ class OrderDetailsDialog {
                 );
                 return;
               }
-
-              // Save cancellation reason
               await firestore
                   .collection('users')
                   .doc(order.customerId)
@@ -425,7 +812,6 @@ class OrderDetailsDialog {
                 'cancellationReason': reasonController.text.trim(),
                 'canceledDate': Timestamp.now(),
               });
-
               Navigator.pop(context, true);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -449,7 +835,6 @@ class OrderDetailsDialog {
           .doc(order.id)
           .collection('shipment')
           .get();
-
       if (updatedShipmentSnapshot.docs.isNotEmpty) {
         setState(() {
           ShipmentModel.fromMap(
@@ -489,8 +874,6 @@ class OrderDetailsDialog {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Show tracking number status
           if (shipment.trackingNumber?.isNotEmpty ?? false) ...[
             _buildShipmentRow('Tracking Number', shipment.trackingNumber!),
             const SizedBox(height: 8),
@@ -498,7 +881,6 @@ class OrderDetailsDialog {
             _buildShipmentRow('Tracking Number', 'Not yet provided', valueColor: Colors.orange),
             const SizedBox(height: 8),
           ],
-
           if (shipment.shippedDate != null) ...[
             _buildShipmentRow('Shipped Date', _formatDate(shipment.shippedDate!)),
             const SizedBox(height: 8),
@@ -506,7 +888,6 @@ class OrderDetailsDialog {
             _buildShipmentRow('Shipped Date', 'Not yet shipped', valueColor: Colors.orange),
             const SizedBox(height: 8),
           ],
-
           if (shipment.fullName?.isNotEmpty ?? false) ...[
             _buildShipmentRow('Recipient', shipment.fullName!),
             const SizedBox(height: 8),
@@ -514,7 +895,6 @@ class OrderDetailsDialog {
             _buildShipmentRow('Recipient', 'Missing name', valueColor: Colors.red),
             const SizedBox(height: 8),
           ],
-
           if (shipment.phoneNum != null && shipment.phoneNum! > 0) ...[
             _buildShipmentRow('Phone', shipment.phoneNum.toString()),
             const SizedBox(height: 8),
@@ -522,7 +902,6 @@ class OrderDetailsDialog {
             _buildShipmentRow('Phone', 'Missing or invalid number', valueColor: Colors.red),
             const SizedBox(height: 8),
           ],
-
           // Full address row in single line
           if ((shipment.streetone?.isNotEmpty ?? false) &&
               (shipment.city?.isNotEmpty ?? false) &&
@@ -575,30 +954,6 @@ class OrderDetailsDialog {
     );
   }
 
-  static Widget _buildOrderInfoRow(OrdersModel order) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(8)
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildInfoColumn('Order Date', _formatDate(order.orderDate)),
-          _verticalDivider(),
-          _buildInfoColumn('Payment Status', order.payment ?? 'Pending'),
-          _verticalDivider(),
-          _buildInfoColumn(
-            'Return Eligible',
-            order.eligibilityForReturn ? 'Yes' : 'No',
-            color: order.eligibilityForReturn ? Colors.green : Colors.red,
-          ),
-        ],
-      ),
-    );
-  }
-
   static Widget _buildInfoColumn(String label, String value, {Color? color}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +979,6 @@ class OrderDetailsDialog {
           final details = productDetails[productId] ?? {};
           final imageUrl = details['imageUrl'] as String?;
           final productName = details['name'] as String? ?? 'Unknown Product';
-
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -704,7 +1058,6 @@ class OrderDetailsDialog {
       children: [
         TextButton(
           onPressed: () {
-            // Check if order can be deleted
             if (order.orderStatus == 'completed' || order.orderStatus == 'to_receive') {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -714,7 +1067,6 @@ class OrderDetailsDialog {
               );
               return;
             }
-
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
@@ -761,7 +1113,6 @@ class OrderDetailsDialog {
   static Future<bool> _showTrackingNumberDialog(BuildContext context,
       OrdersModel order, FirebaseFirestore firestore) async {
     final trackingNumberController = TextEditingController();
-
     return await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -805,7 +1156,6 @@ class OrderDetailsDialog {
                 );
                 return;
               }
-
               try {
                 final shipmentRef = firestore
                     .collection('users')
@@ -813,25 +1163,20 @@ class OrderDetailsDialog {
                     .collection('order')
                     .doc(order.id)
                     .collection('shipment');
-
                 final snapshot = await shipmentRef.get();
-
                 final updateData = {
                   'trackingNumber': trackingNumberController.text.trim(),
                   'shippedDate': Timestamp.now(),
                 };
-
                 if (snapshot.docs.isNotEmpty) {
                   await snapshot.docs.first.reference.update(updateData);
                 } else {
-                  // This shouldn't happen based on your description, but handling just in case
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Shipment document not found')),
                   );
                   Navigator.pop(context, false);
                   return;
                 }
-
                 if (context.mounted) {
                   Navigator.pop(context, true);
                 }

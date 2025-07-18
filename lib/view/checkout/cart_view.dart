@@ -2,14 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../controller/checkout/cart_controller.dart';
 import '../../model/cart_item_model.dart';
-
 import '../widgets/custom_back_button.dart';
 import 'checkout_view.dart';
 
 class CartView extends StatefulWidget {
   final String userId; // pass authenticated userId
   const CartView({super.key, required this.userId});
-
 
   @override
   State<CartView> createState() => _CartViewState();
@@ -19,7 +17,6 @@ class _CartViewState extends State<CartView> {
   final CartController _cartController = CartController();
   late Future<List<CartItem>> _cartItemsFuture;
 
-
   @override
   void initState() {
     super.initState();
@@ -27,7 +24,14 @@ class _CartViewState extends State<CartView> {
   }
 
   double _calculateSubtotal(List<CartItem> items) {
-    return items.fold(0.0, (sum, item) => sum + item.totalPrice);
+    // Only calculate subtotal for in-stock items
+    return items.where((item) => item.product.stockQuantity > 0)
+        .fold(0.0, (sum, item) => sum + item.totalPrice);
+  }
+
+  // Check if any items are out of stock
+  bool _hasOutOfStockItems(List<CartItem> items) {
+    return items.any((item) => item.product.stockQuantity == 0);
   }
 
   // Add confirmation dialog method
@@ -93,7 +97,6 @@ class _CartViewState extends State<CartView> {
           style: TextStyle(
             fontSize: 18,
           ),
-
         ),
         backgroundColor: const Color(0xFFFAFAFA),
         centerTitle: true,
@@ -114,9 +117,7 @@ class _CartViewState extends State<CartView> {
               ),
             );
           }
-
           final items = snapshot.data ?? [];
-
           if (items.isEmpty) {
             return Center(
               child: Column(
@@ -144,6 +145,7 @@ class _CartViewState extends State<CartView> {
           final subtotal = _calculateSubtotal(items);
           const shippingCost = 8.0;
           final total = subtotal + shippingCost;
+          final hasOutOfStock = _hasOutOfStockItems(items);
 
           return Column(
             children: [
@@ -153,10 +155,12 @@ class _CartViewState extends State<CartView> {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
+                    final isOutOfStock = item.product.stockQuantity == 0;
+
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isOutOfStock ? Colors.grey[100] : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -166,72 +170,188 @@ class _CartViewState extends State<CartView> {
                           ),
                         ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Product Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: item.product.images.isNotEmpty
-                                  ? Image.network(
-                                item.product.images.first,
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              )
-                                  : Container(
-                                width: 80,
-                                height: 80,
-                                color: Colors.grey[100],
-                                child: Icon(
-                                  Icons.image_not_supported_outlined,
-                                  size: 32,
-                                  color: Colors.grey[400],
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Product Image
+                                Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: ColorFiltered(
+                                        colorFilter: isOutOfStock
+                                            ? const ColorFilter.mode(
+                                          Colors.grey,
+                                          BlendMode.saturation,
+                                        )
+                                            : const ColorFilter.mode(
+                                          Colors.transparent,
+                                          BlendMode.multiply,
+                                        ),
+                                        child: item.product.images.isNotEmpty
+                                            ? Image.network(
+                                          item.product.images.first,
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                        )
+                                            : Container(
+                                          width: 80,
+                                          height: 80,
+                                          color: Colors.grey[100],
+                                          child: Icon(
+                                            Icons.image_not_supported_outlined,
+                                            size: 32,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (isOutOfStock)
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'SOLD OUT',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Product Details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.product.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                      letterSpacing: -0.3,
-                                      height: 1.3,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Size ${item.product.productSize} • ${item.product.condition}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[600],
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Quantity Controls
-                                  Row(
+                                const SizedBox(width: 12),
+                                // Product Details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildQuantityButton(
-                                        Icons.remove,
-                                            () async {
-                                          if (item.quantity > 1) {
-                                            await _cartController.decreaseQuantity(widget.userId, item.product.id);
-                                            setState(() {
-                                              _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
-                                            });
-                                          } else {
-                                            // Show confirmation dialog before removing
+                                      Text(
+                                        item.product.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
+                                          letterSpacing: -0.3,
+                                          height: 1.3,
+                                          color: isOutOfStock ? Colors.grey[600] : Colors.black,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Size ${item.product.productSize} • ${item.product.condition}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                      if (isOutOfStock) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red[50],
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'Out of Stock',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 12),
+                                      // Quantity Controls or Remove Button
+                                      if (!isOutOfStock) ...[
+                                        Row(
+                                          children: [
+                                            _buildQuantityButton(
+                                              Icons.remove,
+                                                  () async {
+                                                if (item.quantity > 1) {
+                                                  await _cartController.decreaseQuantity(widget.userId, item.product.id);
+                                                  setState(() {
+                                                    _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                                  });
+                                                } else {
+                                                  // Show confirmation dialog before removing
+                                                  final shouldRemove = await _showRemoveConfirmation(
+                                                    context,
+                                                    item.product.name,
+                                                  );
+                                                  if (shouldRemove) {
+                                                    await _cartController.removeItem(widget.userId, item.product.id);
+                                                    setState(() {
+                                                      _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                                    });
+                                                    // Show snackbar after successful removal
+                                                    if (mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text('${item.product.name} removed from cart'),
+                                                          behavior: SnackBarBehavior.floating,
+                                                          duration: const Duration(seconds: 2),
+                                                          action: SnackBarAction(
+                                                            label: 'OK',
+                                                            onPressed: () {},
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                            ),
+                                            Container(
+                                              margin: const EdgeInsets.symmetric(horizontal: 16),
+                                              child: Text(
+                                                item.quantity.toString(),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                ),
+                                              ),
+                                            ),
+                                            _buildQuantityButton(
+                                              Icons.add,
+                                                  () async {
+                                                if (item.quantity < item.product.stockQuantity) {
+                                                  await _cartController.increaseQuantity(widget.userId, item.product.id);
+                                                  setState(() {
+                                                    _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                                  });
+                                                } else {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Maximum stock reached'),
+                                                      behavior: SnackBarBehavior.floating,
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ] else ...[
+                                        TextButton.icon(
+                                          onPressed: () async {
                                             final shouldRemove = await _showRemoveConfirmation(
                                               context,
                                               item.product.name,
@@ -241,84 +361,58 @@ class _CartViewState extends State<CartView> {
                                               setState(() {
                                                 _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
                                               });
-
-                                              // Show snackbar after successful removal
                                               if (mounted) {
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   SnackBar(
                                                     content: Text('${item.product.name} removed from cart'),
                                                     behavior: SnackBarBehavior.floating,
                                                     duration: const Duration(seconds: 2),
-                                                    action: SnackBarAction(
-                                                      label: 'OK',
-                                                      onPressed: () {},
-                                                    ),
                                                   ),
                                                 );
                                               }
                                             }
-                                          }
-                                        },
-                                      ),
-                                      Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: Text(
-                                          item.quantity.toString(),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 15,
+                                          },
+                                          icon: const Icon(Icons.delete_outline, size: 18),
+                                          label: const Text('Remove'),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                            padding: EdgeInsets.zero,
                                           ),
                                         ),
-                                      ),
-                                      _buildQuantityButton(
-                                        Icons.add,
-                                            () async {
-                                          if (item.quantity < item.product.stockQuantity) {
-                                            await _cartController.increaseQuantity(widget.userId, item.product.id);
-                                            setState(() {
-                                              _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
-                                            });
-                                          } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Maximum stock reached'),
-                                                behavior: SnackBarBehavior.floating,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      ),
+                                      ],
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            // Price
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'RM${item.totalPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                    letterSpacing: -0.3,
-                                  ),
                                 ),
-                                if (item.quantity > 1) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'RM${item.product.price.toStringAsFixed(2)} each',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
+                                // Price
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'RM${item.totalPrice.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        letterSpacing: -0.3,
+                                        color: isOutOfStock ? Colors.grey[500] : Colors.black,
+                                        decoration: isOutOfStock ? TextDecoration.lineThrough : null,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    if (item.quantity > 1) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'RM${item.product.price.toStringAsFixed(2)} each',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -343,6 +437,37 @@ class _CartViewState extends State<CartView> {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
+                        if (hasOutOfStock) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Colors.orange[700],
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Remove out of stock items to proceed',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.orange[900],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         _buildSummaryRow('Subtotal', subtotal),
                         const SizedBox(height: 8),
                         _buildSummaryRow('Shipping', shippingCost),
@@ -354,16 +479,20 @@ class _CartViewState extends State<CartView> {
                         const SizedBox(height: 12),
                         _buildSummaryRow('Total', total, isTotal: true),
                         const SizedBox(height: 20),
-
                         SizedBox(
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: () async {
+                            onPressed: hasOutOfStock ? null : () async {
                               final user = FirebaseAuth.instance.currentUser;
                               if (user == null) return;
+
                               // Fetch cart items from Firestore
                               final cartItems = await CartController().fetchCartItems(user.uid);
+
+                              // Filter out out-of-stock items
+                              final inStockItems = cartItems.where((item) => item.product.stockQuantity > 0).toList();
+
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -371,18 +500,19 @@ class _CartViewState extends State<CartView> {
                                     subtotal: subtotal,
                                     shippingCost: shippingCost,
                                     total: total,
-                                    cartItems: cartItems,
+                                    cartItems: inStockItems,
                                   ),
                                 ),
                               );
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF8E6CEF),
+                              backgroundColor: hasOutOfStock ? Colors.grey[400] : const Color(0xFF8E6CEF),
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 0,
+                              disabledBackgroundColor: Colors.grey[300],
                             ),
                             child: const Text(
                               'Proceed to Checkout',
@@ -394,7 +524,7 @@ class _CartViewState extends State<CartView> {
                             ),
                           ),
                         ),
-                      ]
+                      ],
                     ),
                   ),
                 ),
