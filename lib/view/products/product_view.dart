@@ -92,6 +92,8 @@ class _ProductViewState extends State<ProductView> {
         foregroundColor: Colors.black,
         elevation: 0,
         leading: const CustomBackButton(),
+        surfaceTintColor: Colors.transparent,
+
       ),
       body: Padding(
         padding: const EdgeInsets.only(

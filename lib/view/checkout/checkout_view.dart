@@ -190,7 +190,7 @@ class _CheckoutViewState extends State<CheckoutView> {
                     : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('\$${widget.total.toStringAsFixed(2)}',
+                    Text('RM${widget.total.toStringAsFixed(2)}',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                     const SizedBox(width: 16),
                     const Text('Place Order',
@@ -227,7 +227,7 @@ class _CheckoutViewState extends State<CheckoutView> {
                 fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
                 color: isTotal ? Colors.black : Colors.grey[600],
               )),
-          Text('\$${amount.toStringAsFixed(2)}',
+          Text('RM${amount.toStringAsFixed(2)}',
               style: TextStyle(
                 fontSize: isTotal ? 16 : 14,
                 fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
@@ -294,7 +294,7 @@ class _CheckoutViewState extends State<CheckoutView> {
     try {
       final result = await StripeService.processPaymentWithPaymentSheet(
         amount: widget.total,
-        currency: 'USD',
+        currency: 'MYR',
         merchantName: 'SecondSight',
       );
 
