@@ -373,7 +373,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(width: 20),
           _buildStatCard(
             'Total Revenue',
-            '\$${data!.totalRevenue}',
+            'RM${data!.totalRevenue}',
             data!.revenueChange,
             Icons.attach_money,
             Colors.green,
@@ -382,7 +382,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(width: 20),
           _buildStatCard(
             'Avg Order Value',
-            '\$${data!.allOrders > 0 ? (data!.totalRevenue / data!.allOrders).toStringAsFixed(2) : "0.00"}',
+            'RM${data!.allOrders > 0 ? (data!.totalRevenue / data!.allOrders).toStringAsFixed(2) : "0.00"}',
             0,
             Icons.trending_up,
             Colors.purple,

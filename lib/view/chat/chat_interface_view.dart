@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_provider.dart';
+import '../widgets/build_message.dart';
+import 'end_chat_dialog.dart';
 
 class ChatInterfaceWidget extends StatelessWidget {
   final dynamic controller;
@@ -18,7 +20,6 @@ class ChatInterfaceWidget extends StatelessWidget {
     required this.scrollController,
     required this.messageController,
   }) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -37,7 +38,7 @@ class ChatInterfaceWidget extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Chatting about Order #${controller.selectedOrder!.id}',
+                    'Chatting about Order #${controller.selectedOrder!.shortOrderId}',
                     style: TextStyle(
                       color: Colors.purple[700],
                       fontWeight: FontWeight.w500,
@@ -87,7 +88,7 @@ class ChatInterfaceWidget extends StatelessWidget {
                   final isAdmin = message['isAdmin'] ?? false;
                   final isSystem = message['isSystem'] ?? false;
 
-                  return _buildMessage(
+                  return buildMessage(
                     context,
                     message['message'] ?? '',
                     isMe: isMe && !isSystem,
@@ -100,80 +101,136 @@ class ChatInterfaceWidget extends StatelessWidget {
             },
           ),
         ),
-        if (controller.conversationStatus != 'ended')
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: TextField(
-                        controller: messageController,
-                        decoration: InputDecoration(
-                          hintText: 'Type your message...',
-                          hintStyle: TextStyle(color: Colors.grey[500]),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                        maxLines: null,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (value) {
-                          if (value.trim().isEmpty) return;
-                          controller.sendMessage(value.trim());
-                          messageController.clear();
-                        },
-
-                      ),
+        if (controller.conversationId != null &&
+            controller.conversationStatus == 'active')
+          Positioned(
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () {
+                  EndConversationDialog.show(
+                    context: context,
+                    onConfirm: () {
+                      controller.endConversation();
+                    },
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.red[200]!,
+                      width: 1,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: () {
-                      final text = messageController.text.trim();
-                      if (text.isEmpty) return;
-                      controller.sendMessage(text);
-                      messageController.clear();
-                    },
-
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.purple[400]!, Colors.purple[600]!],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.stop_circle_outlined,
+                        size: 16,
+                        color: Colors.red[600],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'End Chat',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red[600],
                         ),
-                        shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                  )
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
+          ),
+        SizedBox(height: 15),
+        if (controller.conversationStatus != 'ended')
+          Stack(
+            children: [
+              // Message Input Container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: TextField(
+                            controller: messageController,
+                            decoration: InputDecoration(
+                              hintText: 'Type your message...',
+                              hintStyle: TextStyle(color: Colors.grey[500]),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                            ),
+                            maxLines: null,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (value) {
+                              if (value.trim().isEmpty) return;
+                              controller.sendMessage(value.trim());
+                              messageController.clear();
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () {
+                          final text = messageController.text.trim();
+                          if (text.isEmpty) return;
+                          controller.sendMessage(text);
+                          messageController.clear();
+                        },
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.purple[400]!, Colors.purple[600]!],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           )
         else
           Container(
@@ -204,115 +261,4 @@ class ChatInterfaceWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildMessage(
-      BuildContext context,
-      String message, {
-        required bool isMe,
-        required bool isAdmin,
-        required bool isSystem,
-        Timestamp? timestamp,
-      }) {
-    final time = timestamp != null
-        ? DateFormat('HH:mm').format(timestamp.toDate())
-        : '';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment:
-        isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMe && !isSystem) ...[
-            const CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.purple,
-              child: Icon(
-                Icons.support_agent,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7,
-              ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isMe
-                    ? Colors.purple
-                    : isSystem
-                    ? Colors.orange[100]
-                    : Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isMe ? 20 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 20),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!isMe && !isSystem)
-                    Text(
-                      isAdmin ? 'Customer Service' : 'System',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.purple[700],
-                      ),
-                    ),
-                  if (!isMe && !isSystem) const SizedBox(height: 4),
-                  Text(
-                    message,
-                    style: TextStyle(
-                      color: isMe
-                          ? Colors.white
-                          : isSystem
-                          ? Colors.orange[900]
-                          : Colors.black87,
-                      fontSize: 15,
-                    ),
-                  ),
-                  if (time.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isMe
-                            ? Colors.white70
-                            : isSystem
-                            ? Colors.orange[700]
-                            : Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (isMe) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.grey[300],
-              child: Icon(Icons.person, color: Colors.grey[600], size: 20),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }

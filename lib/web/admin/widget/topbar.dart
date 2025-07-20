@@ -68,6 +68,20 @@ class _CustomTopBarState extends State<CustomTopBar> {
 
           const Spacer(),
           const SizedBox(width: 10),
+          InkWell(
+            onTap: () {
+              Navigator.pushNamed(context, '/conversations'); // Adjust route name if needed
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(Icons.message_outlined),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+
           const Icon(Icons.notifications_outlined),
           const SizedBox(width: 10),
           CircleAvatar(

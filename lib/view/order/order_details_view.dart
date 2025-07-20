@@ -9,6 +9,7 @@ import '../../model/shipment_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/progress_stepper.dart';
+import 'cancel_dialog.dart';
 import 'order_details_bottom.dart';
 import 'order_notice.dart';
 import 'order_rating_dialog.dart';
@@ -65,6 +66,36 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
           backgroundColor: const Color(0xFFFAFAFA),
           elevation: 0,
           foregroundColor: Colors.black87,
+
+          actions: [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'cancel') {
+                  showCancelOrderDialog(
+                    context: context,
+                    orderId: _controller.shortOrderId,
+                    onCancel: () {
+                      // Handle when user chooses to keep the order
+                      print('User chose to keep the order');
+                    },
+                    //onConfirm: () {
+                    //                       // Handle the actual cancellation logic here
+                    //                       _controller.cancelOrder().then((_) {
+                    //                         // Navigate back or refresh the order status
+                    //                       });
+                    //                     },
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem<String>(
+                  value: 'cancel',
+                  child: Text('Cancel order'),
+                ),
+              ],
+            ),
+          ],
         ),
         body: StreamBuilder<DocumentSnapshot>(
           stream: _controller.getOrderStream(),

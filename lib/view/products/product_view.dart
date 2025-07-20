@@ -37,16 +37,25 @@ class _ProductViewState extends State<ProductView> {
       if (widget.isNewIn) {
         _productStream = FirebaseFirestore.instance
             .collection('products')
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
             .orderBy('createdAt', descending: true)
             .snapshots();
       } else if (widget.categoryRef != null) {
         _productStream = FirebaseFirestore.instance
             .collection('products')
             .where('category', isEqualTo: widget.categoryRef)
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
             .snapshots();
       } else {
-        _productStream = FirebaseFirestore.instance.collection('products').snapshots();
+        _productStream = FirebaseFirestore.instance
+            .collection('products')
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
+            .snapshots();
       }
+
     }
   }
 
@@ -75,12 +84,16 @@ class _ProductViewState extends State<ProductView> {
     final productMap = {
       for (var doc in productDocs.docs)
         doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id)
-    };
 
-    // Sort according to rank order
+    };
+    final filteredMap = Map.fromEntries(productMap.entries.where((entry) {
+      final p = entry.value;
+      return (p.status != 'sold' && p.status != 'inactive' && p.stockQuantity > 0);
+    }));
+
     return rankedProductIds
-        .where((id) => productMap.containsKey(id))
-        .map((id) => productMap[id]!)
+        .where((id) => filteredMap.containsKey(id))
+        .map((id) => filteredMap[id]!)
         .toList();
   }
 

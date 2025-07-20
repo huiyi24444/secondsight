@@ -6,6 +6,7 @@ import 'package:secondsight/view/widgets/order_status_utils.dart';
 
 import '../../controller/chat/chat_support_controller.dart';
 import '../../model/order_model.dart';
+import '../../model/order_product_model.dart';
 import '../../services/auth_provider.dart';
 import '../widgets/chat_history_widget.dart';
 import '../../model/conversation_model.dart';
@@ -13,6 +14,7 @@ import '../widgets/custom_back_button.dart';
 import '../widgets/long_button.dart';
 import 'chat_history_view.dart';
 import 'chat_interface_view.dart';
+import 'end_chat_dialog.dart';
 
 class ChatSupportView extends StatefulWidget {
   const ChatSupportView({Key? key}) : super(key: key);
@@ -48,35 +50,6 @@ class _ChatSupportViewState extends State<ChatSupportView> {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _showEndConversationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('End Conversation'),
-          content: const Text(
-              'Are you sure you want to end this conversation? You won\'t be able to send new messages.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _controller.endConversation();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text('End'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
 
@@ -163,23 +136,6 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                   ),
                 );
               },
-            ),
-
-          if (_controller.conversationId != null &&
-              _controller.conversationStatus == 'active')
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.black),
-              onSelected: (value) {
-                if (value == 'end') {
-                  _showEndConversationDialog();
-                }
-              },
-              itemBuilder: (BuildContext context) => [
-                const PopupMenuItem<String>(
-                  value: 'end',
-                  child: Text('End Conversation'),
-                ),
-              ],
             ),
         ],
       ),
@@ -358,11 +314,16 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                               width: 60,
                               height: 60,
                               decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(10),
+                                color: Colors.purple.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.shopping_bag,
-                                  color: Colors.grey[400]),
+                              child: Center(
+                                child: Icon(
+                                  Icons.shopping_bag_outlined,
+                                  size: 28,
+                                  color: Colors.purple,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 16),
                             // Order Info
@@ -397,7 +358,7 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      _controller.capitalizeWords(order.orderStatus),
+                                      OrderStatusUtils.formatStatus(order.orderStatus),
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: Colors.white,
@@ -469,8 +430,7 @@ class _ChatSupportViewState extends State<ChatSupportView> {
       ),
     );
   }
-
-
-
 }
+
+
 

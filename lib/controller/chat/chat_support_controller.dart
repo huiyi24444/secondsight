@@ -10,20 +10,20 @@ import '../../view/chat/active_conversation_dialog.dart';
 class ChatSupportController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final BuildContext context;
-  String? _conversationId;
+  ConversationModel? _currentConversation; // Use ConversationModel instead of separate fields
   bool _isLoading = true;
   OrdersModel? _selectedOrder;
   bool _showOrderSelection = true;
   bool _showConversationList = false;
-  String? _conversationStatus;
 
-  // Getters
-  String? get conversationId => _conversationId;
+  // Updated getters to use ConversationModel
+  String? get conversationId => _currentConversation?.id;
   bool get isLoading => _isLoading;
   OrdersModel? get selectedOrder => _selectedOrder;
   bool get showOrderSelection => _showOrderSelection;
   bool get showConversationList => _showConversationList;
-  String? get conversationStatus => _conversationStatus;
+  String? get conversationStatus => _currentConversation?.status;
+  ConversationModel? get currentConversation => _currentConversation;
 
   ChatSupportController(this.context);
 
@@ -46,21 +46,30 @@ class ChatSupportController extends ChangeNotifier {
   void showOrderSelectionView() {
     _showConversationList = false;
     _showOrderSelection = true;
-    _conversationId = null;
-    _conversationStatus = null;
+    _currentConversation = null;
     notifyListeners();
   }
 
   Future<void> endConversation() async {
-    if (_conversationId == null) return;
+    if (_currentConversation == null) return;
 
     try {
-      await _firestore.collection('conversations').doc(_conversationId).update({
+      await _firestore.collection('conversations').doc(_currentConversation!.id).update({
         'status': 'ended',
         'endedAt': FieldValue.serverTimestamp(),
       });
 
-      _conversationStatus = 'ended';
+      // Update the local conversation model
+      _currentConversation = ConversationModel(
+        id: _currentConversation!.id,
+        userId: _currentConversation!.userId,
+        orderId: _currentConversation!.orderId,
+        status: 'ended',
+        createdAt: _currentConversation!.createdAt,
+        lastMessageAt: _currentConversation!.lastMessageAt,
+        endedAt: Timestamp.now(),
+      );
+
       notifyListeners();
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,8 +82,8 @@ class ChatSupportController extends ChangeNotifier {
     }
   }
 
-  // Check for existing active conversation with the same order ID
-  Future<Map<String, dynamic>?> checkExistingActiveConversation(String orderId) async {
+  // Updated to return ConversationModel
+  Future<ConversationModel?> checkExistingActiveConversation(String orderId) async {
     try {
       final userId = Provider.of<AuthProvider>(context, listen: false).userId;
       final existingConversations = await _firestore
@@ -86,10 +95,7 @@ class ChatSupportController extends ChangeNotifier {
           .get();
 
       if (existingConversations.docs.isNotEmpty) {
-        return {
-          'conversationId': existingConversations.docs.first.id,
-          'data': existingConversations.docs.first.data(),
-        };
+        return ConversationModel.fromFirestore(existingConversations.docs.first);
       }
       return null;
     } catch (e) {
@@ -113,12 +119,13 @@ class ChatSupportController extends ChangeNotifier {
           onContinue: () {
             // Continue with existing conversation
             Navigator.pop(context);
-            loadConversation(existingConversation['conversationId']);
+            _currentConversation = existingConversation;
+            _showOrderSelection = false;
+            notifyListeners();
           },
           onGoBack: () {
             // Just close the dialog and go back
             Navigator.pop(context);
-            // No other action needed - user stays on order selection screen
           },
         );
       } else {
@@ -137,20 +144,42 @@ class ChatSupportController extends ChangeNotifier {
 
     try {
       final userId = Provider.of<AuthProvider>(context, listen: false).userId;
-      final conversationRef = await _firestore.collection('conversations').add({
-        'userId': userId,
-        'orderId': _selectedOrder!.id,
-        'status': 'active',
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastMessageAt': FieldValue.serverTimestamp(),
-      });
 
-      _conversationId = conversationRef.id;
-      _conversationStatus = 'active';
+      // Check if userId is null
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not authenticated')),
+        );
+        return;
+      }
+
+      // Create the conversation model first
+      final newConversation = ConversationModel(
+        id: '', // Will be set after creation
+        userId: userId,
+        orderId: _selectedOrder!.id,
+        status: 'active',
+        createdAt: Timestamp.now(),
+        lastMessageAt: Timestamp.now(),
+      );
+
+      // Add to Firestore
+      final conversationRef = await _firestore.collection('conversations').add(newConversation.toMap());
+
+      // Update with the actual ID
+      _currentConversation = ConversationModel(
+        id: conversationRef.id,
+        userId: newConversation.userId,
+        orderId: newConversation.orderId,
+        status: newConversation.status,
+        createdAt: newConversation.createdAt,
+        lastMessageAt: newConversation.lastMessageAt,
+      );
+
       _showOrderSelection = false;
       notifyListeners();
 
-      // Send automated response
+      // Send automated response using MessageModel
       Future.delayed(const Duration(seconds: 1), () {
         sendMessage(
           'Hello! I\'m connecting you with our customer service team. Someone will be with you shortly.',
@@ -165,20 +194,32 @@ class ChatSupportController extends ChangeNotifier {
   }
 
   Future<void> loadConversation(String conversationId) async {
-    _conversationId = conversationId;
-    _showConversationList = false;
-    _showOrderSelection = false;
-    notifyListeners();
+    try {
+      _showConversationList = false;
+      _showOrderSelection = false;
 
-    // Load conversation status
-    final conversationDoc = await _firestore
-        .collection('conversations')
-        .doc(conversationId)
-        .get();
+      // Load conversation using the model
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
 
-    if (conversationDoc.exists) {
-      _conversationStatus = conversationDoc.data()?['status'] ?? 'active';
-      notifyListeners();
+      if (conversationDoc.exists) {
+        _currentConversation = ConversationModel.fromFirestore(conversationDoc);
+
+        // Load the associated order if needed
+        if (_currentConversation != null && _selectedOrder == null) {
+          // You might want to load the order data here
+          // based on _currentConversation.orderId
+        }
+
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error loading conversation: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load conversation')),
+      );
     }
   }
 
@@ -187,9 +228,9 @@ class ChatSupportController extends ChangeNotifier {
         bool isAdmin = false,
         bool isSystem = false,
       }) async {
-    if (message.trim().isEmpty || _conversationId == null) return;
+    if (message.trim().isEmpty || _currentConversation == null) return;
 
-    if (_conversationStatus == 'ended') {
+    if (_currentConversation!.status == 'ended') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This conversation has ended')),
       );
@@ -200,21 +241,26 @@ class ChatSupportController extends ChangeNotifier {
     final senderName = isAdmin ? 'Customer Service' : 'You';
 
     try {
+      // Create MessageModel
+      final messageModel = MessageModel(
+        id: '', // Will be set by Firestore
+        message: message,
+        senderId: isAdmin ? 'admin' : userId!,
+        senderName: senderName,
+        timestamp: null, // Will be set by server
+        isAdmin: isAdmin,
+        isSystem: isSystem,
+      );
+
+      // Add message using the model
       await _firestore
           .collection('conversations')
-          .doc(_conversationId)
+          .doc(_currentConversation!.id)
           .collection('messages')
-          .add({
-        'message': message,
-        'senderId': isAdmin ? 'admin' : userId,
-        'senderName': senderName,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isAdmin': isAdmin,
-        'isSystem': isSystem,
-      });
+          .add(messageModel.toMap());
 
       // Update last message timestamp
-      await _firestore.collection('conversations').doc(_conversationId).update({
+      await _firestore.collection('conversations').doc(_currentConversation!.id).update({
         'lastMessageAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -225,14 +271,27 @@ class ChatSupportController extends ChangeNotifier {
   }
 
   Stream<QuerySnapshot>? getMessagesStream() {
-    if (_conversationId == null) return null;
+    if (_currentConversation == null) return null;
 
     return _firestore
         .collection('conversations')
-        .doc(_conversationId)
+        .doc(_currentConversation!.id)
         .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots();
+  }
+
+  // Updated to return Stream of ConversationModel list
+  Stream<List<ConversationModel>> getConversationsModelStream() {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+    return _firestore
+        .collection('conversations')
+        .where('userId', isEqualTo: userId)
+        .orderBy('lastMessageAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => ConversationModel.fromFirestore(doc))
+        .toList());
   }
 
   Stream<QuerySnapshot> getOrdersStream() {
@@ -254,16 +313,6 @@ class ChatSupportController extends ChangeNotifier {
         .orderBy('lastMessageAt', descending: true)
         .snapshots();
   }
-
-  String capitalizeWords(String? text) {
-    if (text == null || text.isEmpty) return '';
-    return text
-        .split(' ')
-        .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
-        .join(' ');
-  }
-
-
 
   String formatDate(DateTime date) {
     final now = DateTime.now();

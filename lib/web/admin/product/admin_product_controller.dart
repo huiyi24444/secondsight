@@ -36,6 +36,17 @@ class ProductManagementController {
       final snapshot = await FirebaseFirestore.instance.collection('products').get();
       print('📄 Fetched ${snapshot.docs.length} products');
 
+      allProducts = snapshot.docs.map((doc) {
+        try {
+          final product = Product.fromDocumentSnapshot(doc);
+          return product;
+        } catch (e) {
+          print('❌ Error parsing product: $e');
+          return null;
+        }
+      }).whereType<Product>().toList();
+
+
       filterProducts(() {
         isLoading = false;
         onUpdate();
