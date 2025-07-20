@@ -142,12 +142,12 @@ class _CheckoutViewState extends State<CheckoutView> {
                     ),
                     const Divider(height: 1),
                     _buildCheckoutOption(
-                      'Payment Method',
+                      'Payment Card',
                       selectedPaymentCard != null
-                          ? '**** ${selectedPaymentCard!.displayName.substring(selectedPaymentCard!.displayName.length - 4)}'
-                          : 'Add Payment Method',
+                          ? '**** ${selectedPaymentCard!.lastFour.substring(selectedPaymentCard!.lastFour.length - 4)}'
+                          : 'Add Payment Card',
                       Icons.chevron_right,
-                      onTap: _showPaymentMethodSelection,
+                      onTap: _showPaymentCardSelection,
                     ),
                     const Spacer(),
                     Padding(
@@ -268,7 +268,7 @@ class _CheckoutViewState extends State<CheckoutView> {
   }
 
 
-  void _showPaymentMethodSelection() {
+  void _showPaymentCardSelection() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
 
@@ -276,9 +276,9 @@ class _CheckoutViewState extends State<CheckoutView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => PaymentMethodSheet(
+      builder: (context) => PaymentCardSheet(
         userId: userId,
-        onPaymentMethodSelected: (PaymentCard card) {
+        onPaymentCardSelected: (PaymentCard card) {
           setState(() {
             selectedPaymentCard = card;
           });

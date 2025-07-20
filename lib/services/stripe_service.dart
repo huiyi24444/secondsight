@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter/material.dart';
 
+import '../model/payment_result_model.dart';
+
 class StripeService {
   static const String _publishableKey = 'pk_test_51RdqXPQSp3H55udZMewh3I9eilxrid02WSapRFKsq2hvoogenAFbSa5TnMbU4IOcRUZemfqBXPCvS1Rd4izRF2wf00KZr3wv10';
   static const String _secretKey = 'sk_test_51RdqXPQSp3H55udZbxSVOUrX8Inys1xEzDQMic5xYiJXfqVtzBGPGXSMsczIe6ZQjtbD2ZU4piNNzqNfqNAzUQ6V00dOZSTaRg';
@@ -316,34 +318,4 @@ class StripeService {
   static bool isValidCVC(String cvc) {
     return cvc.length >= 3 && cvc.length <= 4 && RegExp(r'^\d+$').hasMatch(cvc);
   }
-}
-
-// ======= RESULT CLASSES =======
-
-class PaymentResult {
-  final bool success;
-  final String message;
-  final String? transactionId;
-  final String? errorCode;
-
-  PaymentResult({
-    required this.success,
-    required this.message,
-    this.transactionId,
-    this.errorCode,
-  });
-}
-
-class SetupResult {
-  final bool success;
-  final String message;
-  final Map<String, dynamic>? paymentMethodDetails;
-  final String? errorCode;
-
-  SetupResult({
-    required this.success,
-    required this.message,
-    this.paymentMethodDetails,
-    this.errorCode,
-  });
 }

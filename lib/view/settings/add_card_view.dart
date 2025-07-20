@@ -29,7 +29,7 @@ class _AddCardForm extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             leading: const CustomBackButton(),
-            title: const Text("Add Payment Method"),
+            title: const Text("Add Payment Card"),
             backgroundColor: Colors.transparent,
             centerTitle: true,
             elevation: 0,
@@ -105,7 +105,7 @@ class _AddCardForm extends StatelessWidget {
                       ),
                       const Expanded(
                         child: Text(
-                          "Set as default payment method",
+                          "Set as default payment card",
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
@@ -151,7 +151,7 @@ class _AddCardForm extends StatelessWidget {
 
                 // Add payment method button
                 LongButton(
-                  label: controller.isLoading ? "Processing..." : "Add Payment Method",
+                  label: controller.isLoading ? "Processing..." : "Add Payment Card",
                   onPressed: controller.isLoading
                       ? null
                       : () => controller.saveCard(context),

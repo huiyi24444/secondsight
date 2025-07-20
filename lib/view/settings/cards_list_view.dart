@@ -121,7 +121,7 @@ class _CardListViewState extends State<CardListView> {
       final existingCards = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userId)
-          .collection('paymentMethods')
+          .collection('paymentCards')
           .get();
 
       final isFirstCard = existingCards.docs.isEmpty;
@@ -131,7 +131,7 @@ class _CardListViewState extends State<CardListView> {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(widget.userId)
-            .collection('paymentMethods')
+            .collection('paymentCards')
             .add({
           'stripePaymentMethodId': paymentMethodData['id'],
           'lastFour': paymentMethodData['card']['last4'],
@@ -146,7 +146,7 @@ class _CardListViewState extends State<CardListView> {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(widget.userId)
-            .collection('paymentMethods')
+            .collection('paymentCards')
             .add({
           'stripePaymentMethodId': paymentMethodData['id'],
           'lastFour': paymentMethodData['card']['last4'],
@@ -323,7 +323,7 @@ class _CardListViewState extends State<CardListView> {
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -331,15 +331,25 @@ class _CardListViewState extends State<CardListView> {
                               children: [
                                 // Card brand icon
                                 _buildCardBrandIcon(card.brand),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      const SizedBox(height: 8),
                                       Row(
                                         children: [
+                                          Text(
+                                            formatCardNumber(card.lastFour),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[700],
+                                              letterSpacing: 0.5,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
                                           if (card.isDefault) ...[
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 18),
                                             Container(
                                               padding: const EdgeInsets.symmetric(
                                                 horizontal: 10,
@@ -362,16 +372,6 @@ class _CardListViewState extends State<CardListView> {
                                           ],
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        formatCardNumber(card.lastFour),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                          letterSpacing: 0.5,
-                                          fontFamily: 'monospace',
-                                        ),
-                                      ),
                                     ],
                                   ),
                                 ),
@@ -379,7 +379,7 @@ class _CardListViewState extends State<CardListView> {
                                   icon: Icon(
                                     Icons.more_vert,
                                     color: Colors.grey[600],
-                                    size: 20,
+                                    size: 16,
                                   ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -523,8 +523,8 @@ class _CardListViewState extends State<CardListView> {
         iconColor = Colors.grey[600]!;
     }
     return Container(
-      width: 48,
-      height: 36,
+      width: 42,
+      height: 30,
       decoration: BoxDecoration(
         color: iconColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
@@ -532,7 +532,7 @@ class _CardListViewState extends State<CardListView> {
       child: Icon(
         iconData,
         color: iconColor,
-        size: 24,
+        size: 20,
       ),
     );
   }

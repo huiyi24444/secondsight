@@ -9,15 +9,21 @@ class CardListController {
 
   CardListController({required this.userId});
 
-  // Get payment cards stream - updated to use new collection name
   Stream<QuerySnapshot> getPaymentCards() {
     return _firestore
         .collection('users')
         .doc(userId)
-        .collection('paymentMethods') // Changed from 'paymentCards' to 'paymentMethods'
+        .collection('paymentCards')
         .orderBy('isDefault', descending: true)
         .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) {
+      debugPrint('Fetched ${snapshot.docs.length} payment cards:');
+      for (var doc in snapshot.docs) {
+        debugPrint(doc.data().toString());
+      }
+      return snapshot;
+    });
   }
 
   // Delete payment card with Stripe integration
@@ -63,7 +69,7 @@ class CardListController {
         await _firestore
             .collection('users')
             .doc(userId)
-            .collection('paymentMethods')
+            .collection('paymentCards')
             .doc(cardId)
             .delete();
 
@@ -96,7 +102,7 @@ class CardListController {
       final cardsSnapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('paymentMethods')
+          .collection('paymentCards')
           .get();
 
       for (var doc in cardsSnapshot.docs) {
@@ -108,7 +114,7 @@ class CardListController {
         _firestore
             .collection('users')
             .doc(userId)
-            .collection('paymentMethods')
+            .collection('paymentCards')
             .doc(cardId),
         {'isDefault': true},
       );
@@ -125,7 +131,7 @@ class CardListController {
       final snapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('paymentMethods')
+          .collection('paymentCards')
           .orderBy('isDefault', descending: true)
           .orderBy('createdAt', descending: true)
           .get();
@@ -146,7 +152,7 @@ class CardListController {
       final snapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('paymentMethods')
+          .collection('paymentCards')
           .limit(1)
           .get();
 
@@ -157,12 +163,12 @@ class CardListController {
   }
 
   // Get default payment method
-  Future<Map<String, dynamic>?> getDefaultPaymentMethod() async {
+  Future<Map<String, dynamic>?> getDefaultPaymentCards() async {
     try {
       final snapshot = await _firestore
           .collection('users')
           .doc(userId)
-          .collection('paymentMethods')
+          .collection('paymentCards')
           .where('isDefault', isEqualTo: true)
           .limit(1)
           .get();

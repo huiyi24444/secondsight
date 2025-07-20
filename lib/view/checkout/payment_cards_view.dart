@@ -2,19 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../model/payment_cards_model.dart';
-import '../settings/add_card_view.dart'; // Adjust path if needed
+import '../settings/add_card_view.dart';
+import '../widgets/format_card.dart'; // Adjust path if needed
 
-class PaymentMethodSheet extends StatefulWidget {
-  final Function(PaymentCard) onPaymentMethodSelected;
+class PaymentCardSheet extends StatefulWidget {
+  final Function(PaymentCard) onPaymentCardSelected;
   final String userId;
 
-  const PaymentMethodSheet({super.key, required this.onPaymentMethodSelected, required this.userId});
+  const PaymentCardSheet({super.key, required this.onPaymentCardSelected, required this.userId});
 
   @override
-  State<PaymentMethodSheet> createState() => _PaymentMethodSheetState();
+  State<PaymentCardSheet> createState() => _PaymentCardSheetState();
 }
 
-class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
+class _PaymentCardSheetState extends State<PaymentCardSheet> {
   List<PaymentCard> paymentCards = [];
   String? selectedCardId;
   bool isLoading = true;
@@ -32,7 +33,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
 
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(widget.userId)
           .collection('paymentCards')
           .get();
 
@@ -74,7 +75,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Text(
-              'Select Payment Method',
+              'Select Payment Card',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
@@ -82,7 +83,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : paymentCards.isEmpty
-                ? const Center(child: Text('No payment methods found.'))
+                ? const Center(child: Text('No payment cards found.'))
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: paymentCards.length,
@@ -95,7 +96,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                     setState(() {
                       selectedCardId = card.id;
                     });
-                    widget.onPaymentMethodSelected(card); // Pass the whole card
+                    widget.onPaymentCardSelected(card); // Pass the whole card
                     Navigator.pop(context);
                   },
                 );
@@ -114,8 +115,8 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                 );
 
                 if (mounted) {
-                  setState(() {
-                    // Refresh the address list
+                  setState(() async {
+                    await _fetchPaymentCards();
                   });
                 }
               },
@@ -164,7 +165,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
         leading: _buildCardBrandBadge(card.brand),
         title: Row(
           children: [
-            Text(card.displayName),
+            Text(formatCardNumber(card.lastFour)),
             const SizedBox(width: 12),
             if (card.isDefault)
               Container(
@@ -184,7 +185,6 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
               ),
           ],
         ),
-        subtitle: Text(card.displayName),
         trailing: isSelected
             ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
             : null,

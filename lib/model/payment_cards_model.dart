@@ -4,7 +4,6 @@ class PaymentCard {
   final String id;
   final String brand;
   final Timestamp createdAt;
-  final String displayName;
   final int expMonth;
   final int expYear;
   final bool isDefault;
@@ -15,7 +14,6 @@ class PaymentCard {
     required this.id,
     required this.brand,
     required this.createdAt,
-    required this.displayName,
     required this.expMonth,
     required this.expYear,
     required this.isDefault,
@@ -29,7 +27,6 @@ class PaymentCard {
       id: doc.id,
       brand: data['brand'] ?? '',
       createdAt: data['createdAt'] ?? Timestamp.now(),
-      displayName: data['displayName'] ?? '',
       expMonth: data['expMonth'] ?? 1,
       expYear: data['expYear'] ?? DateTime.now().year,
       isDefault: data['isDefault'] ?? false,

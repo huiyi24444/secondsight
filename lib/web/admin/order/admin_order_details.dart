@@ -416,8 +416,8 @@ class OrderDetailsDialog {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              paymentCard.displayName.isNotEmpty
-                                  ? paymentCard.displayName
+                              paymentCard.lastFour.isNotEmpty
+                                  ? paymentCard.lastFour
                                   : '${paymentCard.brand.toUpperCase()} Card',
                               style: const TextStyle(
                                 fontSize: 16,
