@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:secondsight/web/admin/chat/admin_chat_view.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import 'package:secondsight/web/admin/returnrefund/admin_return.dart';
 import 'firebase_options.dart';
@@ -28,6 +29,7 @@ class AdminApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => AdminNavigator(),
+        '/conversations': (context) => const AdminChatView(),
       },
     );
   }

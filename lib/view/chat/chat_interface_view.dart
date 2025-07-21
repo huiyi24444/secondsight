@@ -1,5 +1,5 @@
-// lib/view/chat/chat_interface_widget.dart
 
+//chat_interface_view.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -95,6 +95,7 @@ class ChatInterfaceWidget extends StatelessWidget {
                     isAdmin: isAdmin,
                     isSystem: isSystem,
                     timestamp: message['timestamp'],
+                    senderName: message['senderName'],
                   );
                 },
               );
