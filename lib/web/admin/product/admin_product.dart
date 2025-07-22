@@ -243,7 +243,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                       ),
                                     ),
 
-                                    DataCell(Text(product.id.substring(0, 8).toUpperCase())),
+                                    DataCell(Text(ProductStatusUtils.shortProductId(product.id))),
                                     DataCell(
                                       Text(controller.getCategoryName(product.category.id)),
                                     ),

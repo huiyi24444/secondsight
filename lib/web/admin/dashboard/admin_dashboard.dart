@@ -387,6 +387,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Icons.trending_up,
             Colors.purple,
           ),
+
         ],
       ),
       const SizedBox(height: 20),
@@ -429,6 +430,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Icons.cancel,
             Colors.red,
             subtitle: 'Order cancelled',
+          ),
+          const SizedBox(width: 20),
+          _buildStatCard(
+            'Overdue',
+            '${data!.cancelledOrders}',
+            0,
+            Icons.cancel,
+            Colors.red,
+            subtitle: 'Overdue To Ship Orders',
           ),
         ],
       )

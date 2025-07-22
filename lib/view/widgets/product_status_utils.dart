@@ -13,4 +13,9 @@ class ProductStatusUtils {
         return Colors.black;
     }
   }
+
+  static String shortProductId(String id) {
+    if (id.length < 8) return id.toUpperCase();
+    return id.substring(0, 8).toUpperCase();
+  }
 }

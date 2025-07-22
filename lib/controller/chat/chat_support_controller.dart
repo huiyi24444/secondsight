@@ -238,7 +238,15 @@ class ChatSupportController extends ChangeNotifier {
     }
 
     final userId = Provider.of<AuthProvider>(context, listen: false).userId;
-    final senderName = isAdmin ? 'Customer Service' : 'You';
+
+    String senderName;
+    if (isAdmin) {
+      senderName = 'Customer Service';
+    } else if (isSystem) {
+      senderName = 'System';
+    } else {
+      senderName = 'Customer'; // Or fetch from user profile
+    }
 
     try {
       // Create MessageModel

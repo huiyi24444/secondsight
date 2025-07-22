@@ -75,6 +75,8 @@ class AdminDashboardController {
 
       final todayOrders = todayOrdersQuery.docs.length;
 
+
+
       // Fetch customers
       final customersSnapshot = await _firestore.collection('users').get();
       final List<CustomerModel> customers = customersSnapshot.docs
@@ -97,6 +99,24 @@ class AdminDashboardController {
           .length;
       int cancelled = orders.where((o) => o.orderStatus == 'cancelled').length;
 
+      final toShipOrdersQuery = await _firestore
+          .collectionGroup('order')
+          .where('orderStatus', isEqualTo: 'to_ship')
+          .get();
+      final List<OrdersModel> allToShipOrders = toShipOrdersQuery.docs
+          .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
+          .toList();
+
+      final overdue = allToShipOrders
+          .where((order) {
+        final orderDate = order.orderDate;
+        final orderStartOfDay = DateTime(orderDate.year, orderDate.month, orderDate.day);
+        final todayStartOfDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+        // Return true if the order date is before today
+        return orderStartOfDay.isBefore(todayStartOfDay);
+      })
+          .length;
       // Calculate changes
       int revenueChange = revenue > 0 && previousRevenue > 0
           ? ((revenue - previousRevenue) / previousRevenue * 100).round()
@@ -130,6 +150,7 @@ class AdminDashboardController {
         to_ship_orders: to_ship,
         to_receive_orders: to_receive,
         cancelledOrders: cancelled,
+        overdueOrders: overdue,
         recentOrders: recentOrders,
         rawOrderDocs: recentOrdersSnapshot.docs,
         todayOrders: todayOrders,
@@ -172,6 +193,7 @@ class DashboardStats {
   final int to_ship_orders;
   final int to_receive_orders;
   final int cancelledOrders;
+  final int overdueOrders;
   final List<OrdersModel> recentOrders;
   final List<DocumentSnapshot> rawOrderDocs;
   final int todayOrders;
@@ -189,6 +211,7 @@ class DashboardStats {
     required this.to_ship_orders,
     required this.to_receive_orders,
     required this.cancelledOrders,
+    required this.overdueOrders,
     required this.recentOrders,
     required this.rawOrderDocs,
     required this.todayOrders,

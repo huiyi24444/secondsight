@@ -15,6 +15,15 @@ Widget buildMessage(
   final time = timestamp?.toDate() ?? DateTime.now();
   final formattedTime = DateFormat('h:mm a').format(time);
 
+  String displayName;
+  if (isMe) {
+    displayName = 'You';
+  } else if (senderName != null && senderName.isNotEmpty) {
+    displayName = senderName;
+  } else {
+    displayName = isAdmin ? 'Customer Service' : 'Customer';
+  }
+
   if (isSystem) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -55,9 +64,7 @@ Widget buildMessage(
             ),
             child: Center(
               child: Text(
-                senderName != null && senderName.isNotEmpty
-                    ? senderName[0].toUpperCase()
-                    : (isAdmin ? 'A' : 'U'),
+                displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
                 style: TextStyle(
                   color: isAdmin ? Colors.purple[700] : Colors.blue[700],
                   fontWeight: FontWeight.bold,
@@ -75,11 +82,15 @@ Widget buildMessage(
             child: Column(
               crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                if (!isMe && senderName != null && senderName.isNotEmpty)
+                if (!isMe || isMe) // Show for all messages
                   Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    padding: EdgeInsets.only(
+                      left: isMe ? 0 : 4,
+                      right: isMe ? 4 : 0,
+                      bottom: 4,
+                    ),
                     child: Text(
-                      senderName,
+                      displayName,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],

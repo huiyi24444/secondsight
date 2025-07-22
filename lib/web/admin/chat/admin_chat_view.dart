@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../model/conversation_model.dart';
 import '../../../view/widgets/build_message.dart';
+import '../order/admin_order_details.dart';
 import '../widget/topbar.dart';
 import 'admin_chat_controller.dart';
 import 'create_conversation_dialog.dart';
@@ -501,7 +502,14 @@ class _AdminChatViewState extends State<AdminChatView> {
                               onExit: (_) => setState(() => isHovered = false),
                               child: InkWell(
                                 onTap: () {
-                                  orderDetailsInChat(_controller.selectedConversation!.orderId);
+                                  // Show the order details dialog
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => OrderDetailsInChat(
+                                      orderId: _controller.selectedConversation!.orderId,
+                                      userId: _controller.selectedConversation!.userId, // or however you get the userId
+                                    ),
+                                  );
                                 },
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(
@@ -531,7 +539,6 @@ class _AdminChatViewState extends State<AdminChatView> {
                         );
                       },
                     ),
-
 
 
                   const SizedBox(width: 12),
