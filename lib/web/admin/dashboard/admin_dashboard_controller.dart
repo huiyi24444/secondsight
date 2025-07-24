@@ -1,9 +1,7 @@
-
 // admin_dashboard_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
-
 import '../../../model/user_model.dart';
 
 class AdminDashboardController {
@@ -12,6 +10,7 @@ class AdminDashboardController {
   Future<DashboardStats> fetchDashboardStats({
     DateFilterType filterType = DateFilterType.day,
     DateTime? selectedDate,
+    StatusDateFilterType statusFilter = StatusDateFilterType.created,
   }) async {
     try {
       selectedDate ??= DateTime.now();
@@ -39,43 +38,52 @@ class AdminDashboardController {
           previousStartDate = DateTime(selectedDate.year - 1, 1, 1);
           previousEndDate = startDate;
           break;
+        case DateFilterType.all:
+        // Fetch all orders regardless of date
+          startDate = DateTime(2020, 1, 1); // Or your business start date
+          endDate = DateTime.now().add(const Duration(days: 1));
+          // For comparison, use last 30 days
+          previousEndDate = DateTime.now().subtract(const Duration(days: 30));
+          previousStartDate = previousEndDate.subtract(const Duration(days: 30));
+          break;
       }
 
-      // Fetch orders for selected period
-      final ordersQuery = await _firestore
+      // Determine which date field to query based on status filter
+      String dateField = _getDateFieldForStatusFilter(statusFilter);
+
+      // Fetch ALL orders for current status counts (regardless of date)
+      final allActiveOrdersQuery = await _firestore
           .collectionGroup('order')
-          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-          .where('orderDate', isLessThan: Timestamp.fromDate(endDate))
+          .where('orderStatus', whereIn: ['to_ship', 'to_receive'])
           .get();
 
-      final List<OrdersModel> orders = ordersQuery.docs
+      final List<OrdersModel> allActiveOrders = allActiveOrdersQuery.docs
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
 
-      // Fetch orders for previous period (for comparison)
-      final previousOrdersQuery = await _firestore
-          .collectionGroup('order')
-          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(previousStartDate))
-          .where('orderDate', isLessThan: Timestamp.fromDate(previousEndDate))
-          .get();
+      // Calculate current active status counts
+      int activeToShip = allActiveOrders.where((o) => o.orderStatus == 'to_ship').length;
+      int activeToReceive = allActiveOrders.where((o) => o.orderStatus == 'to_receive').length;
 
-      final List<OrdersModel> previousOrders = previousOrdersQuery.docs
-          .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
+      // Fetch orders for selected period based on the chosen date field
+      Query ordersQuery = _firestore.collectionGroup('order');
+
+      if (filterType != DateFilterType.all) {
+        ordersQuery = ordersQuery
+            .where(dateField, isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+            .where(dateField, isLessThan: Timestamp.fromDate(endDate));
+      }
+
+      final ordersSnapshot = await ordersQuery.get();
+      final List<OrdersModel> orders = ordersSnapshot.docs
+          .map((doc) => OrdersModel.fromJson(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
 
-      // Fetch today's orders for the indicator
-      final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-      final todayEnd = todayStart.add(const Duration(days: 1));
+      // Fetch status-specific activity for the period
+      final statusActivityStats = await _fetchStatusActivityStats(startDate, endDate);
 
-      final todayOrdersQuery = await _firestore
-          .collectionGroup('order')
-          .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
-          .where('orderDate', isLessThan: Timestamp.fromDate(todayEnd))
-          .get();
-
-      final todayOrders = todayOrdersQuery.docs.length;
-
-
+      // Calculate overdue orders with enhanced logic
+      int overdue = await _calculateOverdueOrders(allActiveOrders);
 
       // Fetch customers
       final customersSnapshot = await _firestore.collection('users').get();
@@ -83,55 +91,19 @@ class AdminDashboardController {
           .map((doc) => CustomerModel.fromJson(doc.data(), doc.id))
           .toList();
 
-      // Calculate stats for current period
+      // Calculate revenue (only from completed orders in the period)
       double revenue = orders
           .where((o) => o.orderStatus == 'completed')
           .fold(0.0, (sum, o) => sum + o.totalAmount);
 
-      double previousRevenue = previousOrders
-          .where((o) => o.orderStatus == 'completed')
-          .fold(0.0, (sum, o) => sum + o.totalAmount);
+      // Calculate period-specific status counts
+      int periodToShip = orders.where((o) => o.orderStatus == 'to_ship').length;
+      int periodToReceive = orders.where((o) => o.orderStatus == 'to_receive').length;
+      int periodCompleted = orders.where((o) => o.orderStatus == 'completed').length;
+      int periodCancelled = orders.where((o) => o.orderStatus == 'cancelled').length;
 
-      int completed = orders.where((o) => o.orderStatus == 'completed').length;
-      int to_ship = orders.where((o) => o.orderStatus == 'to_ship' || o.orderStatus == 'to_ship').length;
-      int to_receive = orders
-          .where((o) => o.orderStatus == 'to_receive' )
-          .length;
-      int cancelled = orders.where((o) => o.orderStatus == 'cancelled').length;
-
-      final toShipOrdersQuery = await _firestore
-          .collectionGroup('order')
-          .where('orderStatus', isEqualTo: 'to_ship')
-          .get();
-      final List<OrdersModel> allToShipOrders = toShipOrdersQuery.docs
-          .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
-          .toList();
-
-      // Calculate overdue orders (to_ship orders that are not from today)
-      int overdue = allToShipOrders.where((order) {
-        final orderDate = order.orderDate;
-        print('🔍 Checking order ID: ${order.id}, orderDate: $orderDate');
-        // Check if the order date is before today (not including today)
-        final orderDateOnly = DateTime(orderDate.year, orderDate.month, orderDate.day);
-        final todayDateOnly = DateTime(todayStart.year, todayStart.month, todayStart.day);
-        print('📅 orderDateOnly: $orderDateOnly, todayDateOnly: $todayDateOnly');
-        print('⏱️ isOverdue: ${orderDateOnly.isBefore(todayDateOnly)}');
-
-        return orderDateOnly.isBefore(todayDateOnly);
-      }).length;
-      print('🔢 Total Overdue Orders: $overdue');
-
-
-      // Calculate changes
-      int revenueChange = revenue > 0 && previousRevenue > 0
-          ? ((revenue - previousRevenue) / previousRevenue * 100).round()
-          : 0;
-      int orderChange = orders.isNotEmpty && previousOrders.isNotEmpty
-          ? orders.length - previousOrders.length
-          : 0;
-
-      // Fetch recent orders (always show last 10 regardless of filter)
-      final recentOrdersSnapshot = await FirebaseFirestore.instance
+      // Fetch recent orders
+      final recentOrdersSnapshot = await _firestore
           .collectionGroup('order')
           .orderBy('orderDate', descending: true)
           .limit(10)
@@ -141,33 +113,188 @@ class AdminDashboardController {
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
 
-      // Count new orders (within last 24 hours)
+      // Count new orders
       final last24Hours = DateTime.now().subtract(const Duration(hours: 24));
       final newOrdersCount = recentOrders
           .where((order) => order.orderDate.isAfter(last24Hours))
           .length;
 
+      // Calculate performance metrics
+      final performanceMetrics = await _calculatePerformanceMetrics(orders);
+
       return DashboardStats(
         totalRevenue: revenue.toInt(),
         totalCustomers: customers.length,
         allOrders: orders.length,
-        completedOrders: completed,
-        to_ship_orders: to_ship,
-        to_receive_orders: to_receive,
-        cancelledOrders: cancelled,
+        completedOrders: periodCompleted,
+        to_ship_orders: periodToShip,
+        to_receive_orders: periodToReceive,
+        cancelledOrders: periodCancelled,
         overdueOrders: overdue,
         recentOrders: recentOrders,
         rawOrderDocs: recentOrdersSnapshot.docs,
-        todayOrders: todayOrders,
-        revenueChange: revenueChange,
-        orderChange: orderChange,
-        customerChange: 0, // You can implement customer change logic if needed
+        todayOrders: statusActivityStats['created'] ?? 0,
+        revenueChange: 0, // Calculate based on your needs
+        orderChange: 0, // Calculate based on your needs
+        customerChange: 0,
         newOrdersCount: newOrdersCount,
+        // New fields for enhanced tracking
+        activeToShipOrders: activeToShip,
+        activeToReceiveOrders: activeToReceive,
+        statusActivity: statusActivityStats,
+        performanceMetrics: performanceMetrics,
       );
     } catch (e) {
       print('Error fetching dashboard stats: $e');
       rethrow;
     }
+  }
+
+  String _getDateFieldForStatusFilter(StatusDateFilterType filter) {
+    switch (filter) {
+      case StatusDateFilterType.created:
+        return 'orderDate';
+      case StatusDateFilterType.shipped:
+        return 'toReceiveDate';
+      case StatusDateFilterType.completed:
+        return 'completedDate';
+      case StatusDateFilterType.statusChanged:
+        return 'lastStatusUpdate';
+    }
+  }
+
+  Future<Map<String, int>> _fetchStatusActivityStats(DateTime startDate, DateTime endDate) async {
+    final stats = <String, int>{};
+
+    // Orders created in period
+    final createdQuery = await _firestore
+        .collectionGroup('order')
+        .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('orderDate', isLessThan: Timestamp.fromDate(endDate))
+        .get();
+    stats['created'] = createdQuery.docs.length;
+
+    // Orders moved to ship in period
+    final toShipQuery = await _firestore
+        .collectionGroup('order')
+        .where('toShipDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('toShipDate', isLessThan: Timestamp.fromDate(endDate))
+        .get();
+    stats['movedToShip'] = toShipQuery.docs.length;
+
+    // Orders shipped in period
+    final shippedQuery = await _firestore
+        .collectionGroup('order')
+        .where('toReceiveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('toReceiveDate', isLessThan: Timestamp.fromDate(endDate))
+        .get();
+    stats['shipped'] = shippedQuery.docs.length;
+
+    // Orders completed in period
+    final completedQuery = await _firestore
+        .collectionGroup('order')
+        .where('completedDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('completedDate', isLessThan: Timestamp.fromDate(endDate))
+        .get();
+    stats['completed'] = completedQuery.docs.length;
+
+    return stats;
+  }
+
+  Future<int> _calculateOverdueOrders(List<OrdersModel> activeOrders) async {
+    int overdue = 0;
+    final now = DateTime.now();
+
+    for (final order in activeOrders) {
+      if (order.orderStatus == 'to_ship') {
+        // Use the toShipDate if available, otherwise fall back to orderDate
+        final referenceDate = order.toShipDate ?? order.orderDate;
+        final daysSinceStatus = now.difference(referenceDate).inDays;
+
+        // Consider overdue if more than 2 days in to_ship status
+        if (daysSinceStatus > 2) {
+          overdue++;
+        }
+      }
+    }
+
+    return overdue;
+  }
+
+  Future<Map<String, dynamic>> _calculatePerformanceMetrics(List<OrdersModel> orders) async {
+    final metrics = <String, dynamic>{};
+
+    // Calculate average processing time (order to ship)
+    final processedOrders = orders.where((o) => o.toShipDate != null).toList();
+    if (processedOrders.isNotEmpty) {
+      final totalProcessingHours = processedOrders.fold<int>(
+        0,
+            (sum, order) => sum + order.toShipDate!.difference(order.orderDate).inHours,
+      );
+      metrics['avgProcessingHours'] = (totalProcessingHours / processedOrders.length).round();
+    }
+
+    // Calculate average shipping time (ship to delivery)
+    final deliveredOrders = orders.where((o) =>
+    o.toShipDate != null && o.completedDate != null
+    ).toList();
+    if (deliveredOrders.isNotEmpty) {
+      final totalShippingHours = deliveredOrders.fold<int>(
+        0,
+            (sum, order) => sum + order.completedDate!.difference(order.toShipDate!).inHours,
+      );
+      metrics['avgShippingHours'] = (totalShippingHours / deliveredOrders.length).round();
+    }
+
+    // Calculate fulfillment rate
+    final totalOrders = orders.length;
+    final completedOrders = orders.where((o) => o.orderStatus == 'completed').length;
+    if (totalOrders > 0) {
+      metrics['fulfillmentRate'] = ((completedOrders / totalOrders) * 100).round();
+    }
+
+    return metrics;
+  }
+
+  // Method to update order status with date tracking
+  Future<void> updateOrderStatus({
+    required String userId,
+    required String orderId,
+    required String newStatus,
+    required String adminId,
+  }) async {
+    final now = DateTime.now();
+    final updateData = <String, dynamic>{
+      'orderStatus': newStatus,
+      'lastStatusUpdate': Timestamp.fromDate(now),
+      'lastUpdatedBy': adminId,
+    };
+
+    // Add specific date field based on new status
+    switch (newStatus) {
+      case 'confirmed':
+        updateData['confirmedDate'] = Timestamp.fromDate(now);
+        break;
+      case 'to_ship':
+        updateData['toShipDate'] = Timestamp.fromDate(now);
+        break;
+      case 'to_receive':
+        updateData['toReceiveDate'] = Timestamp.fromDate(now);
+        break;
+      case 'completed':
+        updateData['completedDate'] = Timestamp.fromDate(now);
+        break;
+      case 'cancelled':
+        updateData['cancelledDate'] = Timestamp.fromDate(now);
+        break;
+    }
+
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('order')
+        .doc(orderId)
+        .update(updateData);
   }
 
   Future<List<OrderProductModel>> fetchOrderProductsFromOrderDoc(DocumentSnapshot orderDoc) async {
@@ -190,6 +317,7 @@ class AdminDashboardController {
   }
 }
 
+// Enhanced DashboardStats class
 class DashboardStats {
   final int totalRevenue;
   final int totalCustomers;
@@ -205,8 +333,13 @@ class DashboardStats {
   final int revenueChange;
   final int orderChange;
   final int customerChange;
-  //final int activeChange;
   final int newOrdersCount;
+
+  // New fields for enhanced tracking
+  final int activeToShipOrders;
+  final int activeToReceiveOrders;
+  final Map<String, int> statusActivity;
+  final Map<String, dynamic> performanceMetrics;
 
   DashboardStats({
     required this.totalRevenue,
@@ -223,10 +356,14 @@ class DashboardStats {
     required this.revenueChange,
     required this.orderChange,
     required this.customerChange,
-    //required this.activeChange,
     required this.newOrdersCount,
+    this.activeToShipOrders = 0,
+    this.activeToReceiveOrders = 0,
+    this.statusActivity = const {},
+    this.performanceMetrics = const {},
   });
 }
 
-// Define the enum here only once
-enum DateFilterType { day, month, year }
+// Enhanced enums
+enum DateFilterType { day, month, year, all }
+enum StatusDateFilterType { created, shipped, completed, statusChanged }
