@@ -10,6 +10,7 @@ import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/progress_stepper.dart';
 import 'cancel_dialog.dart';
+import 'cancel_unavail_dialog.dart';
 import 'order_details_bottom.dart';
 import 'order_notice.dart';
 import 'order_rating_dialog.dart';
@@ -67,25 +68,45 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
           elevation: 0,
           foregroundColor: Colors.black87,
 
-          actions: [
-            PopupMenuButton<String>(
+            actions: [
+        // Wrap PopupMenuButton in StreamBuilder to access current order status
+        StreamBuilder<DocumentSnapshot>(
+        stream: _controller.getOrderStream(),
+          builder: (context, orderSnapshot) {
+            return PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               onSelected: (value) {
                 if (value == 'cancel') {
-                  showCancelOrderDialog(
-                    context: context,
-                    orderId: _controller.shortOrderId,
-                    onCancel: () {
-                      // Handle when user chooses to keep the order
-                      print('User chose to keep the order');
-                    },
-                    //onConfirm: () {
-                    //                       // Handle the actual cancellation logic here
-                    //                       _controller.cancelOrder().then((_) {
-                    //                         // Navigate back or refresh the order status
-                    //                       });
-                    //                     },
-                  );
+                  // Check if we have order data
+                  if (orderSnapshot.hasData) {
+                    final data = orderSnapshot.data!;
+                    final order = _controller.createOrderFromDocument(data);
+
+                    // Check if order status is 'to_ship' (case insensitive)
+                    if (order.orderStatus.toLowerCase() == 'to_ship') {
+                      // Show cancel dialog
+                      showCancelOrderDialog(
+                        context: context,
+                        orderId: _controller.shortOrderId,
+                        onCancel: () {
+                          // Handle when user chooses to keep the order
+                          print('User chose to keep the order');
+                        },
+                        // onConfirm: () {
+                        //   // Handle the actual cancellation logic here
+                        //   _controller.cancelOrder().then((_) {
+                        //     // Navigate back or refresh the order status
+                        //   });
+                        // },
+                      );
+                    } else {
+                      // Show cancel unavailable dialog
+                      showDialog(
+                        context: context,
+                        builder: (context) => const CancelUnavailableDialog(),
+                      );
+                    }
+                  }
                 }
               },
               itemBuilder: (context) => [
@@ -94,8 +115,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                   child: Text('Cancel order'),
                 ),
               ],
-            ),
-          ],
+            );
+          },
+        ),
+            ],
         ),
         body: StreamBuilder<DocumentSnapshot>(
           stream: _controller.getOrderStream(),
@@ -217,15 +240,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
           customMessage: 'This order has been cancelled. If you have any questions, please contact our support team.',
         );
 
-      case 'pending payment':
-      case 'pending_payment':
-      case 'payment pending':
-        return OrderStatusNotice(
-          type: OrderNoticeType.pendingPayment,
-          customMessage: 'Your order is waiting for payment confirmation. Please complete the payment to proceed.',
-          onPaymentPressed: () => _handlePaymentAction(order),
-        );
-
       default:
       // Show normal progress stepper for other statuses
         final config = _controller.getOrderStatusConfig(order.orderStatus);
@@ -236,62 +250,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         );
     }
   }
-
-  void _handlePaymentAction(OrdersModel order) {
-    // Handle payment action - you can implement navigation to payment screen
-    // or show payment options dialog here
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Complete Payment',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: Text(
-            'Redirecting to payment gateway for order #${_controller.shortOrderId}...',
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey[600],
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // TODO: Navigate to payment screen
-                // Navigator.push(context, MaterialPageRoute(
-                //   builder: (context) => PaymentScreen(orderId: order.orderID),
-                // ));
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8E6CEF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Proceed'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
 
   Widget _buildProductsSection() {
     return Container(
@@ -817,7 +775,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       ),
     );
   }
-
 
 // Compact info card for other details
   Widget _buildCompactInfoCard(
