@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../controller/checkout/cart_controller.dart';
 import '../../model/cart_item_model.dart';
 import '../widgets/custom_back_button.dart';
@@ -174,236 +175,251 @@ class _CartViewState extends State<CartView> {
                         children: [
                           Padding(
                             padding: const EdgeInsets.all(12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
                               children: [
-                                // Product Image
-                                Stack(
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: ColorFiltered(
-                                        colorFilter: isOutOfStock
-                                            ? const ColorFilter.mode(
-                                          Colors.grey,
-                                          BlendMode.saturation,
-                                        )
-                                            : const ColorFilter.mode(
-                                          Colors.transparent,
-                                          BlendMode.multiply,
-                                        ),
-                                        child: item.product.images.isNotEmpty
-                                            ? Image.network(
-                                          item.product.images.first,
-                                          width: 80,
-                                          height: 80,
-                                          fit: BoxFit.cover,
-                                        )
-                                            : Container(
-                                          width: 80,
-                                          height: 80,
-                                          color: Colors.grey[100],
-                                          child: Icon(
-                                            Icons.image_not_supported_outlined,
-                                            size: 32,
-                                            color: Colors.grey[400],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    if (isOutOfStock)
-                                      Positioned.fill(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.5),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'SOLD OUT',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
+                                    // Product Image
+                                    Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: ColorFiltered(
+                                            colorFilter: isOutOfStock
+                                                ? const ColorFilter.mode(
+                                              Colors.grey,
+                                              BlendMode.saturation,
+                                            )
+                                                : const ColorFilter.mode(
+                                              Colors.transparent,
+                                              BlendMode.multiply,
+                                            ),
+                                            child: item.product.images.isNotEmpty
+                                                ? Image.network(
+                                              item.product.images.first,
+                                              width: 80,
+                                              height: 80,
+                                              fit: BoxFit.cover,
+                                            )
+                                                : Container(
+                                              width: 80,
+                                              height: 80,
+                                              color: Colors.grey[100],
+                                              child: Icon(
+                                                Icons.image_not_supported_outlined,
+                                                size: 32,
+                                                color: Colors.grey[400],
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(width: 12),
-                                // Product Details
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.product.name,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 15,
-                                          letterSpacing: -0.3,
-                                          height: 1.3,
-                                          color: isOutOfStock ? Colors.grey[600] : Colors.black,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Size ${item.product.productSize} • ${item.product.condition}',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
-                                          letterSpacing: -0.2,
-                                        ),
-                                      ),
-                                      if (isOutOfStock) ...[
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red[50],
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            'Out of Stock',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.red,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 12),
-                                      // Quantity Controls or Remove Button
-                                      if (!isOutOfStock) ...[
-                                        Row(
-                                          children: [
-                                            _buildQuantityButton(
-                                              Icons.remove,
-                                                  () async {
-                                                if (item.quantity > 1) {
-                                                  await _cartController.decreaseQuantity(widget.userId, item.product.id);
-                                                  setState(() {
-                                                    _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
-                                                  });
-                                                } else {
-                                                  // Show confirmation dialog before removing
-                                                  final shouldRemove = await _showRemoveConfirmation(
-                                                    context,
-                                                    item.product.name,
-                                                  );
-                                                  if (shouldRemove) {
-                                                    await _cartController.removeItem(widget.userId, item.product.id);
-                                                    setState(() {
-                                                      _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
-                                                    });
-                                                    // Show snackbar after successful removal
-                                                    if (mounted) {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text('${item.product.name} removed from cart'),
-                                                          behavior: SnackBarBehavior.floating,
-                                                          duration: const Duration(seconds: 2),
-                                                          action: SnackBarAction(
-                                                            label: 'OK',
-                                                            onPressed: () {},
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  }
-                                                }
-                                              },
-                                            ),
-                                            Container(
-                                              margin: const EdgeInsets.symmetric(horizontal: 16),
-                                              child: Text(
-                                                item.quantity.toString(),
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 15,
+                                        if (isOutOfStock)
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.5),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Center(
+                                                child: Text(
+                                                  'SOLD OUT',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                            _buildQuantityButton(
-                                              Icons.add,
-                                                  () async {
-                                                if (item.quantity < item.product.stockQuantity) {
-                                                  await _cartController.increaseQuantity(widget.userId, item.product.id);
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // Product Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        //name and size and condition
+                                        children: [
+                                          Text(
+                                            item.product.name,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15,
+                                              letterSpacing: -0.3,
+                                              height: 1.3,
+                                              color: isOutOfStock ? Colors.grey[600] : Colors.black,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Size ${item.product.productSize} • ${OrderStatusUtils.formatCondition(item.product.condition)}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
+                                              letterSpacing: -0.2,
+                                            ),
+                                          ),
+                                          if (isOutOfStock) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red[50],
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'Out of Stock',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.red,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+
+                                      ),
+
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // Price (moved to top row)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      //price
+                                      children: [
+
+                                        Text(
+                                          'RM${item.totalPrice.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                            letterSpacing: -0.3,
+                                            color: isOutOfStock ? Colors.grey[500] : Colors.black,
+                                            decoration: isOutOfStock ? TextDecoration.lineThrough : null,
+                                          ),
+                                        ),
+                                        if (item.quantity > 1) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'RM${item.product.price.toStringAsFixed(2)} each',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                // Bottom section with quantity controls/remove button positioned to the right
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    //qty and remove button
+                                    if (!isOutOfStock) ...[
+                                      Row(
+                                        children: [
+                                          _buildQuantityButton(
+                                            Icons.remove,
+                                                () async {
+                                              if (item.quantity > 1) {
+                                                await _cartController.decreaseQuantity(widget.userId, item.product.id);
+                                                setState(() {
+                                                  _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                                });
+                                              } else {
+                                                // Show confirmation dialog before removing
+                                                final shouldRemove = await _showRemoveConfirmation(
+                                                  context,
+                                                  item.product.name,
+                                                );
+                                                if (shouldRemove) {
+                                                  await _cartController.removeItem(widget.userId, item.product.id);
                                                   setState(() {
                                                     _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
                                                   });
-                                                } else {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Maximum stock reached'),
-                                                      behavior: SnackBarBehavior.floating,
-                                                    ),
-                                                  );
+                                                  // Show snackbar after successful removal
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('${item.product.name} removed from cart'),
+                                                        behavior: SnackBarBehavior.floating,
+                                                        duration: const Duration(seconds: 2),
+                                                        action: SnackBarAction(
+                                                          label: 'OK',
+                                                          onPressed: () {},
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
                                                 }
-                                              },
+                                              }
+                                            },
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                                            child: Text(
+                                              item.quantity.toString(),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15,
+                                              ),
                                             ),
-                                          ],
-                                        ),
-                                      ] else ...[
-                                        TextButton.icon(
-                                          onPressed: () async {
-                                            final shouldRemove = await _showRemoveConfirmation(
-                                              context,
-                                              item.product.name,
-                                            );
-                                            if (shouldRemove) {
-                                              await _cartController.removeItem(widget.userId, item.product.id);
-                                              setState(() {
-                                                _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
-                                              });
-                                              if (mounted) {
+                                          ),
+                                          _buildQuantityButton(
+                                            Icons.add,
+                                                () async {
+                                              if (item.quantity < item.product.stockQuantity) {
+                                                await _cartController.increaseQuantity(widget.userId, item.product.id);
+                                                setState(() {
+                                                  _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                                });
+                                              } else {
                                                 ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('${item.product.name} removed from cart'),
+                                                  const SnackBar(
+                                                    content: Text('Maximum stock reached'),
                                                     behavior: SnackBarBehavior.floating,
-                                                    duration: const Duration(seconds: 2),
                                                   ),
                                                 );
                                               }
-                                            }
-                                          },
-                                          icon: const Icon(Icons.delete_outline, size: 18),
-                                          label: const Text('Remove'),
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: Colors.red,
-                                            padding: EdgeInsets.zero,
+                                            },
                                           ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                // Price
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'RM${item.totalPrice.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                        letterSpacing: -0.3,
-                                        color: isOutOfStock ? Colors.grey[500] : Colors.black,
-                                        decoration: isOutOfStock ? TextDecoration.lineThrough : null,
+                                        ],
                                       ),
-                                    ),
-                                    if (item.quantity > 1) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'RM${item.product.price.toStringAsFixed(2)} each',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isOutOfStock ? Colors.grey[500] : Colors.grey[600],
+                                    ] else ...[
+                                      TextButton.icon(
+                                        onPressed: () async {
+                                          final shouldRemove = await _showRemoveConfirmation(
+                                            context,
+                                            item.product.name,
+                                          );
+                                          if (shouldRemove) {
+                                            await _cartController.removeItem(widget.userId, item.product.id);
+                                            setState(() {
+                                              _cartItemsFuture = _cartController.fetchCartItems(widget.userId);
+                                            });
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('${item.product.name} removed from cart'),
+                                                  behavior: SnackBarBehavior.floating,
+                                                  duration: const Duration(seconds: 2),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        icon: const Icon(Icons.delete_outline, size: 18),
+                                        label: const Text('Remove'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                          padding: EdgeInsets.zero,
                                         ),
                                       ),
                                     ],
@@ -541,8 +557,8 @@ class _CartViewState extends State<CartView> {
       onTap: onPressed,
       borderRadius: BorderRadius.circular(6),
       child: Container(
-        width: 28,
-        height: 28,
+        width: 24,
+        height: 24,
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey[300]!),
           borderRadius: BorderRadius.circular(6),

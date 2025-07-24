@@ -32,6 +32,8 @@ class OrderDetailsView extends StatefulWidget {
 
 class _OrderDetailsViewState extends State<OrderDetailsView> {
   late OrderDetailsController _controller;
+  final ValueNotifier<bool> _isProductsExpanded = ValueNotifier(false);
+
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
   @override
   void dispose() {
     _controller.dispose();
+    _isProductsExpanded.dispose();
     super.dispose();
   }
 
@@ -153,7 +156,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildOrderStatusCard(order),
+                      _buildEnhancedOrderStatusCard(order),
                       _buildProductsSection(),
                       _buildTotalSummary(order, shipment),
                       const SizedBox(height: 100),
@@ -187,7 +190,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-  Widget _buildOrderStatusCard(OrdersModel order) {
+  // NEW: Enhanced order status card with timeline
+  Widget _buildEnhancedOrderStatusCard(OrdersModel order) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -205,22 +209,55 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Check order status and show appropriate widget
-          _buildStatusContent(order),
-          const SizedBox(height: 12),
+          // Header
+          Row(
+            children: [
+              const Text(
+                'Order Timeline',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(order.orderStatus).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _getStatusDisplayText(order.orderStatus),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _getStatusColor(order.orderStatus),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Status timeline
+          _buildStatusTimeline(order),
+
+          const SizedBox(height: 1),
+
+          // Order date
           Row(
             children: [
               Icon(
-                Icons.calendar_today_outlined,
+                Icons.shopping_bag_outlined,
                 size: 16,
                 color: Colors.grey[600],
               ),
               const SizedBox(width: 8),
               Text(
-                _controller.formatOrderDate(order.orderDate),
+                'Order placed on ${_controller.formatOrderDate(order.orderDate)}',
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
+                  fontSize: 13,
+                  color: Colors.grey[600],
                 ),
               ),
             ],
@@ -230,27 +267,226 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     );
   }
 
-  Widget _buildStatusContent(OrdersModel order) {
-    final String status = order.orderStatus.toLowerCase();
+  // NEW: Build status timeline widget
+  Widget _buildStatusTimeline(OrdersModel order) {
+    final statusSteps = _getOrderStatusSteps(order);
 
-    switch (status) {
-      case 'cancelled':
-        return OrderStatusNotice(
-          type: OrderNoticeType.cancelled,
-          customMessage: 'This order has been cancelled. If you have any questions, please contact our support team.',
-        );
+    return Column(
+      children: List.generate(statusSteps.length, (index) {
+        final step = statusSteps[index];
+        final isLast = index == statusSteps.length - 1;
+        final isActive = step['isActive'] as bool;
+        final isCompleted = step['isCompleted'] as bool;
 
-      default:
-      // Show normal progress stepper for other statuses
-        final config = _controller.getOrderStatusConfig(order.orderStatus);
-        return ProgressStepper(
-          title: config['title'],
-          steps: config['steps'],
-          currentStep: config['currentStep'],
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Timeline indicator
+            Column(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCompleted
+                        ? step['color'] as Color
+                        : Colors.grey[300],
+                    border: isActive && !isCompleted
+                        ? Border.all(
+                      color: step['color'] as Color,
+                      width: 2,
+                    )
+                        : null,
+                  ),
+                  child: Center(
+                    child: isCompleted
+                        ? const Icon(
+                      Icons.check,
+                      size: 16,
+                      color: Colors.white,
+                    )
+                        : Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isActive
+                            ? step['color'] as Color
+                            : Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isLast)
+                  Container(
+                    width: 2,
+                    height: 40,
+                    color: isCompleted
+                        ? (statusSteps[index + 1]['isCompleted'] as bool
+                        ? step['color'] as Color
+                        : Colors.grey[300])
+                        : Colors.grey[300],
+                  ),
+              ],
+            ),
+            const SizedBox(width: 16),
+
+            // Status info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      step['title'] as String,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: isCompleted || isActive
+                            ? Colors.black87
+                            : Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (step['date'] != null)
+                      Text(
+                        _formatStatusDate(step['date'] as DateTime),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isCompleted || isActive
+                              ? Colors.grey[600]
+                              : Colors.grey[400],
+                        ),
+                      )
+                    else
+                      Text(
+                        step['pendingText'] as String,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[400],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         );
+      }).toList(),
+    );
+  }
+
+  // NEW: Get order status steps with dates
+  List<Map<String, dynamic>> _getOrderStatusSteps(OrdersModel order) {
+    final status = order.orderStatus.toLowerCase();
+    final steps = <Map<String, dynamic>>[];
+
+    // Order Confirmed
+    steps.add({
+      'title': 'Order Confirmed',
+      'date': order.confirmedDate ?? order.orderDate,
+      'isCompleted': true,
+      'isActive': false,
+      'color': Color(0xFF8E6CEF),
+      'pendingText': 'Pending confirmation',
+    });
+
+    // To Ship
+    steps.add({
+      'title': 'Ready to Ship',
+      'date': order.toShipDate,
+      'isCompleted': order.toShipDate != null,
+      'isActive': status == 'to_ship',
+      'color': Color(0xFF8E6CEF),
+      'pendingText': 'Preparing your order',
+    });
+
+    // To Receive
+    steps.add({
+      'title': 'Shipped',
+      'date': order.toReceiveDate,
+      'isCompleted': order.toReceiveDate != null,
+      'isActive': status == 'to_receive',
+      'color': Color(0xFF8E6CEF),
+      'pendingText': 'Waiting to be shipped',
+    });
+
+    // Completed or Cancelled
+    if (status == 'cancelled' && order.cancelledDate != null) {
+      steps.add({
+        'title': 'Order Cancelled',
+        'date': order.cancelledDate,
+        'isCompleted': true,
+        'isActive': false,
+        'color': Colors.red,
+        'pendingText': '',
+      });
+    } else {
+      steps.add({
+        'title': 'Delivered',
+        'date': order.completedDate,
+        'isCompleted': order.completedDate != null,
+        'isActive': status == 'completed',
+        'color': Colors.green,
+        'pendingText': 'Out for delivery',
+      });
+    }
+
+    return steps;
+  }
+
+  // Helper method to format status dates
+  String _formatStatusDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
+    }  else {
+      return '${DateFormat('EEEE').format(date)}, ${DateFormat('MMM d, yyyy').format(date)} at ${DateFormat('h:mm a').format(date)}';
+
     }
   }
 
+  // Helper methods
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return Colors.blue;
+      case 'to_ship':
+        return Colors.orange;
+      case 'to_receive':
+        return Colors.blue[700]!;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusDisplayText(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Confirmed';
+      case 'to_ship':
+        return 'Preparing';
+      case 'to_receive':
+        return 'In Transit';
+      case 'completed':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
   Widget _buildProductsSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -290,46 +526,152 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
               }
 
               final products = productsSnapshot.data!.docs;
+              final productCount = products.length;
 
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: products.length,
-                separatorBuilder: (context, index) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: Colors.grey[200]),
+              // Show first 3 items directly
+              final visibleProducts = products.take(3).toList();
+              final hiddenProducts = productCount > 3 ? products.skip(3).toList() : <QueryDocumentSnapshot>[];
+              final hiddenFutures = hiddenProducts
+                  .map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final orderProduct = _controller.createOrderProductFromDocument(data);
+                return _controller.getProductDocument(orderProduct.productID).then((productDoc) => {
+                  'orderProduct': orderProduct,
+                  'productData': productDoc.data() as Map<String, dynamic>?,
+                });
+              })
+                  .toList();
+              return Column(
+                children: [
+                  // Always visible products (first 3)
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: visibleProducts.length,
+                    separatorBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: Colors.grey[200]),
+                    ),
+                    itemBuilder: (context, index) {
+                      final data = visibleProducts[index].data() as Map<String, dynamic>;
+                      final orderProduct = _controller.createOrderProductFromDocument(data);
+                      final productRef = orderProduct.productID;
+
+                      return FutureBuilder<DocumentSnapshot>(
+                        future: _controller.getProductDocument(productRef),
+                        builder: (context, productSnapshot) {
+                          if (!productSnapshot.hasData) {
+                            return const SizedBox(
+                              height: 80,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF8E6CEF),
+                                ),
+                              ),
+                            );
+                          }
+                          final product = productSnapshot.data!.data() as Map<String, dynamic>?;
+                          final productURL = _controller.extractProductImageUrl(product);
+                          final productName = _controller.extractProductName(product);
+                          return _buildProductItem(orderProduct, productURL, productName);
+                        },
+                      );
+                    },
+                  ),
+
+                  // Expandable section for additional items
+                  if (hiddenFutures.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: Colors.grey[200]),
+                    ),
+                    _buildExpandableItemsSection(hiddenFutures),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandableItemsSection(List<Future<Map<String, dynamic>>> futureProducts) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isProductsExpanded,
+      builder: (context, expanded, _) {
+        return Column(
+          children: [
+            if (!expanded) // ✅ Show toggle button only if not expanded
+              InkWell(
+                onTap: () => _isProductsExpanded.value = true,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8E6CEF).withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF8E6CEF).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'Show More Items',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF8E6CEF),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Color(0xFF8E6CEF),
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ),
-                itemBuilder: (context, index) {
-                  final data = products[index].data() as Map<String, dynamic>;
-                  final orderProduct = _controller.createOrderProductFromDocument(data);
-                  final productRef = orderProduct.productID;
+              ),
 
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: _controller.getProductDocument(productRef),
-                    builder: (context, productSnapshot) {
-                      if (!productSnapshot.hasData) {
-                        return const SizedBox(
-                          height: 80,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFF8E6CEF),
-                            ),
-                          ),
-                        );
-                      }
-                      final product = productSnapshot.data!.data() as Map<String, dynamic>?;
+            // Expandable product section
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: FutureBuilder<List<Map<String, dynamic>>>(
+                future: Future.wait(futureProducts),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  }
+                  final loaded = snapshot.data!;
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: loaded.length,
+                    separatorBuilder: (_, __) => Divider(color: Colors.grey[200]),
+                    itemBuilder: (context, index) {
+                      final orderProduct = loaded[index]['orderProduct'];
+                      final product = loaded[index]['productData'];
                       final productURL = _controller.extractProductImageUrl(product);
                       final productName = _controller.extractProductName(product);
                       return _buildProductItem(orderProduct, productURL, productName);
                     },
                   );
                 },
-              );
-            },
-          ),
-        ],
-      ),
+              ),
+              crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -619,7 +961,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                 _buildInfoRow(
                   icon: Icons.person_outline,
                   label: 'Recipient',
-                  value: fullName.isNotEmpty ? fullName : 'No name provided',
+                  value: fullName.isNotEmpty ? fullName : 'Unknown',
                   iconColor: const Color(0xFF8E6CEF),
                   isHighlighted: true,
                 ),
