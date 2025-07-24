@@ -266,7 +266,7 @@ class OrderDetailsDialog {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Payment Status', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            Text('Payment Info', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,

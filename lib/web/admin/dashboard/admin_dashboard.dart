@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../widget/blinkingdot.dart';
 import '../widget/topbar.dart';
 import 'admin_dashboard_controller.dart';
 import 'chart_painter.dart';
@@ -199,6 +200,55 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
 
           const Spacer(),
+
+          InkWell(
+            onTap: () {
+              // TODO: Navigate to overdue orders page or show dialog
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${data!.overdueOrders} overdue orders need attention'),
+                  action: SnackBarAction(
+                    label: 'View',
+                    onPressed: () {
+                      // Navigate to orders page with overdue filter
+                    },
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(20),
+                border: data!.overdueOrders > 0
+                    ? Border.all(color: Colors.orange[200]!, width: 1)
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Overdue Orders: ${data!.overdueOrders}',
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (data!.overdueOrders > 0) ...[
+                    const SizedBox(width: 4),
+                    const BlinkingDot(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
 
           // Total Customers Indicator
           Container(
@@ -430,15 +480,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Icons.cancel,
             Colors.red,
             subtitle: 'Order cancelled',
-          ),
-          const SizedBox(width: 20),
-          _buildStatCard(
-            'Overdue',
-            '${data!.cancelledOrders}',
-            0,
-            Icons.cancel,
-            Colors.red,
-            subtitle: 'Overdue To Ship Orders',
           ),
         ],
       )

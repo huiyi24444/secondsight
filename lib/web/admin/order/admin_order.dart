@@ -1,4 +1,4 @@
-// lib/view/admin/order_management_view.dart
+// admin_order.dart (Enhanced UI)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -55,6 +55,9 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                   child: Column(
                     children: [
                       const CustomTopBar(title: 'Order Management'),
+                      // Overdue Alert Banner
+                      if (controller.overdueOrdersCount > 0)
+                        _buildOverdueAlertBanner(controller),
                       Expanded(
                         child: Container(
                           margin: const EdgeInsets.all(20),
@@ -72,6 +75,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                           child: Column(
                             children: [
                               _buildHeader(controller),
+                              _buildFilterAndSortBar(controller),
                               _buildFilterTabs(controller),
                               const SizedBox(height: 20),
                               _buildOrdersList(controller),
@@ -91,6 +95,41 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
+  Widget _buildOverdueAlertBanner(OrderManagementController controller) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      color: Colors.orange[50],
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+          const SizedBox(width: 10),
+          Text(
+            '${controller.overdueOrdersCount} overdue orders need immediate attention',
+            style: TextStyle(
+              color: Colors.orange[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: () {
+              controller.setSelectedTab('To Ship');
+              controller.toggleOverdueOnly();
+            },
+            child: Text(
+              'View Overdue Orders',
+              style: TextStyle(
+                color: Colors.orange[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader(OrderManagementController controller) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -100,7 +139,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
             child: TextField(
               controller: controller.searchController,
               decoration: InputDecoration(
-                hintText: 'Search order...',
+                hintText: 'Search order or customer...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -126,14 +165,117 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
-  Widget _buildFilterTabs(OrderManagementController controller) {
+  Widget _buildFilterAndSortBar(OrderManagementController controller) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
+          // Overdue Toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: controller.showOverdueOnly ? Colors.orange[100] : Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+              border: controller.showOverdueOnly
+                  ? Border.all(color: Colors.orange[300]!)
+                  : null,
+            ),
+            child: InkWell(
+              onTap: controller.toggleOverdueOnly,
+              borderRadius: BorderRadius.circular(20),
+              child: Row(
+                children: [
+                  Icon(
+                    controller.showOverdueOnly
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    size: 16,
+                    color: controller.showOverdueOnly
+                        ? Colors.orange[700]
+                        : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Show Overdue Only',
+                    style: TextStyle(
+                      color: controller.showOverdueOnly
+                          ? Colors.orange[700]
+                          : Colors.grey[700],
+                      fontWeight: controller.showOverdueOnly
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Sort Dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButton<SortOption>(
+              value: controller.currentSort,
+              underline: const SizedBox(),
+              isDense: true,
+              icon: Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+              style: TextStyle(color: Colors.grey[700], fontSize: 13),
+              onChanged: (value) {
+                if (value != null) controller.setSortOption(value);
+              },
+              items: const [
+                DropdownMenuItem(
+                  value: SortOption.overdueFirst,
+                  child: Row(
+                    children: [
+                      Icon(Icons.priority_high, size: 16, color: Colors.orange),
+                      SizedBox(width: 6),
+                      Text('Overdue First'),
+                    ],
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: SortOption.dateNewest,
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule, size: 16, color: Colors.grey),
+                      SizedBox(width: 6),
+                      Text('Newest First'),
+                    ],
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: SortOption.dateOldest,
+                  child: Row(
+                    children: [
+                      Icon(Icons.history, size: 16, color: Colors.grey),
+                      SizedBox(width: 6),
+                      Text('Oldest First'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterTabs(OrderManagementController controller) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20).copyWith(top: 10),
+      child: Row(
+        children: [
           _buildFilterTab('All', controller.selectedTab == 'All', controller),
           const SizedBox(width: 20),
-          _buildFilterTab('To Ship', controller.selectedTab == 'To Ship', controller),
+          _buildFilterTab('To Ship', controller.selectedTab == 'To Ship', controller,
+              showBadge: controller.overdueOrdersCount > 0),
           const SizedBox(width: 20),
           _buildFilterTab('To Receive', controller.selectedTab == 'To Receive', controller),
           const SizedBox(width: 20),
@@ -145,7 +287,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
-  Widget _buildFilterTab(String title, bool isActive, OrderManagementController controller) {
+  Widget _buildFilterTab(String title, bool isActive, OrderManagementController controller, {bool showBadge = false}) {
     return InkWell(
       onTap: () => controller.setSelectedTab(title),
       child: Container(
@@ -158,12 +300,34 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
             ),
           ),
         ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? const Color(0xFF7C3AED) : Colors.grey[600],
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: isActive ? const Color(0xFF7C3AED) : Colors.grey[600],
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            if (showBadge && title == 'To Ship') ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${controller.overdueOrdersCount}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -173,6 +337,22 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     return Expanded(
       child: controller.isLoading
           ? const Center(child: CircularProgressIndicator())
+          : controller.filteredOrders.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              controller.showOverdueOnly
+                  ? 'No overdue orders found'
+                  : 'No orders found',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+          ],
+        ),
+      )
           : SingleChildScrollView(
         child: Column(
           children: controller.currentOrders.map((order) {
@@ -186,13 +366,19 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   Widget _buildOrderCard(OrdersModel order, OrderManagementController controller) {
     final products = controller.orderProducts[order.id] ?? [];
     final isExpanded = controller.isOrderExpanded(order.id);
+    final isOverdue = controller.isOrderOverdue(order);
+    final daysOverdue = controller.getDaysOverdue(order);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: isOverdue ? Colors.grey[200]! : Colors.grey[200]!,
+          width: isOverdue ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
+        color: isOverdue ? Colors.white : Colors.white,
       ),
       child: Column(
         children: [
@@ -203,6 +389,22 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
+                  // Overdue indicator
+                  if (isOverdue) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.priority_high,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
                     color: Colors.grey[600],
@@ -213,12 +415,34 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '#${order.shortOrderId}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              '#${order.shortOrderId}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (isOverdue) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${daysOverdue}d overdue',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -235,7 +459,9 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                     flex: 2,
                     child: Text(
                       controller.formatDate(order.orderDate),
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -310,9 +536,9 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
         }
       },
       itemBuilder: (BuildContext context) => [
-        const PopupMenuItem(value: 'pending', child: Text('Mark as Pending')),
-        const PopupMenuItem(value: 'processing', child: Text('Mark as Processing')),
-        const PopupMenuItem(value: 'delivered', child: Text('Mark as Delivered')),
+        const PopupMenuItem(value: 'to_ship', child: Text('Mark as To Ship')),
+        const PopupMenuItem(value: 'to_receive', child: Text('Mark as To Receive')),
+        const PopupMenuItem(value: 'completed', child: Text('Mark as Completed')),
         const PopupMenuItem(value: 'cancelled', child: Text('Mark as Cancelled')),
         const PopupMenuDivider(),
         const PopupMenuItem(

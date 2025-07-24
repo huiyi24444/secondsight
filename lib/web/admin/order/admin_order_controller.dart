@@ -1,4 +1,4 @@
-// lib/controller/admin/order_management_controller.dart
+// admin_order_controller.dart (Enhanced version)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,6 +22,10 @@ class OrderManagementController extends ChangeNotifier {
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
+  // New properties for overdue functionality
+  bool _showOverdueOnly = false;
+  SortOption _currentSort = SortOption.dateNewest;
+
   // Getters
   List<OrdersModel> get orders => _orders;
   List<OrdersModel> get filteredOrders => _filteredOrders;
@@ -33,11 +37,16 @@ class OrderManagementController extends ChangeNotifier {
   String get selectedTab => _selectedTab;
   int get currentPage => _currentPage;
   int get itemsPerPage => _itemsPerPage;
+  bool get showOverdueOnly => _showOverdueOnly;
+  SortOption get currentSort => _currentSort;
 
   // Computed properties
   int get totalPages => (_filteredOrders.length / _itemsPerPage).ceil();
   int get startIndex => (_currentPage - 1) * _itemsPerPage;
   int get endIndex => startIndex + _itemsPerPage;
+
+  // New computed property for overdue count
+  int get overdueOrdersCount => _orders.where((order) => isOrderOverdue(order)).length;
 
   List<OrdersModel> get currentOrders => _filteredOrders.sublist(
     startIndex,
@@ -51,6 +60,26 @@ class OrderManagementController extends ChangeNotifier {
 
   void _onSearchChanged() {
     filterOrders();
+  }
+
+  // Check if an order is overdue
+  bool isOrderOverdue(OrdersModel order) {
+    if (order.orderStatus.toLowerCase() != 'to_ship') return false;
+
+    final today = DateTime.now();
+    final orderDateOnly = DateTime(order.orderDate.year, order.orderDate.month, order.orderDate.day);
+    final todayDateOnly = DateTime(today.year, today.month, today.day);
+
+    return orderDateOnly.isBefore(todayDateOnly);
+  }
+
+  // Get days overdue
+  int getDaysOverdue(OrdersModel order) {
+    if (!isOrderOverdue(order)) return 0;
+
+    final today = DateTime.now();
+    final difference = today.difference(order.orderDate);
+    return difference.inDays;
   }
 
   Future<void> loadOrders() async {
@@ -103,7 +132,6 @@ class OrderManagementController extends ChangeNotifier {
         }
       }
 
-      loadedOrders.sort((a, b) => b.orderDate.compareTo(a.orderDate)); // Sort newest to oldest
       _orders = loadedOrders;
       _customerNames = customerNameMap;
       _orderProducts = orderProductsMap;
@@ -147,13 +175,49 @@ class OrderManagementController extends ChangeNotifier {
     if (searchController.text.isNotEmpty) {
       final search = searchController.text.toLowerCase();
       filtered = filtered.where((order) =>
-          order.shortOrderId.toLowerCase().contains(search)
+      order.shortOrderId.toLowerCase().contains(search) ||
+          (_customerNames[order.customerId] ?? '').toLowerCase().contains(search)
       ).toList();
+    }
+
+    // Filter overdue only if toggle is on
+    if (_showOverdueOnly) {
+      filtered = filtered.where((order) => isOrderOverdue(order)).toList();
+    }
+
+    // Apply sorting
+    switch (_currentSort) {
+      case SortOption.dateNewest:
+        filtered.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+        break;
+      case SortOption.dateOldest:
+        filtered.sort((a, b) => a.orderDate.compareTo(b.orderDate));
+        break;
+      case SortOption.overdueFirst:
+        filtered.sort((a, b) {
+          final aOverdue = isOrderOverdue(a);
+          final bOverdue = isOrderOverdue(b);
+          if (aOverdue && !bOverdue) return -1;
+          if (!aOverdue && bOverdue) return 1;
+          // If both overdue or both not overdue, sort by date
+          return b.orderDate.compareTo(a.orderDate);
+        });
+        break;
     }
 
     _filteredOrders = filtered;
     _currentPage = 1;
     notifyListeners();
+  }
+
+  void toggleOverdueOnly() {
+    _showOverdueOnly = !_showOverdueOnly;
+    filterOrders();
+  }
+
+  void setSortOption(SortOption option) {
+    _currentSort = option;
+    filterOrders();
   }
 
   void setSelectedTab(String tab) {
@@ -236,5 +300,26 @@ class OrderManagementController extends ChangeNotifier {
     searchController.removeListener(_onSearchChanged);
     searchController.dispose();
     super.dispose();
+  }
+}
+
+// Add this enum for sort options
+enum SortOption {
+  dateNewest,
+  dateOldest,
+  overdueFirst,
+}
+
+// Extension to add copyWith method to OrdersModel
+extension OrdersModelExtension on OrdersModel {
+  OrdersModel copyWith({String? customerId}) {
+    return OrdersModel(
+      id: this.id,
+      orderDate: this.orderDate,
+      orderStatus: this.orderStatus,
+      totalAmount: this.totalAmount,
+      eligibilityForReturn: this.eligibilityForReturn,
+      shipmentID: this.shipmentID,
+    );
   }
 }

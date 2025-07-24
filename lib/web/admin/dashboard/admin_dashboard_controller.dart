@@ -107,16 +107,21 @@ class AdminDashboardController {
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
 
-      final overdue = allToShipOrders
-          .where((order) {
+      // Calculate overdue orders (to_ship orders that are not from today)
+      int overdue = allToShipOrders.where((order) {
         final orderDate = order.orderDate;
-        final orderStartOfDay = DateTime(orderDate.year, orderDate.month, orderDate.day);
-        final todayStartOfDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        print('🔍 Checking order ID: ${order.id}, orderDate: $orderDate');
+        // Check if the order date is before today (not including today)
+        final orderDateOnly = DateTime(orderDate.year, orderDate.month, orderDate.day);
+        final todayDateOnly = DateTime(todayStart.year, todayStart.month, todayStart.day);
+        print('📅 orderDateOnly: $orderDateOnly, todayDateOnly: $todayDateOnly');
+        print('⏱️ isOverdue: ${orderDateOnly.isBefore(todayDateOnly)}');
 
-        // Return true if the order date is before today
-        return orderStartOfDay.isBefore(todayStartOfDay);
-      })
-          .length;
+        return orderDateOnly.isBefore(todayDateOnly);
+      }).length;
+      print('🔢 Total Overdue Orders: $overdue');
+
+
       // Calculate changes
       int revenueChange = revenue > 0 && previousRevenue > 0
           ? ((revenue - previousRevenue) / previousRevenue * 100).round()
