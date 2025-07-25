@@ -502,14 +502,18 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.visibility_outlined),
-                    onPressed: () => OrderDetailsDialog.show(
+                    onPressed: () => Navigator.push(
                       context,
-                      order: order,
-                      products: controller.orderProducts[order.id] ?? [],
-                      productDetails: controller.productDetails,
-                      customerNames: controller.customerNames,
-                      firestore: FirebaseFirestore.instance,
-                      onOrdersReload: controller.loadOrders,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsPage(
+                          order: order,
+                          products: controller.orderProducts[order.id] ?? [],
+                          productDetails: controller.productDetails,
+                          customerNames: controller.customerNames,
+                          firestore: FirebaseFirestore.instance,
+                          onOrdersReload: controller.loadOrders,
+                        ),
+                      ),
                     ),
                     tooltip: 'View Details',
                   ),

@@ -1,4 +1,4 @@
-// FILE: order_details_dialog.dart
+// FILE: order_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -7,36 +7,68 @@ import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
 import '../../../model/payment_cards_model.dart';
+import '../widget/topbar.dart';
 
-class OrderDetailsDialog {
+class OrderDetailsPage extends StatefulWidget {
+  final OrdersModel order;
+  final List<OrderProductModel> products;
+  final Map<String, Map<String, dynamic>> productDetails;
+  final Map<String, String> customerNames;
+  final FirebaseFirestore firestore;
+  final Future<void> Function() onOrdersReload;
+
+  const OrderDetailsPage({
+    Key? key,
+    required this.order,
+    required this.products,
+    required this.productDetails,
+    required this.customerNames,
+    required this.firestore,
+    required this.onOrdersReload,
+  }) : super(key: key);
+
+  @override
+  State<OrderDetailsPage> createState() => _OrderDetailsPageState();
+}
+
+class _OrderDetailsPageState extends State<OrderDetailsPage> {
+  late String currentStatus;
+  ShipmentModel? shipment;
+  PaymentCard? paymentCard;
+  bool isLoading = true;
+
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
     'to_ship': ['to_receive', 'canceled'],
     'to_receive': ['completed', 'canceled'],
-    'completed': [], // No transitions allowed
-    'canceled': [], // No transitions allowed
+    'completed': [],
+    'canceled': [],
   };
 
-  static Future<void> show(
-      BuildContext context, {
-        required OrdersModel order,
-        required List<OrderProductModel> products,
-        required Map<String, Map<String, dynamic>> productDetails,
-        required Map<String, String> customerNames,
-        required FirebaseFirestore firestore,
-        required Future<void> Function() onOrdersReload,
-      }) async {
-    String currentStatus = order.orderStatus;
-    print('Fetching shipment for orderId: ${order.id}, customerId: ${order.customerId}');
+  @override
+  void initState() {
+    super.initState();
+    currentStatus = widget.order.orderStatus;
+    _loadOrderData();
+  }
 
-    // Fetch shipment information
-    ShipmentModel? shipment;
+  Future<void> _loadOrderData() async {
+    await Future.wait([
+      _fetchShipmentData(),
+      _fetchPaymentData(),
+    ]);
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  Future<void> _fetchShipmentData() async {
     try {
-      final shipmentSnapshot = await firestore
+      final shipmentSnapshot = await widget.firestore
           .collection('users')
-          .doc(order.customerId)
+          .doc(widget.order.customerId)
           .collection('order')
-          .doc(order.id)
+          .doc(widget.order.id)
           .collection('shipment')
           .get();
       if (shipmentSnapshot.docs.isNotEmpty) {
@@ -48,14 +80,14 @@ class OrderDetailsDialog {
     } catch (e) {
       debugPrint('Error fetching shipment: $e');
     }
+  }
 
-    // Fetch payment card information
-    PaymentCard? paymentCard;
+  Future<void> _fetchPaymentData() async {
     try {
-      if (order.payment != null && order.payment != 'Pending') {
-        final paymentMethodsSnapshot = await firestore
+      if (widget.order.payment != null && widget.order.payment != 'Pending') {
+        final paymentMethodsSnapshot = await widget.firestore
             .collection('users')
-            .doc(order.customerId)
+            .doc(widget.order.customerId)
             .collection('paymentMethods')
             .get();
 
@@ -76,346 +108,498 @@ class OrderDetailsDialog {
     } catch (e) {
       debugPrint('Error fetching payment card: $e');
     }
+  }
 
-    await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                width: 900,
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: Row(
+        children: [
+          // Sidebar
+          _buildSidebar(),
+          // Main Content
+          Expanded(
+            child: Column(
+              children: [
+
+                // Top Bar
+                CustomTopBar(
+                  title: 'Order',
+                  subtitle: 'Order Details',
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                // Content Area
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0), // optional spacing
+                    child: _buildBody(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildBody() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left Column - Main Content (70%)
+          Expanded(
+            flex: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMainOrderInfo(),
+                const SizedBox(height: 32),
+                _buildProductsSection(),
+                const SizedBox(height: 32),
+                _buildOrderTimeline(),
+              ],
+            ),
+          ),
+          const SizedBox(width: 32),
+          // Right Column - Supporting Details (30%)
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildOrderSummaryCard(),
+                const SizedBox(height: 24),
+                _buildPaymentInfoCard(),
+                const SizedBox(height: 24),
+                if (shipment != null) _buildShipmentInfoCard(),
+                const SizedBox(width: 24),
+                _buildCustomerInfoCard(),
+                const SizedBox(width: 24),
+                _buildDeleteButton(),
+                const SizedBox(width: 24),
+                Row(
                   children: [
-                    // Enhanced Header with gradient background
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF7C3AED).withOpacity(0.1),
-                            const Color(0xFF7C3AED).withOpacity(0.05),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
+                    Text(
+                      'Order #${widget.order.shortOrderId}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Order #${order.shortOrderId}',
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text('Customer: ${customerNames[order.customerId] ?? 'Unknown'}',
-                                  style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-                            ],
-                          ),
-                          Row(
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: OrderStatusUtils.getStatusColor(currentStatus).withOpacity(0.1),
+                        border: Border.all(color: OrderStatusUtils.getStatusColor(currentStatus)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String>(
+                        value: currentStatus,
+                        underline: const SizedBox(),
+                        isDense: true,
+                        items: _getAvailableStatuses(currentStatus)
+                            .map((status) => DropdownMenuItem(
+                          value: status,
+                          child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(right: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  border: Border.all(color: Colors.grey[300]!),
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: DropdownButton<String>(
-                                  value: currentStatus,
-                                  underline: const SizedBox(),
-                                  isDense: true,
-                                  items: _getAvailableStatuses(currentStatus)
-                                      .map((status) => DropdownMenuItem(
-                                    value: status,
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          margin: const EdgeInsets.only(right: 8),
-                                          decoration: BoxDecoration(
-                                            color: OrderStatusUtils.getStatusColor(status),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        Text(OrderStatusUtils.formatStatus(status)),
-                                      ],
-                                    ),
-                                  ))
-                                      .toList(),
-                                  onChanged: (newStatus) async {
-                                    if (newStatus != null && newStatus != currentStatus) {
-                                      if (!_isTransitionAllowed(currentStatus, newStatus)) {
-                                        _showTransitionError(context, currentStatus, newStatus);
-                                        return;
-                                      }
-
-                                      bool proceedWithUpdate = false;
-                                      switch ('$currentStatus->$newStatus') {
-                                        case 'to_ship->to_receive':
-                                          proceedWithUpdate = await _handleShipToReceive(
-                                              context, order, shipment, firestore
-                                          );
-                                          break;
-                                        case 'to_receive->completed':
-                                          proceedWithUpdate = await _handleReceiveToCompleted(
-                                              context, order, firestore
-                                          );
-                                          break;
-                                        case 'to_ship->canceled':
-                                        case 'to_receive->canceled':
-                                          proceedWithUpdate = await _handleCancellation(
-                                              context, order, currentStatus, firestore
-                                          );
-                                          break;
-                                        default:
-                                          proceedWithUpdate = true;
-                                      }
-                                      if (proceedWithUpdate) {
-                                        setState(() => currentStatus = newStatus);
-                                        await updateOrderStatus(order, newStatus, firestore, onOrdersReload, context);
-                                        if (newStatus == 'to_receive') {
-                                          await _refreshShipmentData(setState, firestore, order);
-                                        }
-                                      }
-                                    }
-                                  },
+                                  color: OrderStatusUtils.getStatusColor(status),
+                                  shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () => Navigator.pop(context),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(Icons.close, size: 20),
-                                  ),
-                                ),
-                              ),
+                              Text(OrderStatusUtils.formatStatus(status)),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-
-                    // Scrollable content
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Enhanced Order Info Cards
-                            _buildEnhancedOrderInfoRow(order, paymentCard, context),
-
-                            const SizedBox(height: 24),
-
-                            // Status Timeline Section
-                            _buildStatusTimeline(order),
-
-                            if (shipment != null) ...[
-                              const SizedBox(height: 24),
-                              _buildShipmentInfo(shipment!),
-                            ],
-
-                            const SizedBox(height: 24),
-
-                            // Products Section with icon
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 20,
-                                    color: Colors.purple,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Products (${products.length})',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _buildProductList(products, productDetails),
-
-                            const SizedBox(height: 24),
-
-                            // Total Amount Card
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF7C3AED).withOpacity(0.1),
-                                    const Color(0xFF7C3AED).withOpacity(0.05),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFF7C3AED).withOpacity(0.2),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF7C3AED).withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: const Icon(
-                                          Icons.account_balance_wallet,
-                                          color: Color(0xFF7C3AED),
-                                          size: 24,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Total Amount',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'RM ${order.totalAmount.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF7C3AED),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Action Buttons Section
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _buildDeleteButton(context, firestore, order, onOrdersReload),
-                        ],
+                        ))
+                            .toList(),
+                        onChanged: _handleStatusChange,
                       ),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-        );
-      },
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-
-  // Enhanced Order Info Row with modern card design
-  static Widget _buildEnhancedOrderInfoRow(OrdersModel order, PaymentCard? paymentCard, BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.calendar_today,
-            iconColor: Colors.blue,
-            label: 'Order Date',
-            value: _formatDate(order.orderDate),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildPaymentInfoCard(order, paymentCard, context),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildInfoCard(
-            icon: Icons.assignment_return,
-            iconColor: order.eligibilityForReturn ? Colors.green : Colors.red,
-            label: 'Return Eligible',
-            value: order.eligibilityForReturn ? 'Yes' : 'No',
-            valueColor: order.eligibilityForReturn ? Colors.green : Colors.red,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Enhanced info card widget
-  static Widget _buildInfoCard({
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required String value,
-    Color? valueColor,
-  }) {
+  Widget _buildMainOrderInfo() {
     return Container(
-      height: 120,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.receipt_long,
+                  color: Color(0xFF7C3AED),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Order Information',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoTile(
+                  'Order Date',
+                  _formatDate(widget.order.orderDate),
+                  Icons.calendar_today,
+                  Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildInfoTile(
+                  'Customer',
+                  widget.customerNames[widget.order.customerId] ?? 'Unknown',
+                  Icons.person,
+                  Colors.green,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildInfoTile(
+                  'Return Eligible',
+                  widget.order.eligibilityForReturn ? 'Yes' : 'No',
+                  Icons.assignment_return,
+                  widget.order.eligibilityForReturn ? Colors.green : Colors.red,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTile(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsSection() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.inventory_2,
+                  color: Colors.orange,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Products (${widget.products.length})',
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: widget.products.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final product = widget.products[index];
+              final productId = (product.productID as DocumentReference).id;
+              final details = widget.productDetails[productId] ?? {};
+              final imageUrl = details['imageUrl'] as String?;
+              final productName = details['name'] as String? ?? 'Unknown Product';
+
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: (imageUrl?.isNotEmpty ?? false)
+                          ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.image, color: Colors.grey),
+                        ),
+                      )
+                          : const Icon(Icons.image, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            productName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Quantity: ${product.productQuantity}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (product.productQuantity > 1)
+                            Text(
+                              'RM ${product.price.toStringAsFixed(2)} each',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      'RM ${product.totalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderTimeline() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.timeline,
+                  color: Colors.blue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'Order Timeline',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Column(
+            children: _buildTimelineItems(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Right Column Cards - Smaller and more compact
+  Widget _buildOrderSummaryCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF7C3AED).withOpacity(0.1),
+            const Color(0xFF7C3AED).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF7C3AED).withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: Color(0xFF7C3AED),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Order Total',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'RM ${widget.order.totalAmount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF7C3AED),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
@@ -432,383 +616,212 @@ class OrderDetailsDialog {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
+                child: const Icon(
+                  Icons.payment,
+                  color: Colors.green,
                   size: 18,
-                  color: iconColor,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
+              const SizedBox(width: 12),
+              const Text(
+                'Payment',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
+            widget.order.payment ?? 'Pending',
+            style: const TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: valueColor,
             ),
-            overflow: TextOverflow.ellipsis,
+          ),
+          if (paymentCard != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '•••• •••• •••• ${paymentCard!.lastFour}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShipmentInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.local_shipping,
+                  color: Colors.blue,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Shipment',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (shipment?.trackingNumber?.isNotEmpty ?? false) ...[
+            Text(
+              'Tracking: ${shipment!.trackingNumber!}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (shipment?.shippedDate != null) ...[
+            Text(
+              'Shipped: ${_formatDate(shipment!.shippedDate!)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Not yet shipped',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.orange[600],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          if (shipment?.fullName?.isNotEmpty ?? false) ...[
+            Text(
+              'To: ${shipment!.fullName!}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.purple,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Customer',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.customerNames[widget.order.customerId] ?? 'Unknown Customer',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'ID: ${widget.order.customerId}',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey[500],
+              fontFamily: 'monospace',
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Enhanced payment info card
-  static Widget _buildPaymentInfoCard(OrdersModel order, PaymentCard? paymentCard, BuildContext context) {
-    final paymentStatus = order.payment ?? 'Pending';
-    final hasPaymentDetails = paymentCard != null;
-
-    return GestureDetector(
-      onTap: hasPaymentDetails ? () => _showPaymentDetailsDialog(context, order, paymentCard) : null,
-      child: Container(
-        height: 120,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: hasPaymentDetails ? Colors.blue[50] : Colors.white,
-          border: Border.all(color: hasPaymentDetails ? Colors.blue[200]! : Colors.grey[200]!),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.payment,
-                    size: 18,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Payment Info',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (hasPaymentDetails) ...[
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: Colors.blue[600],
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              paymentStatus,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: hasPaymentDetails ? Colors.blue[700] : null,
-              ),
-            ),
-            if (hasPaymentDetails)
-              Text(
-                'Tap for details',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.blue[600],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Enhanced shipment info section
-  static Widget _buildShipmentInfo(ShipmentModel shipment) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.local_shipping,
-                size: 20,
-                color: Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Shipment Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[200]!),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildShipmentDetailRow(
-                'Tracking Number',
-                shipment.trackingNumber?.isNotEmpty ?? false
-                    ? shipment.trackingNumber!
-                    : 'Not yet provided',
-                shipment.trackingNumber?.isNotEmpty ?? false ? null : Colors.orange,
-              ),
-              const SizedBox(height: 12),
-              _buildShipmentDetailRow(
-                'Shipped Date',
-                shipment.shippedDate != null
-                    ? _formatDate(shipment.shippedDate!)
-                    : 'Not yet shipped',
-                shipment.shippedDate != null ? null : Colors.orange,
-              ),
-              const SizedBox(height: 12),
-              _buildShipmentDetailRow(
-                'Recipient',
-                shipment.fullName?.isNotEmpty ?? false
-                    ? shipment.fullName!
-                    : 'Missing name',
-                shipment.fullName?.isNotEmpty ?? false ? null : Colors.red,
-              ),
-              const SizedBox(height: 12),
-              _buildShipmentDetailRow(
-                'Phone',
-                shipment.phoneNum != null && shipment.phoneNum! > 0
-                    ? shipment.phoneNum.toString()
-                    : 'Missing or invalid number',
-                shipment.phoneNum != null && shipment.phoneNum! > 0 ? null : Colors.red,
-              ),
-              const SizedBox(height: 12),
-              _buildShipmentDetailRow(
-                'Shipping Address',
-                _buildFullAddress(shipment),
-                _isAddressValid(shipment) ? null : Colors.red,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget _buildShipmentDetailRow(String label, String value, Color? valueColor) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              color: valueColor ?? Colors.grey[800],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  static String _buildFullAddress(ShipmentModel shipment) {
-    if (_isAddressValid(shipment)) {
-      return [
-        shipment.streetone,
-        shipment.streettwo,
-        shipment.city,
-        shipment.state,
-        shipment.zipCode,
-      ]
-          .where((part) => part != null && part!.trim().isNotEmpty)
-          .join(', ');
-    }
-    return 'Missing or invalid address data';
-  }
-
-  static bool _isAddressValid(ShipmentModel shipment) {
-    return (shipment.streetone?.isNotEmpty ?? false) &&
-        (shipment.city?.isNotEmpty ?? false) &&
-        (shipment.state?.isNotEmpty ?? false) &&
-        (shipment.zipCode?.isNotEmpty ?? false);
-  }
-
-  // Enhanced product list
-  static Widget _buildProductList(List<OrderProductModel> products, Map<String, Map<String, dynamic>> productDetails) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 300),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final product = products[index];
-          final productId = (product.productID as DocumentReference).id;
-          final details = productDetails[productId] ?? {};
-          final imageUrl = details['imageUrl'] as String?;
-          final productName = details['name'] as String? ?? 'Unknown Product';
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey[200]!),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: (imageUrl?.isNotEmpty ?? false)
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.image, color: Colors.grey),
-                    ),
-                  )
-                      : const Icon(Icons.image, color: Colors.grey),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        productName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Quantity: ${product.productQuantity}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'RM ${product.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF7C3AED),
-                      ),
-                    ),
-                    if (product.productQuantity > 1)
-                      Text(
-                        'RM ${product.price.toStringAsFixed(2)} each',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // Enhanced delete button
-  static Widget _buildDeleteButton(BuildContext context, FirebaseFirestore firestore,
-      OrdersModel order, Future<void> Function() reloadCallback) {
+  Widget _buildDeleteButton() {
     return TextButton.icon(
       onPressed: () {
-        if (order.orderStatus == 'completed' || order.orderStatus == 'to_receive') {
+        if (widget.order.orderStatus == 'completed' || widget.order.orderStatus == 'to_receive') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Cannot delete ${OrderStatusUtils.formatStatus(order.orderStatus)} orders'),
+              content: Text('Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders'),
               backgroundColor: Colors.red,
             ),
           );
           return;
         }
-        _showDeleteConfirmationDialog(context, firestore, order, reloadCallback);
+        _showDeleteConfirmationDialog();
       },
       icon: const Icon(Icons.delete_outline, size: 18),
       label: const Text('Delete Order'),
@@ -822,197 +835,14 @@ class OrderDetailsDialog {
     );
   }
 
-  static void _showDeleteConfirmationDialog(BuildContext context, FirebaseFirestore firestore,
-      OrdersModel order, Future<void> Function() reloadCallback) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_outline,
-                  size: 48,
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Delete Order',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Are you sure you want to delete this order?',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.red.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: 20,
-                      color: Colors.red[700],
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This action cannot be undone.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.red[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.grey[300]!),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        Navigator.pop(context);
-                        try {
-                          await firestore
-                              .collection('users')
-                              .doc(order.customerId)
-                              .collection('order')
-                              .doc(order.id)
-                              .delete();
-                          await reloadCallback();
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error deleting order: $e'))
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Delete Order'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // New method to build status timeline
-  static Widget _buildStatusTimeline(OrdersModel order) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.timeline,
-                size: 20,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Order Timeline',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: _buildTimelineItems(order),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Build timeline items based on order status dates
-  static List<Widget> _buildTimelineItems(OrdersModel order) {
+  // Timeline helper methods
+  List<Widget> _buildTimelineItems() {
     List<Widget> timelineItems = [];
 
     // Order Created (always present)
     timelineItems.add(_buildTimelineItem(
       'Order Created',
-      order.orderDate,
+      widget.order.orderDate,
       Icons.shopping_cart,
       Colors.grey[700]!,
       isCompleted: true,
@@ -1020,15 +850,15 @@ class OrderDetailsDialog {
     ));
 
     // Order Confirmed
-    if (order.confirmedDate != null) {
+    if (widget.order.confirmedDate != null) {
       timelineItems.add(_buildTimelineItem(
         'Order Confirmed',
-        order.confirmedDate!,
+        widget.order.confirmedDate!,
         Icons.check_circle,
         Colors.grey[700]!,
         isCompleted: true,
       ));
-    } else if (order.orderStatus != 'canceled') {
+    } else if (widget.order.orderStatus != 'canceled') {
       timelineItems.add(_buildTimelineItem(
         'Order Confirmed',
         null,
@@ -1039,15 +869,15 @@ class OrderDetailsDialog {
     }
 
     // To Ship
-    if (order.toShipDate != null) {
+    if (widget.order.toShipDate != null) {
       timelineItems.add(_buildTimelineItem(
         'Ready to Ship',
-        order.toShipDate!,
+        widget.order.toShipDate!,
         Icons.inventory,
         Colors.grey[700]!,
         isCompleted: true,
       ));
-    } else if (['to_ship', 'to_receive', 'completed'].contains(order.orderStatus)) {
+    } else if (['to_ship', 'to_receive', 'completed'].contains(widget.order.orderStatus)) {
       timelineItems.add(_buildTimelineItem(
         'Ready to Ship',
         null,
@@ -1058,15 +888,15 @@ class OrderDetailsDialog {
     }
 
     // To Receive (Shipped)
-    if (order.toReceiveDate != null) {
+    if (widget.order.toReceiveDate != null) {
       timelineItems.add(_buildTimelineItem(
         'Shipped',
-        order.toReceiveDate!,
+        widget.order.toReceiveDate!,
         Icons.local_shipping,
         Colors.grey[700]!,
         isCompleted: true,
       ));
-    } else if (['to_receive', 'completed'].contains(order.orderStatus)) {
+    } else if (['to_receive', 'completed'].contains(widget.order.orderStatus)) {
       timelineItems.add(_buildTimelineItem(
         'Shipped',
         null,
@@ -1077,25 +907,25 @@ class OrderDetailsDialog {
     }
 
     // Completed or Cancelled
-    if (order.completedDate != null) {
+    if (widget.order.completedDate != null) {
       timelineItems.add(_buildTimelineItem(
         'Delivered',
-        order.completedDate!,
+        widget.order.completedDate!,
         Icons.done_all,
         Colors.green[700]!,
         isCompleted: true,
         isLast: true,
       ));
-    } else if (order.cancelledDate != null) {
+    } else if (widget.order.cancelledDate != null) {
       timelineItems.add(_buildTimelineItem(
         'Cancelled',
-        order.cancelledDate!,
+        widget.order.cancelledDate!,
         Icons.cancel,
         Colors.red[700]!,
         isCompleted: true,
         isLast: true,
       ));
-    } else if (order.orderStatus != 'canceled') {
+    } else if (widget.order.orderStatus != 'canceled') {
       timelineItems.add(_buildTimelineItem(
         'Delivered',
         null,
@@ -1106,40 +936,10 @@ class OrderDetailsDialog {
       ));
     }
 
-    // Add last status update info
-    timelineItems.add(const SizedBox(height: 16));
-    timelineItems.add(Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.update,
-            size: 16,
-            color: Colors.grey[600],
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Last updated: ${_formatDateTime(order.lastStatusUpdate)}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
-    ));
-
     return timelineItems;
   }
 
-  // Build individual timeline item
-  static Widget _buildTimelineItem(
+  Widget _buildTimelineItem(
       String title,
       DateTime? date,
       IconData icon,
@@ -1196,7 +996,7 @@ class OrderDetailsDialog {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: isCompleted ? Colors.grey[800] : Colors.grey[500],
                   ),
@@ -1205,7 +1005,7 @@ class OrderDetailsDialog {
                   Text(
                     _formatDateTime(date),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: Colors.grey[600],
                     ),
                   )
@@ -1213,7 +1013,7 @@ class OrderDetailsDialog {
                   Text(
                     'Pending',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: Colors.grey[500],
                       fontStyle: FontStyle.italic,
                     ),
@@ -1226,337 +1026,65 @@ class OrderDetailsDialog {
     );
   }
 
+  // Event handlers and utility methods
+  void _handleStatusChange(String? newStatus) async {
+    if (newStatus != null && newStatus != currentStatus) {
+      if (!_isTransitionAllowed(currentStatus, newStatus)) {
+        _showTransitionError(currentStatus, newStatus);
+        return;
+      }
 
-  // New method to show payment details dialog (keeping your existing implementation)
-  static void _showPaymentDetailsDialog(BuildContext context, OrdersModel order, PaymentCard paymentCard) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 400,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Payment Details',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                      constraints: const BoxConstraints(),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+      bool proceedWithUpdate = false;
+      switch ('$currentStatus->$newStatus') {
+        case 'to_ship->to_receive':
+          proceedWithUpdate = await _handleShipToReceive();
+          break;
+        case 'to_receive->completed':
+          proceedWithUpdate = await _handleReceiveToCompleted();
+          break;
+        case 'to_ship->canceled':
+        case 'to_receive->canceled':
+          proceedWithUpdate = await _handleCancellation();
+          break;
+        default:
+          proceedWithUpdate = true;
+      }
 
-                // Order information
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Order #${order.shortOrderId}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getPaymentStatusColor(order.payment ?? 'Pending'),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              order.payment ?? 'Pending',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Total Amount: RM ${order.totalAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF7C3AED),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+      if (proceedWithUpdate) {
+        setState(() => currentStatus = newStatus);
+        await _updateOrderStatus(newStatus);
+        if (newStatus == 'to_receive') {
+          await _fetchShipmentData();
+        }
+      }
+    }
+  }
 
-                const SizedBox(height: 20),
-
-                // Payment method information
-                const Text(
-                  'Payment Method Used',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      // Card brand icon
-                      _buildCardBrandIcon(paymentCard.brand),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              paymentCard.lastFour.isNotEmpty
-                                  ? paymentCard.lastFour
-                                  : '${paymentCard.brand.toUpperCase()} Card',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '•••• •••• •••• ${paymentCard.lastFour}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Expires ${paymentCard.expMonth.toString().padLeft(2, '0')}/${paymentCard.expYear.toString().substring(2)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (paymentCard.isDefault)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF8E6CEF),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Default',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Payment timestamp (if available)
-                if (order.orderDate != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.schedule, color: Colors.blue[700], size: 20),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Payment Processed',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              _formatDateTime(order.orderDate),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.blue[900],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                const SizedBox(height: 24),
-
-                // Close button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8E6CEF),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Future<void> _updateOrderStatus(String newStatus) async {
+    try {
+      await widget.firestore
+          .collection('users')
+          .doc(widget.order.customerId)
+          .collection('order')
+          .doc(widget.order.id)
+          .update({'orderStatus': newStatus});
+      await widget.onOrdersReload();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order status updated successfully')),
         );
-      },
-    );
-  }
-
-  // Helper method to build card brand icon
-  static Widget _buildCardBrandIcon(String brand) {
-    IconData iconData;
-    Color iconColor;
-
-    switch (brand.toLowerCase()) {
-      case 'visa':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFF1A1F71);
-        break;
-      case 'mastercard':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFFEB001B);
-        break;
-      case 'amex':
-      case 'american express':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFF006FCF);
-        break;
-      case 'discover':
-        iconData = Icons.credit_card;
-        iconColor = const Color(0xFFFF6000);
-        break;
-      default:
-        iconData = Icons.credit_card_outlined;
-        iconColor = Colors.grey[600]!;
-    }
-
-    return Container(
-      width: 48,
-      height: 36,
-      decoration: BoxDecoration(
-        color: iconColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(
-        iconData,
-        color: iconColor,
-        size: 24,
-      ),
-    );
-  }
-
-  // Helper method to get payment status color
-  static Color _getPaymentStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-      case 'paid':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'failed':
-        return Colors.red;
-      default:
-        return Colors.grey;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating order: $e')),
+        );
+      }
     }
   }
 
-  // Helper method to format date and time
-  static String _formatDateTime(DateTime dateTime) {
-    final formatter = DateFormat('dd MMM yyyy, HH:mm');
-    return formatter.format(dateTime);
-  }
-
-  // Rest of your existing methods
-  static List<String> _getAvailableStatuses(String currentStatus) {
-    List<String> statuses = [currentStatus];
-    statuses.addAll(allowedTransitions[currentStatus] ?? []);
-    return statuses;
-  }
-
-  static bool _isTransitionAllowed(String fromStatus, String toStatus) {
-    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
-  }
-
-  static void _showTransitionError(BuildContext context, String fromStatus, String toStatus) {
-    String message = '';
-    if (fromStatus == 'completed') {
-      message = 'Completed orders cannot be modified.';
-    } else if (fromStatus == 'canceled') {
-      message = 'Canceled orders cannot be reactivated.';
-    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
-      message = 'Cannot revert to "To Ship" once tracking number is provided.';
-    } else {
-      message = 'This status transition is not allowed.';
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-
-  static Future<bool> _handleShipToReceive(
-      BuildContext context,
-      OrdersModel order,
-      ShipmentModel? shipment,
-      FirebaseFirestore firestore,
-      ) async {
-    if (order.payment == null) {
+  Future<bool> _handleShipToReceive() async {
+    if (widget.order.payment == null) {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1580,12 +1108,12 @@ class OrderDetailsDialog {
     }
 
     bool isAddressComplete = shipment != null &&
-        (shipment.fullName?.isNotEmpty ?? false) &&
-        (shipment.phoneNum != null && shipment.phoneNum! > 0) &&
-        (shipment.streetone?.isNotEmpty ?? false) &&
-        (shipment.city?.isNotEmpty ?? false) &&
-        (shipment.state?.isNotEmpty ?? false) &&
-        (shipment.zipCode?.isNotEmpty ?? false);
+        (shipment!.fullName?.isNotEmpty ?? false) &&
+        (shipment!.phoneNum != null && shipment!.phoneNum! > 0) &&
+        (shipment!.streetone?.isNotEmpty ?? false) &&
+        (shipment!.city?.isNotEmpty ?? false) &&
+        (shipment!.state?.isNotEmpty ?? false) &&
+        (shipment!.zipCode?.isNotEmpty ?? false);
 
     if (!isAddressComplete) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1598,16 +1126,12 @@ class OrderDetailsDialog {
     }
 
     if (shipment?.trackingNumber == null || shipment!.trackingNumber!.isEmpty) {
-      return await _showTrackingNumberDialog(context, order, firestore);
+      return await _showTrackingNumberDialog();
     }
     return true;
   }
 
-  static Future<bool> _handleReceiveToCompleted(
-      BuildContext context,
-      OrdersModel order,
-      FirebaseFirestore firestore,
-      ) async {
+  Future<bool> _handleReceiveToCompleted() async {
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1647,11 +1171,11 @@ class OrderDetailsDialog {
           ),
           ElevatedButton(
             onPressed: () async {
-              await firestore
+              await widget.firestore
                   .collection('users')
-                  .doc(order.customerId)
+                  .doc(widget.order.customerId)
                   .collection('order')
-                  .doc(order.id)
+                  .doc(widget.order.id)
                   .update({
                 'completedDate': Timestamp.now(),
               });
@@ -1665,12 +1189,7 @@ class OrderDetailsDialog {
     ) ?? false;
   }
 
-  static Future<bool> _handleCancellation(
-      BuildContext context,
-      OrdersModel order,
-      String currentStatus,
-      FirebaseFirestore firestore,
-      ) async {
+  Future<bool> _handleCancellation() async {
     final reasonController = TextEditingController();
     return await showDialog<bool>(
       context: context,
@@ -1726,11 +1245,11 @@ class OrderDetailsDialog {
                 );
                 return;
               }
-              await firestore
+              await widget.firestore
                   .collection('users')
-                  .doc(order.customerId)
+                  .doc(widget.order.customerId)
                   .collection('order')
-                  .doc(order.id)
+                  .doc(widget.order.id)
                   .update({
                 'cancellationReason': reasonController.text.trim(),
                 'canceledDate': Timestamp.now(),
@@ -1745,34 +1264,7 @@ class OrderDetailsDialog {
     ) ?? false;
   }
 
-  static Future<void> _refreshShipmentData(
-      StateSetter setState,
-      FirebaseFirestore firestore,
-      OrdersModel order,
-      ) async {
-    try {
-      final updatedShipmentSnapshot = await firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .collection('shipment')
-          .get();
-      if (updatedShipmentSnapshot.docs.isNotEmpty) {
-        setState(() {
-          ShipmentModel.fromMap(
-            updatedShipmentSnapshot.docs.first.data(),
-            updatedShipmentSnapshot.docs.first.id,
-          );
-        });
-      }
-    } catch (e) {
-      debugPrint('Error refreshing shipment data: $e');
-    }
-  }
-
-  static Future<bool> _showTrackingNumberDialog(BuildContext context,
-      OrdersModel order, FirebaseFirestore firestore) async {
+  Future<bool> _showTrackingNumberDialog() async {
     final trackingNumberController = TextEditingController();
     return await showDialog<bool>(
       context: context,
@@ -1818,11 +1310,11 @@ class OrderDetailsDialog {
                 return;
               }
               try {
-                final shipmentRef = firestore
+                final shipmentRef = widget.firestore
                     .collection('users')
-                    .doc(order.customerId)
+                    .doc(widget.order.customerId)
                     .collection('order')
-                    .doc(order.id)
+                    .doc(widget.order.id)
                     .collection('shipment');
                 final snapshot = await shipmentRef.get();
                 final updateData = {
@@ -1858,37 +1350,210 @@ class OrderDetailsDialog {
     ) ?? false;
   }
 
-  static Future<void> updateOrderStatus(
-      OrdersModel order,
-      String newStatus,
-      FirebaseFirestore firestore,
-      Future<void> Function() reloadCallback,
-      BuildContext context,
-      ) async {
-    try {
-      await firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .update({'orderStatus': newStatus});
-      await reloadCallback();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order status updated successfully'))
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating order: $e'))
-        );
-      }
-    }
+  void _showDeleteConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          height: 330,
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  size: 48,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Delete Order',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Are you sure you want to delete this order?',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[700],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 20,
+                      color: Colors.red[700],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This action cannot be undone.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.red[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: Colors.grey[300]!),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        Navigator.pop(context);
+                        try {
+                          await widget.firestore
+                              .collection('users')
+                              .doc(widget.order.customerId)
+                              .collection('order')
+                              .doc(widget.order.id)
+                              .delete();
+                          await widget.onOrdersReload();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error deleting order: $e'))
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Delete Order'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  static String _formatDate(DateTime dateTime) {
+  // Utility methods
+  List<String> _getAvailableStatuses(String currentStatus) {
+    List<String> statuses = [currentStatus];
+    statuses.addAll(allowedTransitions[currentStatus] ?? []);
+    return statuses;
+  }
+
+  bool _isTransitionAllowed(String fromStatus, String toStatus) {
+    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
+  }
+
+  void _showTransitionError(String fromStatus, String toStatus) {
+    String message = '';
+    if (fromStatus == 'completed') {
+      message = 'Completed orders cannot be modified.';
+    } else if (fromStatus == 'canceled') {
+      message = 'Canceled orders cannot be reactivated.';
+    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
+      message = 'Cannot revert to "To Ship" once tracking number is provided.';
+    } else {
+      message = 'This status transition is not allowed.';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
     final formatter = DateFormat('dd MMM yyyy');
     return formatter.format(dateTime);
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final formatter = DateFormat('dd MMM yyyy, HH:mm');
+    return formatter.format(dateTime);
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 250,
+      color: const Color(0xFF7C3AED),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Logo',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
