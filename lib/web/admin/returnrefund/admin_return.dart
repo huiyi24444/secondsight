@@ -98,15 +98,13 @@ class ReturnManagementView extends StatelessWidget {
                             children: [
                               _buildFilterTab(context, 'All'),
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Pending'),
-                              const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Processing'),
+                              _buildFilterTab(context, 'Submitted'),  // Updated from 'Pending'
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Approved'),
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Rejected'),
+                              _buildFilterTab(context, 'Completed'),  // Updated from 'Refunded'
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Completed'),
+                              _buildFilterTab(context, 'Rejected'),
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Cancelled'),
                             ],
@@ -166,12 +164,13 @@ class ReturnManagementView extends StatelessWidget {
                                           await ReturnDetailsDialog.show(
                                             context,
                                             returnItem: item,
-                                            onUpdateReturnStatus: (userId, returnId, newStatus) {
-                                              return controller.updateReturnStatus(context, userId, returnId, newStatus);
+                                            onUpdateReturnStatus: (returnId, newStatus) { // Updated signature
+                                              return controller.updateReturnStatus(context, item['userEmail'], returnId, newStatus);
                                             },
                                             formatDate: controller.formatDate,
                                             formatStatus: controller.formatStatus,
                                             firestore: FirebaseFirestore.instance,
+                                            getOrderProductDoc: controller.getOrderProductDoc, // Added this parameter
                                           );
                                         }
                                         else if (value == 'delete') {
@@ -188,10 +187,9 @@ class ReturnManagementView extends StatelessWidget {
                                                 ElevatedButton(
                                                   onPressed: () async {
                                                     Navigator.pop(context);
+                                                    // Updated to use top-level returnRequests collection
                                                     await FirebaseFirestore.instance
-                                                        .collection('users')
-                                                        .doc(item['userId'])
-                                                        .collection('returnRequests')
+                                                        .collection('returnRequests') // Updated collection path
                                                         .doc(item['id'])
                                                         .delete();
                                                     controller.loadReturns();
@@ -209,9 +207,10 @@ class ReturnManagementView extends StatelessWidget {
                                       itemBuilder: (_) => const [
                                         PopupMenuItem(value: 'view', child: Text('View Details')),
                                         PopupMenuDivider(),
-                                        PopupMenuItem(value: 'pending', child: Text('Mark as Pending')),
+                                        PopupMenuItem(value: 'submitted', child: Text('Mark as Submitted')), // Updated from 'pending'
                                         PopupMenuItem(value: 'approved', child: Text('Approve Return')),
-                                        PopupMenuItem(value: 'refunded', child: Text('Process Refund')),
+                                        PopupMenuItem(value: 'completed', child: Text('Mark as Completed')), // Updated from 'refunded'
+                                        PopupMenuItem(value: 'rejected', child: Text('Reject Return')), // Updated text
                                         PopupMenuItem(value: 'cancelled', child: Text('Cancel Return')),
                                         PopupMenuDivider(),
                                         PopupMenuItem(value: 'delete', child: Text('Delete Return', style: TextStyle(color: Colors.red))),
@@ -284,6 +283,7 @@ class ReturnManagementView extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildFilterTab(BuildContext context, String title) {
     final controller = context.read<ReturnManagementController>();

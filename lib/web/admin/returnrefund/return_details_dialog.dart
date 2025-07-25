@@ -8,10 +8,11 @@ class ReturnDetailsDialog {
   static Future<void> show(
       BuildContext context, {
         required Map<String, dynamic> returnItem,
-        required Future<void> Function(String userId, String returnId, String newStatus) onUpdateReturnStatus,
+        required Future<void> Function(String returnId, String newStatus) onUpdateReturnStatus,
         required String Function(int timestamp) formatDate,
         required String Function(String status) formatStatus,
         required FirebaseFirestore firestore,
+        required Future<DocumentSnapshot> Function(String userId, String orderID, String orderProductID) getOrderProductDoc,
       }) async {
     String currentStatus = returnItem['status'] ?? 'pending';
 
@@ -44,7 +45,7 @@ class ReturnDetailsDialog {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Order: #${returnItem['orderId']}',
+                              'Order: #${returnItem['shortOrderId']}', // Updated field name
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -65,7 +66,7 @@ class ReturnDetailsDialog {
                                 value: currentStatus,
                                 underline: const SizedBox(),
                                 isDense: true,
-                                items: ['pending', 'approved', 'refunded', 'rejected']
+                                items: ['submitted', 'approved', 'completed', 'rejected'] // Updated status values
                                     .map((status) => DropdownMenuItem(
                                   value: status,
                                   child: Row(
@@ -88,7 +89,6 @@ class ReturnDetailsDialog {
                                   if (newStatus != null) {
                                     setState(() => currentStatus = newStatus);
                                     await onUpdateReturnStatus(
-                                      returnItem['userId'],
                                       returnItem['id'],
                                       newStatus,
                                     );
@@ -159,55 +159,73 @@ class ReturnDetailsDialog {
                               height: 1.5,
                             ),
                           ),
-                          if (returnItem['description'] != null) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.grey[200]!),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Additional Comments',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey[600],
+                          // Show return comment from the return request
+                          FutureBuilder<Map<String, dynamic>?>(
+                            future: _getReturnRequestDetails(firestore, returnItem['id']),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data?['returnComment'] != null) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.grey[200]!),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Additional Comments',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            snapshot.data!['returnComment'],
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    returnItem['description'],
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                  ],
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
                         ],
                       ),
                     ),
 
-                    // Products Section (if available)
-                    if (returnItem['products'] != null) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        'Returned Products',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    // Product Details Section using order product data
+                    const SizedBox(height: 20),
+                    Text(
+                      'Product Details',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 12),
-                      _buildReturnProductsList(returnItem['products']),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<Map<String, dynamic>?>(
+                      future: _getOrderProductDetails(getOrderProductDoc, returnItem),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return _buildProductCard(snapshot.data!);
+                        }
+                        return const CircularProgressIndicator();
+                      },
+                    ),
 
                     const SizedBox(height: 20),
                     const Divider(),
@@ -225,7 +243,7 @@ class ReturnDetailsDialog {
                           ),
                         ),
                         Text(
-                          'RM ${(returnItem['total'] ?? 0).toStringAsFixed(2)}',
+                          'RM ${(returnItem['returnPrice'] ?? 0).toStringAsFixed(2)}', // Updated to use returnPrice
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -240,12 +258,11 @@ class ReturnDetailsDialog {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (currentStatus == 'pending') ...[
+                        if (currentStatus == 'submitted') ...[
                           TextButton(
                             onPressed: () async {
                               setState(() => currentStatus = 'rejected');
                               await onUpdateReturnStatus(
-                                returnItem['userId'],
                                 returnItem['id'],
                                 'rejected',
                               );
@@ -260,7 +277,6 @@ class ReturnDetailsDialog {
                             onPressed: () async {
                               setState(() => currentStatus = 'approved');
                               await onUpdateReturnStatus(
-                                returnItem['userId'],
                                 returnItem['id'],
                                 'approved',
                               );
@@ -280,11 +296,10 @@ class ReturnDetailsDialog {
                             onPressed: () async {
                               final confirmed = await _showRefundConfirmationDialog(context);
                               if (confirmed) {
-                                setState(() => currentStatus = 'refunded');
+                                setState(() => currentStatus = 'completed');
                                 await onUpdateReturnStatus(
-                                  returnItem['userId'],
                                   returnItem['id'],
-                                  'refunded',
+                                  'completed',
                                 );
                               }
                             },
@@ -309,6 +324,90 @@ class ReturnDetailsDialog {
     );
   }
 
+  // Helper method to get return request details
+  static Future<Map<String, dynamic>?> _getReturnRequestDetails(FirebaseFirestore firestore, String returnId) async {
+    try {
+      final doc = await firestore.collection('returnRequests').doc(returnId).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+    } catch (e) {
+      print('Error fetching return request details: $e');
+    }
+    return null;
+  }
+
+  // Helper method to get order product details
+  static Future<Map<String, dynamic>?> _getOrderProductDetails(
+      Future<DocumentSnapshot> Function(String, String, String) getOrderProductDoc,
+      Map<String, dynamic> returnItem) async {
+    try {
+      // Extract data from returnItem (this comes from the mapped data in loadReturns)
+      // You'll need to get the actual userID from the return request document
+      final firestore = FirebaseFirestore.instance;
+      final returnDoc = await firestore.collection('returnRequests').doc(returnItem['id']).get();
+
+      if (returnDoc.exists) {
+        final returnData = returnDoc.data() as Map<String, dynamic>;
+        final orderProductDoc = await getOrderProductDoc(
+            returnData['userID'],
+            returnData['orderID'],
+            returnData['orderProductID']
+        );
+
+        if (orderProductDoc.exists) {
+          return orderProductDoc.data() as Map<String, dynamic>?;
+        }
+      }
+    } catch (e) {
+      print('Error fetching order product details: $e');
+    }
+    return null;
+  }
+
+  static Widget _buildProductCard(Map<String, dynamic> productData) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Product Quantity: ${productData['productQuantity'] ?? 1}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Unit Price: RM ${(productData['price'] ?? 0).toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'Total: RM ${(productData['totalPrice'] ?? 0).toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   static Widget _buildReturnInfoRow(Map<String, dynamic> returnItem, String Function(int) formatDate) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -325,13 +424,13 @@ class ReturnDetailsDialog {
           ),
           _verticalDivider(),
           _buildInfoColumn(
-            'Customer ID',
-            returnItem['userId']?.toString() ?? 'Unknown',
+            'Customer Email',
+            returnItem['userEmail'] ?? 'Unknown', // Updated to use userEmail
           ),
           _verticalDivider(),
           _buildInfoColumn(
-            'Return Type',
-            returnItem['returnType'] ?? 'Standard',
+            'Order Product ID',
+            returnItem['orderProductId'] ?? 'Unknown', // Show order product ID
           ),
         ],
       ),
@@ -369,61 +468,6 @@ class ReturnDetailsDialog {
       color: Colors.grey[300],
     );
   }
-
-  static Widget _buildReturnProductsList(List<dynamic> products) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: products.length,
-        itemBuilder: (context, index) {
-          final product = products[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product['name'] ?? 'Unknown Product',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Quantity: ${product['quantity'] ?? 1}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'RM ${(product['price'] ?? 0).toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
 
   static String _formatReturnStatus(String status) {
     return status[0].toUpperCase() + status.substring(1);

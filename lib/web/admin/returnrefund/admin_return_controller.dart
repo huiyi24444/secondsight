@@ -13,6 +13,18 @@ class ReturnManagementController extends ChangeNotifier {
   int currentPage = 1;
   int itemsPerPage = 10;
 
+  // Add this method to the controller
+  Future<DocumentSnapshot> getOrderProductDoc(String userId, String orderID, String orderProductID) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('order')
+        .doc(orderID)
+        .collection('orderProducts')
+        .doc(orderProductID)
+        .get();
+  }
+
   Future<void> loadReturns() async {
     isLoading = true;
     notifyListeners();
@@ -48,19 +60,16 @@ class ReturnManagementController extends ChangeNotifier {
       final mappedReturns = await Future.wait(loadedReturns.map((entry) async {
         final returnRequest = entry['returnRequest'] as ReturnRequestModel;
 
-        // Get order product data using the stored IDs
+        // Get order product data using the controller method
         Map<String, dynamic> orderProductData = {};
         String orderId = returnRequest.orderID;
 
         try {
-          final orderProductDoc = await _firestore
-              .collection('users')
-              .doc(returnRequest.userID)
-              .collection('order')
-              .doc(returnRequest.orderID)
-              .collection('orderProducts')
-              .doc(returnRequest.orderProductID)
-              .get();
+          final orderProductDoc = await getOrderProductDoc(
+              returnRequest.userID,
+              returnRequest.orderID,
+              returnRequest.orderProductID
+          );
 
           if (orderProductDoc.exists) {
             orderProductData = orderProductDoc.data() as Map<String, dynamic>? ?? {};
@@ -99,12 +108,14 @@ class ReturnManagementController extends ChangeNotifier {
     if (selectedTab != 'All') {
       filtered = filtered.where((returnItem) {
         switch (selectedTab) {
-          case 'Pending':
-            return returnItem['status'] == 'pending';
+          case 'Submitted':  // Updated from 'Pending'
+            return returnItem['status'] == 'submitted';
           case 'Approved':
             return returnItem['status'] == 'approved';
-          case 'Refunded':
-            return returnItem['status'] == 'refunded';
+          case 'Completed':  // Updated from 'Refunded'
+            return returnItem['status'] == 'completed';
+          case 'Rejected':
+            return returnItem['status'] == 'rejected';
           case 'Cancelled':
             return returnItem['status'] == 'cancelled';
           default:
@@ -117,8 +128,8 @@ class ReturnManagementController extends ChangeNotifier {
       filtered = filtered.where((returnItem) {
         final search = searchController.text.toLowerCase();
         return returnItem['returnId'].toLowerCase().contains(search) ||
-            returnItem['orderId'].toLowerCase().contains(search) ||
-            returnItem['customer'].toLowerCase().contains(search);
+            returnItem['shortOrderId'].toLowerCase().contains(search) ||  // Updated from 'orderId'
+            returnItem['userEmail'].toLowerCase().contains(search);        // Updated from 'customer'
       }).toList();
     }
 
@@ -136,19 +147,19 @@ class ReturnManagementController extends ChangeNotifier {
       final returnData = ReturnRequestModel.fromDocument(returnDoc);
 
       // Extract necessary data
-      final userId = returnData.userID;  // Make sure your model has this field
-      final orderId = returnData.orderID; // Also ensure this exists
+      final userId = returnData.userID;
+      final orderId = returnData.orderID;
       final orderProductId = returnData.orderProductID;
 
-      final orderProductRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('order')
-          .doc(orderId)
-          .collection('orderProducts')
-          .doc(orderProductId);
-
-      await orderProductRef.update({'orderStatus': 'refunded'});
+      // Use the controller method here too for consistency
+      try {
+        final orderProductDoc = await getOrderProductDoc(userId, orderId, orderProductId);
+        if (orderProductDoc.exists) {
+          await orderProductDoc.reference.update({'orderStatus': 'refunded'});
+        }
+      } catch (e) {
+        print('Error updating order product status: $e');
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Return status updated successfully')),
