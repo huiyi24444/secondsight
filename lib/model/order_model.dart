@@ -130,7 +130,7 @@ class OrdersModel {
   }
 
   String get shortOrderId =>
-      (id.length >= 6 ? id.substring(0, 6) : id).toUpperCase();
+      (id.length >= 6 ? id.substring(0, 8) : id).toUpperCase();
 
   // Helper methods for status duration calculations
   Duration? get processingDuration {

@@ -536,11 +536,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
         }
       },
       itemBuilder: (BuildContext context) => [
-        const PopupMenuItem(value: 'to_ship', child: Text('Mark as To Ship')),
-        const PopupMenuItem(value: 'to_receive', child: Text('Mark as To Receive')),
-        const PopupMenuItem(value: 'completed', child: Text('Mark as Completed')),
-        const PopupMenuItem(value: 'cancelled', child: Text('Mark as Cancelled')),
-        const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'delete',
           child: Text('Delete Order', style: TextStyle(color: Colors.red)),

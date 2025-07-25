@@ -207,12 +207,6 @@ class ReturnManagementView extends StatelessWidget {
                                       itemBuilder: (_) => const [
                                         PopupMenuItem(value: 'view', child: Text('View Details')),
                                         PopupMenuDivider(),
-                                        PopupMenuItem(value: 'submitted', child: Text('Mark as Submitted')), // Updated from 'pending'
-                                        PopupMenuItem(value: 'approved', child: Text('Approve Return')),
-                                        PopupMenuItem(value: 'completed', child: Text('Mark as Completed')), // Updated from 'refunded'
-                                        PopupMenuItem(value: 'rejected', child: Text('Reject Return')), // Updated text
-                                        PopupMenuItem(value: 'cancelled', child: Text('Cancel Return')),
-                                        PopupMenuDivider(),
                                         PopupMenuItem(value: 'delete', child: Text('Delete Return', style: TextStyle(color: Colors.red))),
                                       ],
                                     ),

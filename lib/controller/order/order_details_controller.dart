@@ -21,7 +21,7 @@ class OrderDetailsController extends ChangeNotifier {
   // Getters
   int get rating => _rating;
   TextEditingController get reviewController => _reviewController;
-  String get shortOrderId => orderId.substring(0, 6).toUpperCase();
+  String get shortOrderId => orderId.substring(0, 8).toUpperCase();
 
   /// Get formatted order date
   String formatOrderDate(DateTime orderDate) {

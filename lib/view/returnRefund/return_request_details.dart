@@ -445,8 +445,10 @@ class ReturnRequestDetailsView extends StatelessWidget {
           const SizedBox(height: 16),
           _buildDetailRow('Return Reason', request.returnReason),
           _buildDetailRow('Request ID', request.id.substring(0, 12).toUpperCase()),
-          _buildDetailRow('Refund Amount', 'RM ${orderProduct.totalPrice.toStringAsFixed(2)}'),
-          _buildDetailRow('Refund Method', 'Original Payment Method'),
+          if (request.returnStatus.toLowerCase() == 'completed') ...[
+            _buildDetailRow('Refund Amount', 'RM ${orderProduct.totalPrice.toStringAsFixed(2)}'),
+            _buildDetailRow('Refund Method', 'Original Payment Method'),
+          ],
           const SizedBox(height: 16),
           const Text('Description', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
