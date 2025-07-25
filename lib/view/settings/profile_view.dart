@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:secondsight/view/products/homepage.dart';
 import 'package:secondsight/view/products/wishlist_view.dart';
+import 'package:secondsight/view/settings/faq_view.dart';
 import '../../model/profile_model.dart';
 import '../../services/auth_provider.dart';
 import '../order/notifications_view.dart';
@@ -350,7 +351,12 @@ class _ProfileViewState extends State<ProfileView> {
           Icons.help_outline,
           "FAQ",
               () {
-            // Add help functionality
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FAQView(),
+                  ),
+                );
           },
         ),
         const SizedBox(height: 16),

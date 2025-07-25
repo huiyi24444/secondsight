@@ -33,12 +33,21 @@ class WishlistView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFFFAFAFA),
+        centerTitle: true,
         elevation: 0,
-        title: const Text("My Wishlist"),
+        foregroundColor: Colors.black87,
+        title: const Text(
+          "My Wishlist",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         leading: const CustomBackButton(),
+
       ),
       body: Padding(
         padding: const EdgeInsets.all(14.0),
