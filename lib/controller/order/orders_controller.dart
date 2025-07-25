@@ -97,9 +97,8 @@ class OrdersController extends ChangeNotifier {
     }
 
     return FirebaseFirestore.instance
-        .collection('users')
-        .doc(_userId!)
         .collection('returnRequests')
+        .where('userID', isEqualTo: _userId!)
         .orderBy('returnDate', descending: true);
   }
 

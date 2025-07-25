@@ -22,7 +22,14 @@ class ReturnRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DocumentSnapshot>(
-      future: returnRequest.orderProductID.get(),
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(returnRequest.userID)
+          .collection('order')
+          .doc(returnRequest.orderID)
+          .collection('orderProducts')
+          .doc(returnRequest.orderProductID)
+          .get(),
       builder: (context, orderProductSnapshot) {
         if (!orderProductSnapshot.hasData) {
           return Container(

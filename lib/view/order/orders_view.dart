@@ -159,9 +159,12 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
 
     final query = controller.buildReturnRequestsQuery();
 
+    debugPrint('[_buildReturnRequestsList] Building return requests list for user: $userId');
+
     return LazyLoadingList(
       query: query,
       itemBuilder: (doc) {
+        debugPrint('[_buildReturnRequestsList] Processing return request document ID: ${doc.id}');
         final returnRequest = controller.createReturnRequestFromDocument(doc);
         return ReturnRequestCard(
           returnRequest: returnRequest,
@@ -171,4 +174,5 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
       emptyMessage: controller.getEmptyMessage('returns'),
     );
   }
+
 }

@@ -9,8 +9,6 @@ import '../../model/order_product_model.dart';
 class ReturnRequestDetailsController {
   Stream<DocumentSnapshot> getReturnRequestStream(String userId, String returnRequestId) {
     return FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
         .collection('returnRequests')
         .doc(returnRequestId)
         .snapshots();
@@ -25,12 +23,20 @@ class ReturnRequestDetailsController {
   }
 
 
-  Future<DocumentSnapshot> getOrderProductDoc(DocumentReference orderProductRef) {
-    return orderProductRef.get();
+  Future<DocumentSnapshot> getOrderProductDoc(String userId, String orderID, String orderProductID) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('order')
+        .doc(orderID)
+        .collection('orderProducts')
+        .doc(orderProductID)
+        .get();
   }
 
-  Future<DocumentSnapshot?> getProductDoc(DocumentReference? productRef) async {
-    return productRef?.get();
+  Future<DocumentSnapshot?> getProductDoc(DocumentReference? productRef) {
+    if (productRef == null) return Future.value(null);
+    return productRef.get();
   }
 
   String formatDate(DateTime dateTime) {

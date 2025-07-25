@@ -41,16 +41,30 @@ class ReturnRequestDetailsView extends StatelessWidget {
           if (!returnSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF8E6CEF)));
           }
+          if (returnSnapshot.data!.data() == null) {
+            return const Center(child: Text('Return request not found'));
+          }
           final returnRequest = ReturnRequestModel.fromDocument(returnSnapshot.data!);
 
           return FutureBuilder<DocumentSnapshot>(
-            future: controller.getOrderProductDoc(returnRequest.orderProductID),
+            // Fix: Use the controller method with the correct parameters
+            future: controller.getOrderProductDoc(
+                returnRequest.userID,           // userId parameter
+                returnRequest.orderID,          // orderID parameter
+                returnRequest.orderProductID    // orderProductID parameter
+            ),
             builder: (context, orderProductSnapshot) {
               if (!orderProductSnapshot.hasData) {
                 return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF8E6CEF)));
               }
-              final orderProduct = OrderProductModel.fromJson(orderProductSnapshot.data!.data() as Map<String, dynamic>);
 
+              // Add null check for orderProduct data
+              final orderProductData = orderProductSnapshot.data!.data() as Map<String, dynamic>?;
+              if (orderProductData == null) {
+                return const Center(child: Text('Order product not found'));
+              }
+
+              final orderProduct = OrderProductModel.fromJson(orderProductData);
               return FutureBuilder<DocumentSnapshot?>(
                 future: controller.getProductDoc(orderProduct.productID),
                 builder: (context, productSnapshot) {
@@ -445,35 +459,53 @@ class ReturnRequestDetailsView extends StatelessWidget {
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ),
-          if (request.returnImages.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text('Uploaded Images', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: request.returnImages.length,
-                itemBuilder: (context, index) => Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey[300]!)),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(7),
-                    child: Image.network(
-                      request.returnImages[index],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+          request.returnImages.isNotEmpty
+              ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              const Text(
+                'Uploaded Images',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: request.returnImages.length,
+                  itemBuilder: (context, index) => Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: Image.network(
+                        request.returnImages[index],
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            )
-          ],
+            ],
+          )
+              : const Padding(
+            padding: EdgeInsets.only(top: 16),
+            child: Text(
+              'No image uploaded',
+              style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Colors.grey),
+            ),
+          ),
+
         ],
       ),
     );

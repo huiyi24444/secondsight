@@ -479,7 +479,9 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
           final returnRequest = ReturnRequestModel.fromDocument(returnSnapshot.data!);
 
           return FutureBuilder<DocumentSnapshot>(
-            future: returnRequest.orderProductID.get(),
+            future: FirebaseFirestore.instance
+                .doc(returnRequest.orderProductID)
+                .get(),
             builder: (context, orderProductSnapshot) {
               if (!orderProductSnapshot.hasData) {
                 return const Center(
@@ -619,7 +621,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
                               Divider(color: Colors.grey[200]),
                               const SizedBox(height: 16),
 
-                              // Return Details - Updated to use returnPrice
+                              // Return Details - Updated to handle double returnPrice
                               _buildDetailRow('Refund Amount', 'RM ${returnRequest.returnPrice.toStringAsFixed(2)}'),
                               _buildDetailRow('Refund Reason', returnRequest.returnReason),
                               _buildDetailRow('Refund To', 'Original Payment Method'),
@@ -927,24 +929,14 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
       // Upload images first
       List<String> uploadedUrls = await _uploadImagesToStorage(selectedImages);
 
-      // Get reference to the order product
-      final orderProductRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('order')
-          .doc(widget.orderId)
-          .collection('orderProducts')
-          .doc(widget.orderProductId);
+      final double returnPrice = orderProduct.totalPrice;
 
-      // Convert totalPrice (double) to returnPrice (int)
-      // Multiply by 100 to convert to cents if your prices are in dollars/ringgit format
-      // Or just round to int if already in smallest unit
-      final returnPrice = orderProduct.totalPrice.round();
-
-      // Create return request with uploaded image URLs and returnPrice
+      // Create return request using string values for IDs
       final returnRequest = ReturnRequestModel(
         id: '', // Firestore will assign this
-        orderProductID: orderProductRef,
+        userID: widget.userId,
+        orderID: widget.orderId,
+        orderProductID: widget.orderProductId, // now a String
         returnDate: Timestamp.now(),
         returnImages: uploadedUrls,
         returnReason: selectedReason,
@@ -953,10 +945,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
         returnPrice: returnPrice,
       );
 
-      // Save to Firestore
       await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
           .collection('returnRequests')
           .add(returnRequest.toMap());
 
@@ -986,6 +975,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
       }
     }
   }
+
 
   Future<bool?> _showReturnPolicyConfirmation() {
     return showDialog<bool>(

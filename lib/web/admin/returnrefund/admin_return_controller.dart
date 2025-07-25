@@ -18,45 +18,55 @@ class ReturnManagementController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final usersSnapshot = await _firestore.collection('users').get();
+      // Access the top-level returnRequests collection directly
+      final returnRequestsSnapshot = await _firestore.collection('returnRequests').get();
       final List<Map<String, dynamic>> loadedReturns = [];
 
-      for (final userDoc in usersSnapshot.docs) {
-        final userData = userDoc.data();
-        final userEmail = userData['email'] ?? 'Unknown';
+      for (final returnDoc in returnRequestsSnapshot.docs) {
+        final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
 
-        final returnRequestsSnapshot =
-        await userDoc.reference.collection('returnRequests').get();
-
-        for (final returnDoc in returnRequestsSnapshot.docs) {
-          final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
-
-          loadedReturns.add({
-            'id': returnRequest.id,
-            'userEmail': userEmail,
-            'returnRequest': returnRequest,
-          });
+        // Get user email using the userID from the return request
+        String userEmail = 'Unknown';
+        try {
+          final userDoc = await _firestore.collection('users').doc(returnRequest.userID).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>?;
+            userEmail = userData?['email'] ?? 'Unknown';
+          }
+        } catch (e) {
+          print('Error fetching user email for ${returnRequest.userID}: $e');
         }
+
+        loadedReturns.add({
+          'id': returnRequest.id,
+          'userEmail': userEmail,
+          'returnRequest': returnRequest,
+        });
       }
 
-
+      // Map the returns with additional data
       final mappedReturns = await Future.wait(loadedReturns.map((entry) async {
-        final returnRequest = entry['returnRequest'];
-        final orderProductRef = returnRequest.orderProductID;
-        final orderProductDoc = await orderProductRef.get();
-        final orderProductData = orderProductDoc.data() as Map<String, dynamic>? ?? {};
+        final returnRequest = entry['returnRequest'] as ReturnRequestModel;
 
-        String orderId = 'N/A';
-        String userEmail = 'Unknown';
-        double returnPrice = (returnRequest.returnPrice ?? 0).toDouble(); // ✅ fixed
+        // Get order product data using the stored IDs
+        Map<String, dynamic> orderProductData = {};
+        String orderId = returnRequest.orderID;
 
-        final orderRef = orderProductRef.parent.parent;
-        if (orderRef != null) {
-          final orderDoc = await orderRef.get();
-          final orderData = orderDoc.data() as Map<String, dynamic>? ?? {};
+        try {
+          final orderProductDoc = await _firestore
+              .collection('users')
+              .doc(returnRequest.userID)
+              .collection('order')
+              .doc(returnRequest.orderID)
+              .collection('orderProducts')
+              .doc(returnRequest.orderProductID)
+              .get();
 
-          orderId = orderRef.id;
-          userEmail = orderData['userEmail'] ?? '';
+          if (orderProductDoc.exists) {
+            orderProductData = orderProductDoc.data() as Map<String, dynamic>? ?? {};
+          }
+        } catch (e) {
+          print('Error fetching order product data: $e');
         }
 
         return {
@@ -64,15 +74,14 @@ class ReturnManagementController extends ChangeNotifier {
           'userEmail': entry['userEmail'],
           'returnId': entry['id'].substring(0, 8).toUpperCase(),
           'shortOrderId': orderId.length >= 6 ? orderId.substring(0, 6).toUpperCase() : orderId.toUpperCase(),
-          'orderProductId': orderProductRef.id,
+          'orderProductId': returnRequest.orderProductID,
           'date': returnRequest.returnDate.millisecondsSinceEpoch,
-          'returnPrice': returnPrice,
+          'returnPrice': returnRequest.returnPrice, // This is now directly available
           'status': returnRequest.returnStatus,
           'reason': returnRequest.returnReason,
           'items': orderProductData['items'] ?? [],
         };
       }));
-
 
       returns = mappedReturns;
       filterReturns();
@@ -119,25 +128,30 @@ class ReturnManagementController extends ChangeNotifier {
   }
 
   Future<void> updateReturnStatus(BuildContext context, String userEmail, String returnId, String newStatus) async {
-    try {
-      final returnRef = _firestore.collection('users').doc(userEmail).collection('returnRequests').doc(returnId);
-      await returnRef.update({'returnStatus': newStatus});
+    final returnRef = _firestore.collection('returnRequests').doc(returnId);
+    await returnRef.update({'returnStatus': newStatus});
 
-      if (newStatus == 'refunded') {
-        final returnDoc = await returnRef.get();
-        final returnData = ReturnRequestModel.fromDocument(returnDoc);
-        final orderRef = returnData.orderProductID;
-        await orderRef.update({'orderStatus': 'refunded'});
-      }
+    if (newStatus == 'refunded') {
+      final returnDoc = await returnRef.get();
+      final returnData = ReturnRequestModel.fromDocument(returnDoc);
 
-      await loadReturns();
+      // Extract necessary data
+      final userId = returnData.userID;  // Make sure your model has this field
+      final orderId = returnData.orderID; // Also ensure this exists
+      final orderProductId = returnData.orderProductID;
+
+      final orderProductRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .collection('orderProducts')
+          .doc(orderProductId);
+
+      await orderProductRef.update({'orderStatus': 'refunded'});
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Return status updated successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating return: $e')),
       );
     }
   }
