@@ -430,7 +430,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         'date': order.completedDate,
         'isCompleted': order.completedDate != null,
         'isActive': status == 'completed',
-        'color': Colors.green,
+        'color': Color(0xFF8E6CEF),
         'pendingText': 'Out for delivery',
       });
     }

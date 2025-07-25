@@ -83,6 +83,60 @@ class OrderDetailsController extends ChangeNotifier {
     }
   }
 
+  /// Mark order as completed
+  Future<bool> markOrderAsCompleted() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .update({
+        'orderStatus': 'completed',
+        'completedDate': Timestamp.now(),
+      });
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error marking order as completed: $e');
+      return false;
+    }
+  }
+
+  /// Check if order should be auto-completed
+  Future<void> checkAndAutoCompleteOrder(OrdersModel order) async {
+    if (order.orderStatus.toLowerCase() != 'to_receive' || order.toReceiveDate == null) {
+      return;
+    }
+
+    final currentDate = DateTime.now();
+    final daysSinceShipped = currentDate.difference(order.toReceiveDate!).inDays;
+
+    // If more than 10 days have passed since to_receive date, auto-complete the order
+    if (daysSinceShipped >= 14) {
+      await markOrderAsCompleted();
+      debugPrint('Order auto-completed after 14 days');
+    }
+  }
+
+  /// Check if order is eligible to be marked as received
+  bool canMarkAsReceived(OrdersModel order) {
+    return order.orderStatus.toLowerCase() == 'to_receive';
+  }
+
+  /// Get days remaining until auto-completion
+  int getDaysUntilAutoComplete(OrdersModel order) {
+    if (order.toReceiveDate == null) return -1;
+
+    final currentDate = DateTime.now();
+    final daysSinceShipped = currentDate.difference(order.toReceiveDate!).inDays;
+    final remainingDays = 10 - daysSinceShipped;
+
+    return remainingDays > 0 ? remainingDays : 0;
+  }
+
+
 
 
 
@@ -157,14 +211,50 @@ class OrderDetailsController extends ChangeNotifier {
 
 
 
+
   /// Check if order is eligible for return/refund
   bool isEligibleForReturn(OrdersModel order) {
-    return order.eligibilityForReturn &&
-        (order.orderStatus.toLowerCase() == 'completed' ||
-            order.orderStatus.toLowerCase() == 'delivered');
+    // First check if order status allows returns
+    if (order.orderStatus.toLowerCase() != 'completed' &&
+        order.orderStatus.toLowerCase() != 'delivered') {
+      return false;
+    }
+
+    // Check if eligibilityForReturn is already false
+    if (!order.eligibilityForReturn) {
+      return false;
+    }
+
+    // Check if 5 days have passed since completion
+    if (order.completedDate != null) {
+      final daysSinceCompleted = DateTime.now().difference(order.completedDate!).inDays;
+      if (daysSinceCompleted > 5) {
+        // Update eligibilityForReturn to false in Firestore
+        _updateReturnEligibility(false);
+        return false;
+      }
+    }
+
+    return true;
   }
 
-  /// Check if order can be rated
+
+  /// Update return eligibility in Firestore
+  Future<void> _updateReturnEligibility(bool eligible) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .update({
+        'eligibilityForReturn': eligible,
+      });
+    } catch (e) {
+      debugPrint('Error updating return eligibility: $e');
+    }
+  }
+
   bool canRateOrder(OrdersModel order) {
     return order.orderStatus.toLowerCase() == 'completed' ||
         order.orderStatus.toLowerCase() == 'delivered';
@@ -183,26 +273,21 @@ class OrderDetailsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Submit rating (placeholder for actual implementation)
+  /// Submit rating
   Future<bool> submitRating() async {
     if (_rating == 0) return false;
 
     try {
-      // TODO: Implement actual rating submission to Firestore
-      // Example implementation:
-      // await FirebaseFirestore.instance
-      //     .collection('users')
-      //     .doc(userId)
-      //     .collection('order')
-      //     .doc(orderId)
-      //     .update({
-      //   'rating': _rating,
-      //   'review': _reviewController.text.trim(),
-      //   'ratedAt': FieldValue.serverTimestamp(),
-      // });
-
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .update({
+        'rating': _rating,
+        'review': _reviewController.text.trim(),
+        'ratedAt': FieldValue.serverTimestamp(),
+      });
 
       resetRatingState();
       return true;

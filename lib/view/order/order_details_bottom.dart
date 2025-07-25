@@ -22,6 +22,135 @@ class OrderBottomButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check and auto-complete order if needed
+    controller.checkAndAutoCompleteOrder(order);
+
+    final status = order.orderStatus.toLowerCase();
+
+    // Show different button configurations based on order status
+    if (status == 'to_receive') {
+      return _buildOrderReceivedSection(context);
+    } else if (status == 'completed') {
+      return _buildCompletedOrderButtons(context);
+    }
+
+    // For other statuses, don't show bottom buttons
+    return const SizedBox.shrink();
+  }
+
+  // Build section for orders waiting to be received
+  Widget _buildOrderReceivedSection(BuildContext context) {
+    final remainingDays = controller.getDaysUntilAutoComplete(order);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Auto-complete reminder
+              if (remainingDays > 0)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.amber.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: Colors.amber[700],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Please confirm once you receive your order',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.amber[800],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Auto-completes in $remainingDays day${remainingDays > 1 ? 's' : ''} if not confirmed',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber[700],
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+                ),
+
+              // Order Received Button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => _handleOrderReceived(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8E6CEF),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Order Received',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Build buttons for completed orders (your existing code)
+  Widget _buildCompletedOrderButtons(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -108,6 +237,102 @@ class OrderBottomButtons extends StatelessWidget {
             color: canRate ? Colors.white : Colors.grey[500],
           ),
         ),
+      ),
+    );
+  }
+
+  // Handle order received action
+  void _handleOrderReceived(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Confirm Order Received',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: const Text(
+          'Have you received your order? This action cannot be undone.',
+          style: TextStyle(fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext loadingContext) => const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF8E6CEF),
+                  ),
+                ),
+              );
+
+              // Mark order as completed
+              final success = await controller.markOrderAsCompleted();
+
+              // Hide loading indicator
+              Navigator.of(context).pop();
+
+              if (success) {
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Order marked as completed successfully!'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              } else {
+                // Show error message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Failed to update order status. Please try again.'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8E6CEF),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
