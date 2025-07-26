@@ -122,7 +122,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Expanded(
             child: Column(
               children: [
-
                 // Top Bar
                 CustomTopBar(
                   title: 'Order',
@@ -131,7 +130,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 // Content Area
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0), // optional spacing
+                    padding: const EdgeInsets.all(12.0),
                     child: _buildBody(),
                   ),
                 ),
@@ -143,92 +142,164 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-
-
   Widget _buildBody() {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Row(
+      padding: const EdgeInsets.all(16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left Column - Main Content (70%)
-          Expanded(
-            flex: 7,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildMainOrderInfo(),
-                const SizedBox(height: 32),
-                _buildProductsSection(),
-                const SizedBox(height: 32),
-                _buildOrderTimeline(),
-              ],
-            ),
+          // Header Section with Order ID, Status, and Delete Button
+          _buildHeaderSection(),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column - Main Content (70%)
+              Expanded(
+                flex: 7,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildMainOrderInfo(),
+                    const SizedBox(height: 20),
+                    _buildProductsSection(),
+                    const SizedBox(height: 20),
+                    _buildOrderTimeline(),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              // Right Column - Supporting Details (30%)
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildOrderSummaryCard(),
+                    const SizedBox(height: 16),
+                    _buildPaymentInfoCard(),
+                    const SizedBox(height: 16),
+                    if (shipment != null) _buildShipmentInfoCard(),
+                    const SizedBox(height: 16),
+                    _buildCustomerInfoCard(),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 32),
-          // Right Column - Supporting Details (30%)
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Order ID and Status
           Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                _buildOrderSummaryCard(),
-                const SizedBox(height: 24),
-                _buildPaymentInfoCard(),
-                const SizedBox(height: 24),
-                if (shipment != null) _buildShipmentInfoCard(),
-                const SizedBox(width: 24),
-                _buildCustomerInfoCard(),
-                const SizedBox(width: 24),
-                _buildDeleteButton(),
-                const SizedBox(width: 24),
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Order #${widget.order.shortOrderId}',
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: OrderStatusUtils.getStatusColor(currentStatus).withOpacity(0.1),
-                        border: Border.all(color: OrderStatusUtils.getStatusColor(currentStatus)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DropdownButton<String>(
-                        value: currentStatus,
-                        underline: const SizedBox(),
-                        isDense: true,
-                        items: _getAvailableStatuses(currentStatus)
-                            .map((status) => DropdownMenuItem(
-                          value: status,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: OrderStatusUtils.getStatusColor(status),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              Text(OrderStatusUtils.formatStatus(status)),
-                            ],
-                          ),
-                        ))
-                            .toList(),
-                        onChanged: _handleStatusChange,
+                    const SizedBox(height: 4),
+                    Text(
+                      'ID: ${widget.order.id}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(width: 24),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: OrderStatusUtils.getStatusColor(currentStatus).withOpacity(0.1),
+                    border: Border.all(color: OrderStatusUtils.getStatusColor(currentStatus)),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: DropdownButton<String>(
+                    value: currentStatus,
+                    underline: const SizedBox(),
+                    isDense: true,
+                    items: _getAvailableStatuses(currentStatus)
+                        .map((status) => DropdownMenuItem(
+                      value: status,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: OrderStatusUtils.getStatusColor(status),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          Text(
+                            OrderStatusUtils.formatStatus(status),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ))
+                        .toList(),
+                    onChanged: _handleStatusChange,
+                  ),
+                ),
               ],
+            ),
+          ),
+          // Delete Button
+          Container(
+            height: 36,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: TextButton.icon(
+              onPressed: () {
+                if (widget.order.orderStatus == 'completed' || widget.order.orderStatus == 'to_receive') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                _showDeleteConfirmationDialog();
+              },
+              icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+              label: const Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
             ),
           ),
         ],
@@ -238,15 +309,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildMainOrderInfo() {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -256,28 +327,28 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF7C3AED).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.receipt_long,
                   color: Color(0xFF7C3AED),
-                  size: 20,
+                  size: 16,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               const Text(
                 'Order Information',
                 style: TextStyle(
-                  fontSize: 19,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -288,7 +359,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   Colors.blue,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildInfoTile(
                   'Customer',
@@ -297,7 +368,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   Colors.green,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildInfoTile(
                   'Return Eligible',
@@ -315,10 +386,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildInfoTile(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(
@@ -326,23 +397,23 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: color,
             ),
@@ -354,15 +425,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildProductsSection() {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -372,33 +443,33 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.inventory_2,
                   color: Colors.orange,
-                  size: 20,
+                  size: 16,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Text(
                 'Products (${widget.products.length})',
                 style: const TextStyle(
-                  fontSize: 19,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: widget.products.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final product = widget.products[index];
               final productId = (product.productID as DocumentReference).id;
@@ -407,35 +478,35 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               final productName = details['name'] as String? ?? 'Unknown Product';
 
               return Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey[200]!),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey[300]!),
                       ),
                       child: (imageUrl?.isNotEmpty ?? false)
                           ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           imageUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.image, color: Colors.grey),
+                          const Icon(Icons.image, color: Colors.grey, size: 24),
                         ),
                       )
-                          : const Icon(Icons.image, color: Colors.grey),
+                          : const Icon(Icons.image, color: Colors.grey, size: 24),
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,15 +514,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           Text(
                             productName,
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Text(
                             'Quantity: ${product.productQuantity}',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               color: Colors.grey[600],
                             ),
                           ),
@@ -459,7 +530,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                             Text(
                               'RM ${product.price.toStringAsFixed(2)} each',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.grey[600],
                               ),
                             ),
@@ -469,7 +540,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     Text(
                       'RM ${product.totalPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
-                        fontSize: 19,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF7C3AED),
                       ),
@@ -486,123 +557,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildOrderTimeline() {
     return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.timeline,
-                  color: Colors.blue,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Text(
-                'Order Timeline',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Column(
-            children: _buildTimelineItems(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Right Column Cards - Smaller and more compact
-  Widget _buildOrderSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF7C3AED).withOpacity(0.1),
-            const Color(0xFF7C3AED).withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF7C3AED).withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  color: Color(0xFF7C3AED),
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Order Total',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'RM ${widget.order.totalAmount.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF7C3AED),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: Colors.grey.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -616,39 +577,149 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
-                  Icons.payment,
-                  color: Colors.green,
-                  size: 18,
+                  Icons.timeline,
+                  color: Colors.blue,
+                  size: 16,
                 ),
               ),
               const SizedBox(width: 12),
               const Text(
-                'Payment',
+                'Order Timeline',
                 style: TextStyle(
                   fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Column(
+            children: _buildTimelineItems(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Right Column Cards - Smaller and more compact
+  Widget _buildOrderSummaryCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF7C3AED).withOpacity(0.1),
+            const Color(0xFF7C3AED).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFF7C3AED).withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: Color(0xFF7C3AED),
+                  size: 14,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Order Total',
+                style: TextStyle(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          Text(
+            'RM ${widget.order.totalAmount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF7C3AED),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.payment,
+                  color: Colors.green,
+                  size: 14,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Payment',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Text(
             widget.order.payment ?? 'Pending',
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
           ),
           if (paymentCard != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               '•••• •••• •••• ${paymentCard!.lastFour}',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 color: Colors.grey[600],
                 fontFamily: 'monospace',
               ),
@@ -661,16 +732,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildShipmentInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -680,44 +751,44 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Icon(
                   Icons.local_shipping,
                   color: Colors.blue,
-                  size: 18,
+                  size: 14,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               const Text(
                 'Shipment',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (shipment?.trackingNumber?.isNotEmpty ?? false) ...[
             Text(
               'Tracking: ${shipment!.trackingNumber!}',
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
           ],
           if (shipment?.shippedDate != null) ...[
             Text(
               'Shipped: ${_formatDate(shipment!.shippedDate!)}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.grey[600],
               ),
             ),
@@ -725,17 +796,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Text(
               'Not yet shipped',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.orange[600],
               ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           if (shipment?.fullName?.isNotEmpty ?? false) ...[
             Text(
               'To: ${shipment!.fullName!}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.grey[600],
               ),
             ),
@@ -747,16 +818,16 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildCustomerInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -766,71 +837,45 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Icon(
                   Icons.person,
                   color: Colors.purple,
-                  size: 18,
+                  size: 14,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               const Text(
                 'Customer',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             widget.customerNames[widget.order.customerId] ?? 'Unknown Customer',
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             'ID: ${widget.order.customerId}',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               color: Colors.grey[500],
               fontFamily: 'monospace',
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDeleteButton() {
-    return TextButton.icon(
-      onPressed: () {
-        if (widget.order.orderStatus == 'completed' || widget.order.orderStatus == 'to_receive') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        _showDeleteConfirmationDialog();
-      },
-      icon: const Icon(Icons.delete_outline, size: 18),
-      label: const Text('Delete Order'),
-      style: TextButton.styleFrom(
-        foregroundColor: Colors.red,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 12,
-        ),
       ),
     );
   }
@@ -957,12 +1002,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             if (!isFirst)
               Container(
                 width: 2,
-                height: 16,
+                height: 12,
                 color: isCompleted ? Colors.grey[400] : Colors.grey[300],
               ),
             Container(
-              width: 32,
-              height: 32,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
                 color: isCompleted ? color : Colors.grey[100],
                 shape: BoxShape.circle,
@@ -973,30 +1018,30 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
               child: Icon(
                 icon,
-                size: 16,
+                size: 12,
                 color: isCompleted ? Colors.white : Colors.grey[400],
               ),
             ),
             if (!isLast)
               Container(
                 width: 2,
-                height: 24,
+                height: 20,
                 color: isCompleted ? Colors.grey[400] : Colors.grey[300],
               ),
           ],
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         // Timeline content
         Expanded(
           child: Container(
-            padding: const EdgeInsets.only(top: 4, bottom: 20),
+            padding: const EdgeInsets.only(top: 2, bottom: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: isCompleted ? Colors.grey[800] : Colors.grey[500],
                   ),
@@ -1005,7 +1050,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   Text(
                     _formatDateTime(date),
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       color: Colors.grey[600],
                     ),
                   )
@@ -1013,7 +1058,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   Text(
                     'Pending',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       color: Colors.grey[500],
                       fontStyle: FontStyle.italic,
                     ),
@@ -1354,93 +1399,91 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          height: 330,
-          width: 500,
-          padding: const EdgeInsets.all(24),
+          width: 400,
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.delete_outline,
-                  size: 48,
+                  size: 36,
                   color: Colors.red,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Text(
                 'Delete Order',
                 style: TextStyle(
-                  fontSize: 19,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 'Are you sure you want to delete this order?',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: Colors.grey[700],
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color: Colors.red.withOpacity(0.3),
                   ),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.warning_amber_rounded,
-                      size: 20,
+                      size: 16,
                       color: Colors.red[700],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This action cannot be undone.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.red[700],
-                        ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'This action cannot be undone.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[700],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           side: BorderSide(color: Colors.grey[300]!),
                         ),
                       ),
                       child: const Text(
                         'Cancel',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
@@ -1464,12 +1507,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                       ),
-                      child: const Text('Delete Order'),
+                      child: const Text('Delete Order', style: TextStyle(fontSize: 13)),
                     ),
                   ),
                 ],
@@ -1523,29 +1566,29 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Widget _buildSidebar() {
     return Container(
-      width: 250,
+      width: 220,
       color: const Color(0xFF7C3AED),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 32,
+                  height: 32,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
+                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED), size: 20),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 const Text(
                   'Logo',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
