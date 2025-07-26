@@ -3,11 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
+import 'package:secondsight/web/admin/product/admin_product.dart';
+import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
 import '../../../model/payment_cards_model.dart';
+import '../../../view/widgets/product_status_utils.dart';
+import '../customer/admin_customer.dart';
+import '../returnrefund/admin_return.dart';
+import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
+import 'admin_order.dart';
 
 class OrderDetailsPage extends StatefulWidget {
   final OrdersModel order;
@@ -36,6 +43,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   ShipmentModel? shipment;
   PaymentCard? paymentCard;
   bool isLoading = true;
+  String currentPage = 'orders';
 
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
@@ -117,7 +125,49 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       body: Row(
         children: [
           // Sidebar
-          _buildSidebar(),
+          AdminSidebar(
+            currentPage: currentPage,
+            onPageChanged: (String page) {
+              // Handle navigation based on selected page
+              switch (page) {
+                case 'dashboard':
+                // Navigate to dashboard - since we're in a sub-page, we go back to main
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => AdminNavigator()),
+                        (route) => false,
+                  );
+                  break;
+                case 'products':
+                // Already on products page, might want to go back to product list
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => ProductManagementPage()),
+                  );
+                  break;
+                case 'orders':
+                // Navigate to order management
+                  Navigator.pop(context);
+                  break;
+                case 'returns':
+                // Navigate to return management
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => ReturnManagementPage()),
+                  );
+                  break;
+                case 'customers':
+                // Navigate to customer management
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => CustomerManagementPage()),
+                  );
+                  break;
+                case 'reports':
+                // Navigate to reports - you'll need to create this page
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reports page not implemented yet')),
+                  );
+                  break;
+              }
+            },
+          ),
           // Main Content
           Expanded(
             child: Column(
@@ -162,7 +212,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   children: [
                     _buildMainOrderInfo(),
                     const SizedBox(height: 20),
-                    _buildProductsSection(),
+                    _buildOrderSummaryCard(),
                     const SizedBox(height: 20),
                     _buildOrderTimeline(),
                   ],
@@ -175,11 +225,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildOrderSummaryCard(),
                     const SizedBox(height: 16),
                     _buildPaymentInfoCard(),
                     const SizedBox(height: 16),
                     if (shipment != null) _buildShipmentInfoCard(),
+                    const SizedBox(height: 16),
+                    _buildAddressInfoCard(),
                     const SizedBox(height: 16),
                     _buildCustomerInfoCard(),
                   ],
@@ -223,12 +274,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         color: Colors.black,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      'ID: ${widget.order.id}',
+                      '${widget.order.orderDate}',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[500],
+                        fontSize: 15,
+                        color: Colors.grey,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -423,9 +474,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget _buildProductsSection() {
+  Widget _buildOrderSummaryCard() {
+    const double shippingFee = 8.00;
+    final double subtotal = widget.products.fold(
+        0,
+            (sum, product) => sum + product.totalPrice
+    );
+    final double grandTotal = subtotal + shippingFee;
+
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -438,38 +495,152 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.inventory_2,
-                  color: Colors.orange,
-                  size: 16,
-                ),
+          // Invoice Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF7C3AED).withOpacity(0.1),
+                  const Color(0xFF7C3AED).withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 12),
-              Text(
-                'Products (${widget.products.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
-            ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'INVOICE',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF7C3AED),
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Order #${widget.order.id ?? 'N/A'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    widget.order.orderStatus.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          ListView.separated(
+
+          // Products Table Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    'ITEM DESCRIPTION',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'SKU',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'QTY',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'PRICE',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'TOTAL',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+
+            ),
+          ),
+
+          // Product Items
+          ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: widget.products.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final product = widget.products[index];
               final productId = (product.productID as DocumentReference).id;
@@ -478,71 +649,98 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               final productName = details['name'] as String? ?? 'Unknown Product';
 
               return Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[200]!),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 0.5,
+                    ),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: (imageUrl?.isNotEmpty ?? false)
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.image, color: Colors.grey, size: 24),
-                        ),
-                      )
-                          : const Icon(Icons.image, color: Colors.grey, size: 24),
-                    ),
-                    const SizedBox(width: 16),
+                    // Product Image and Name
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      flex: 4,
+                      child: Row(
                         children: [
-                          Text(
-                            productName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Quantity: ${product.productQuantity}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          if (product.productQuantity > 1)
-                            Text(
-                              'RM ${product.price.toStringAsFixed(2)} each',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
+                            child: (imageUrl?.isNotEmpty ?? false)
+                                ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(Icons.image, color: Colors.grey[400], size: 20),
                               ),
+                            )
+                                : Icon(Icons.image, color: Colors.grey[400], size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              productName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
+                          ),
                         ],
                       ),
                     ),
-                    Text(
-                      'RM ${product.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF7C3AED),
+                    //sku
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        '${ProductStatusUtils.shortProductId(product.productID.id)}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+
+                    // Quantity
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        '${product.productQuantity}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    // Unit Price
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'RM ${product.price.toStringAsFixed(2)}',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                    // Total Price
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'RM ${product.totalPrice.toStringAsFixed(2)}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -550,10 +748,137 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               );
             },
           ),
+
+          // Summary Section
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Subtotal
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Subtotal',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    Text(
+                      'RM ${subtotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Shipping Fee
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Shipping Fee',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'RM ${shippingFee.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Divider
+                Divider(
+                  color: Colors.grey[300],
+                  thickness: 1,
+                ),
+                const SizedBox(height: 16),
+
+                // Grand Total
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF7C3AED).withOpacity(0.1),
+                        const Color(0xFF7C3AED).withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF7C3AED).withOpacity(0.2),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C3AED).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet,
+                              color: Color(0xFF7C3AED),
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'TOTAL AMOUNT',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'RM ${grandTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+
 
   Widget _buildOrderTimeline() {
     return Container(
@@ -606,63 +931,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
   // Right Column Cards - Smaller and more compact
-  Widget _buildOrderSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF7C3AED).withOpacity(0.1),
-            const Color(0xFF7C3AED).withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: const Color(0xFF7C3AED).withOpacity(0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  color: Color(0xFF7C3AED),
-                  size: 14,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Order Total',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'RM ${widget.order.totalAmount.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF7C3AED),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildPaymentInfoCard() {
     return Container(
@@ -764,9 +1032,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Shipment',
+                'Shipment Information',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -777,7 +1045,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Text(
               'Tracking: ${shipment!.trackingNumber!}',
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 15,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w500,
               ),
@@ -788,7 +1056,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Text(
               'Shipped: ${_formatDate(shipment!.shippedDate!)}',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 15,
                 color: Colors.grey[600],
               ),
             ),
@@ -796,7 +1064,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Text(
               'Not yet shipped',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 15,
                 color: Colors.orange[600],
               ),
             ),
@@ -806,7 +1074,114 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Text(
               'To: ${shipment!.fullName!}',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 15,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.local_shipping,
+                  color: Colors.blue,
+                  size: 14,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Address Information',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (shipment?.fullName?.isNotEmpty ?? false) ...[
+            Text(
+              '${shipment!.fullName!}',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (shipment?.phoneNum != null) ...[
+            Row(
+              children: [
+                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                const SizedBox(width: 6),
+                Text(
+                  '${shipment!.phoneNum}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (shipment?.streetone?.isNotEmpty ?? false) ...[
+            Text(
+              '${shipment!.streetone}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          if (shipment?.streettwo?.isNotEmpty ?? false) ...[
+            Text(
+              '${shipment!.streettwo}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+          if ((shipment?.city?.isNotEmpty ?? false) ||
+              (shipment?.state?.isNotEmpty ?? false) ||
+              (shipment?.zipCode?.isNotEmpty ?? false)) ...[
+            Text(
+              '${shipment?.city ?? ""}${(shipment?.city?.isNotEmpty ?? false) && (shipment?.state?.isNotEmpty ?? false) ? ", " : ""}${shipment?.state ?? ""} ${shipment?.zipCode ?? ""}'.trim(),
+              style: TextStyle(
+                fontSize: 14,
                 color: Colors.grey[600],
               ),
             ),
@@ -1564,39 +1939,4 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     return formatter.format(dateTime);
   }
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 220,
-      color: const Color(0xFF7C3AED),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED), size: 20),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Logo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

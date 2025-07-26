@@ -4,7 +4,12 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:secondsight/web/admin/product/admin_product_addition_controller.dart';
 import 'dart:html' as html;
 
+import '../../../admin_main.dart';
 import '../../../model/category_model.dart';
+import '../customer/admin_customer.dart';
+import '../order/admin_order.dart';
+import '../returnrefund/admin_return.dart';
+import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'measurements_widget.dart';
 
@@ -19,7 +24,7 @@ class ProductAdditionPage extends StatefulWidget {
 
 class _ProductAdditionPageState extends State<ProductAdditionPage> {
   late final ProductAdditionController controller;
-
+  String currentPage = 'products';
 
 
   @override
@@ -41,7 +46,49 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
       body: Row(
         children: [
           // Sidebar
-          _buildSidebar(),
+          AdminSidebar(
+            currentPage: currentPage,
+            onPageChanged: (String page) {
+              // Handle navigation based on selected page
+              switch (page) {
+                case 'dashboard':
+                // Navigate to dashboard - since we're in a sub-page, we go back to main
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => AdminNavigator()),
+                        (route) => false,
+                  );
+                  break;
+                case 'products':
+                // Already on products page, might want to go back to product list
+                  Navigator.pop(context);
+                  break;
+                case 'orders':
+                // Navigate to order management
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => OrderManagementPage()),
+                  );
+                  break;
+                case 'returns':
+                // Navigate to return management
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => ReturnManagementPage()),
+                  );
+                  break;
+                case 'customers':
+                // Navigate to customer management
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => CustomerManagementPage()),
+                  );
+                  break;
+                case 'reports':
+                // Navigate to reports - you'll need to create this page
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reports page not implemented yet')),
+                  );
+                  break;
+              }
+            },
+          ),
           // Main Content
           Expanded(
             child: Column(
@@ -706,42 +753,6 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar() {
-    return Container(
-      width: 250,
-      color: const Color(0xFF7C3AED),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shopping_bag, color: Color(0xFF7C3AED)),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Logo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
