@@ -9,13 +9,16 @@ import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
 import '../../../model/payment_cards_model.dart';
+import '../../../view/returnRefund/return_request_details.dart';
 import '../../../view/widgets/product_status_utils.dart';
+import '../../../view/widgets/return_status_utils.dart';
 import '../../../view/widgets/user_utils.dart';
 import '../customer/admin_customer.dart';
 import '../returnrefund/admin_return.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_order.dart';
+import 'admin_order_details_controller.dart';
 
 class OrderDetailsPage extends StatefulWidget {
   final OrdersModel order;
@@ -46,6 +49,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   bool isLoading = true;
   String currentPage = 'orders';
   String? customerFullName;
+  late OrderDetailsManagementController _controller;
 
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
@@ -58,64 +62,35 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _controller = OrderDetailsManagementController(firestore: widget.firestore);
     currentStatus = widget.order.orderStatus;
     _loadOrderData();
     fetchCustomerName();
   }
 
   Future<void> _loadOrderData() async {
-    await Future.wait([_fetchShipmentData(), _fetchPaymentData()]);
+    final data = await _controller.loadOrderData(
+      customerId: widget.order.customerId!,
+      orderId: widget.order.id,
+      paymentStatus: widget.order.payment,
+    );
+
     setState(() {
+      shipment = data.shipment;
+      paymentCard = data.paymentCard;
       isLoading = false;
     });
   }
 
-  Future<void> _fetchShipmentData() async {
-    try {
-      final shipmentSnapshot = await widget.firestore
-          .collection('users')
-          .doc(widget.order.customerId)
-          .collection('order')
-          .doc(widget.order.id)
-          .collection('shipment')
-          .get();
-      if (shipmentSnapshot.docs.isNotEmpty) {
-        shipment = ShipmentModel.fromMap(
-          shipmentSnapshot.docs.first.data(),
-          shipmentSnapshot.docs.first.id,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error fetching shipment: $e');
-    }
-  }
 
-  Future<void> _fetchPaymentData() async {
-    try {
-      if (widget.order.payment != null && widget.order.payment != 'Pending') {
-        final paymentMethodsSnapshot = await widget.firestore
-            .collection('users')
-            .doc(widget.order.customerId)
-            .collection('paymentMethods')
-            .get();
+  Future<bool> hasReturnRequest(String orderId) async {
+    final query = await FirebaseFirestore.instance
+        .collection('returnRequests')
+        .where('orderId', isEqualTo: orderId)
+        .limit(1)
+        .get();
 
-        if (paymentMethodsSnapshot.docs.isNotEmpty) {
-          QueryDocumentSnapshot<Map<String, dynamic>>? defaultPaymentDoc;
-
-          for (var doc in paymentMethodsSnapshot.docs) {
-            if (doc.data()['isDefault'] == true) {
-              defaultPaymentDoc = doc;
-              break;
-            }
-          }
-
-          defaultPaymentDoc ??= paymentMethodsSnapshot.docs.first;
-          paymentCard = PaymentCard.fromDocument(defaultPaymentDoc);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching payment card: $e');
-    }
+    return query.docs.isNotEmpty;
   }
 
   @override
@@ -215,8 +190,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMainOrderInfo(),
-                    const SizedBox(height: 20),
                     _buildOrderSummaryCard(),
                     const SizedBox(height: 20),
                     _buildOrderTimeline(),
@@ -238,6 +211,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     _buildAddressInfoCard(),
                     const SizedBox(height: 16),
                     _buildCustomerInfoCard(),
+                    const SizedBox(height: 16),
+                    _buildReturnInfoCard(),
                   ],
                 ),
               ),
@@ -281,13 +256,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${widget.order.orderDate}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
+                      DateFormat('MMM dd, yyyy • hh:mm a').format(widget.order.orderDate),
+                      // Output: Jul 17, 2025 • 01:06 AM
+                    )
                   ],
                 ),
                 const SizedBox(width: 24),
@@ -309,7 +280,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     value: currentStatus,
                     underline: const SizedBox(),
                     isDense: true,
-                    items: _getAvailableStatuses(currentStatus)
+                    items: _controller.getAvailableStatuses(currentStatus)
                         .map(
                           (status) => DropdownMenuItem(
                             value: status,
@@ -383,132 +354,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ),
     );
   }
-
-  Widget _buildMainOrderInfo() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.receipt_long,
-                  color: Color(0xFF7C3AED),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Order Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoTile(
-                  'Order Date',
-                  _formatDate(widget.order.orderDate),
-                  Icons.calendar_today,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildInfoTile(
-                  'Customer',
-                  widget.customerNames[widget.order.customerId] ?? 'Unknown',
-                  Icons.person,
-                  Colors.green,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildInfoTile(
-                  'Return Eligible',
-                  widget.order.eligibilityForReturn ? 'Yes' : 'No',
-                  Icons.assignment_return,
-                  widget.order.eligibilityForReturn ? Colors.green : Colors.red,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildOrderSummaryCard() {
-    const double shippingFee = 8.00;
-    final double subtotal = widget.products.fold(
-      0,
-      (sum, product) => sum + product.totalPrice,
-    );
-    final double grandTotal = subtotal + shippingFee;
+    final shippingFee = _controller.getShippingFee();
+    final subtotal = _controller.calculateSubtotal(widget.products);
+    final grandTotal = _controller.calculateGrandTotal(widget.products);
 
     return Container(
       decoration: BoxDecoration(
@@ -934,13 +783,296 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ],
           ),
           const SizedBox(height: 16),
-          Column(children: _buildTimelineItems()),
+          // CHANGE: Use controller to get timeline items
+          Column(
+            children: _controller.getTimelineItems(widget.order).map((item) =>
+                _buildTimelineItem(
+                  item.title,
+                  item.date,
+                  item.icon,
+                  item.color,
+                  isCompleted: item.isCompleted,
+                  isFirst: item.isFirst,
+                  isLast: item.isLast,
+                ),
+            ).toList(),
+          ),
         ],
       ),
     );
   }
 
+
   // Right Column Cards - Smaller and more compact
+
+  Widget _buildReturnInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.assignment_return, color: Colors.green, size: 14),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Return Details',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Return Eligibility
+          Row(
+            children: [
+              const Text(
+                'Return Eligibility: ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                widget.order.eligibilityForReturn ? 'Yes' : 'No',
+                style: TextStyle(
+                  color: widget.order.eligibilityForReturn ? Colors.green : Colors.red,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          // Check if there are return requests for this order
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('returnRequests')
+                .where('userID', isEqualTo: widget.order.customerId)
+                .where('orderID', isEqualTo: widget.order.id)
+                .snapshots(),
+
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 12.0),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF8E6CEF),
+                    ),
+                  ),
+                );
+              }
+
+              if (snapshot.data!.docs.isEmpty) {
+                // No return requests found - show message
+                return Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'No return requests for this order',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+
+                  // Active Return Requests Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Active Return Requests (${snapshot.data!.docs.length})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Return Request List
+                  ...snapshot.data!.docs.map((doc) {
+                    final returnData = doc.data() as Map<String, dynamic>;
+                    final returnId = doc.id;
+                    final status = returnData['status'] ?? 'Pending';
+                    final createdAt = (returnData['createdTime'] as Timestamp?)?.toDate();
+                    final reason = returnData['reason'] ?? 'Not specified';
+
+                    return GestureDetector(
+                      onTap: () {
+                        // Navigate to return request details
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReturnRequestDetailsView(
+                              returnRequestId: returnId,
+                              userId: widget.order.customerId ?? '',
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Return ID and Status
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Return #${returnId.substring(0, 6).toUpperCase()}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: ReturnStatusUtils.getReturnStatusColor(status).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: ReturnStatusUtils.getReturnStatusColor(status),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Reason
+                            Row(
+                              children: [
+                                const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'Reason: $reason',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Date
+                            if (createdAt != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Requested: ${DateFormat('MMM d, y').format(createdAt)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+
+                            // View Details Link
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'View Details',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 12,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildPaymentInfoCard() {
     return Container(
@@ -1236,7 +1368,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'User ID: ${shortUserId(widget.order.customerId ?? "")}',
+            'User ID: #${shortUserId(widget.order.customerId ?? "")}',
             style: TextStyle(fontSize: 14, fontFamily: 'monospace'),
           ),
           const SizedBox(height: 4),
@@ -1247,134 +1379,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         ],
       ),
     );
-  }
-
-  // Timeline helper methods
-  List<Widget> _buildTimelineItems() {
-    List<Widget> timelineItems = [];
-
-    // Order Created (always present)
-    timelineItems.add(
-      _buildTimelineItem(
-        'Order Created',
-        widget.order.orderDate,
-        Icons.shopping_cart,
-        Colors.grey[700]!,
-        isCompleted: true,
-        isFirst: true,
-      ),
-    );
-
-    // Order Confirmed
-    if (widget.order.confirmedDate != null) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Order Confirmed',
-          widget.order.confirmedDate!,
-          Icons.check_circle,
-          Colors.grey[700]!,
-          isCompleted: true,
-        ),
-      );
-    } else if (widget.order.orderStatus != 'canceled') {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Order Confirmed',
-          null,
-          Icons.check_circle_outline,
-          Colors.grey[400]!,
-          isCompleted: false,
-        ),
-      );
-    }
-
-    // To Ship
-    if (widget.order.toShipDate != null) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Ready to Ship',
-          widget.order.toShipDate!,
-          Icons.inventory,
-          Colors.grey[700]!,
-          isCompleted: true,
-        ),
-      );
-    } else if ([
-      'to_ship',
-      'to_receive',
-      'completed',
-    ].contains(widget.order.orderStatus)) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Ready to Ship',
-          null,
-          Icons.inventory_outlined,
-          Colors.grey[400]!,
-          isCompleted: false,
-        ),
-      );
-    }
-
-    // To Receive (Shipped)
-    if (widget.order.toReceiveDate != null) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Shipped',
-          widget.order.toReceiveDate!,
-          Icons.local_shipping,
-          Colors.grey[700]!,
-          isCompleted: true,
-        ),
-      );
-    } else if (['to_receive', 'completed'].contains(widget.order.orderStatus)) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Shipped',
-          null,
-          Icons.local_shipping_outlined,
-          Colors.grey[400]!,
-          isCompleted: false,
-        ),
-      );
-    }
-
-    // Completed or Cancelled
-    if (widget.order.completedDate != null) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Delivered',
-          widget.order.completedDate!,
-          Icons.done_all,
-          Colors.green[700]!,
-          isCompleted: true,
-          isLast: true,
-        ),
-      );
-    } else if (widget.order.cancelledDate != null) {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Cancelled',
-          widget.order.cancelledDate!,
-          Icons.cancel,
-          Colors.red[700]!,
-          isCompleted: true,
-          isLast: true,
-        ),
-      );
-    } else if (widget.order.orderStatus != 'canceled') {
-      timelineItems.add(
-        _buildTimelineItem(
-          'Delivered',
-          null,
-          Icons.done_all_outlined,
-          Colors.grey[400]!,
-          isCompleted: false,
-          isLast: true,
-        ),
-      );
-    }
-
-    return timelineItems;
   }
 
   Widget _buildTimelineItem(
@@ -1461,15 +1465,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // Event handlers and utility methods
+  //already in controller ***************
+
   void _handleStatusChange(String? newStatus) async {
     if (newStatus != null && newStatus != currentStatus) {
-      if (!_isTransitionAllowed(currentStatus, newStatus)) {
+      // Check if transition is allowed
+      if (!_controller.isTransitionAllowed(currentStatus, newStatus)) {
         _showTransitionError(currentStatus, newStatus);
         return;
       }
 
       bool proceedWithUpdate = false;
+
+      // Handle specific transitions
       switch ('$currentStatus->$newStatus') {
         case 'to_ship->to_receive':
           proceedWithUpdate = await _handleShipToReceive();
@@ -1489,21 +1497,23 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         setState(() => currentStatus = newStatus);
         await _updateOrderStatus(newStatus);
         if (newStatus == 'to_receive') {
-          await _fetchShipmentData();
+          await _loadOrderData(); // Re-fetch shipment + payment
         }
+
       }
     }
   }
 
+  // Update order status with UI feedback
   Future<void> _updateOrderStatus(String newStatus) async {
     try {
-      await widget.firestore
-          .collection('users')
-          .doc(widget.order.customerId)
-          .collection('order')
-          .doc(widget.order.id)
-          .update({'orderStatus': newStatus});
+      await _controller.updateOrderStatus(
+        customerId: widget.order.customerId!,
+        orderId: widget.order.id,
+        newStatus: newStatus,
+      );
       await widget.onOrdersReload();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Order status updated successfully')),
@@ -1511,305 +1521,298 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error updating order: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating order: $e')),
+        );
       }
     }
   }
 
+  // Handle ship to receive transition
   Future<bool> _handleShipToReceive() async {
-    if (widget.order.payment == null) {
-      final proceed =
-          await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Payment Not Confirmed'),
-              content: const Text(
-                'This order does not have a recorded payment method. Are you sure you want to ship it?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                  ),
-                  child: const Text('Proceed Anyway'),
-                ),
-              ],
+    final validationResult = _controller.validateShipToReceive(
+      order: widget.order,
+      shipment: shipment,
+    );
+
+    switch (validationResult) {
+      case OrderDetailsManagementController.NO_PAYMENT:
+        return await _showPaymentWarningDialog();
+
+      case OrderDetailsManagementController.INCOMPLETE_ADDRESS:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Shipping address is incomplete. Please update customer information first.',
             ),
-          ) ??
-          false;
-      if (!proceed) return false;
-    }
-
-    bool isAddressComplete =
-        shipment != null &&
-        (shipment!.fullName?.isNotEmpty ?? false) &&
-        (shipment!.phoneNum != null && shipment!.phoneNum! > 0) &&
-        (shipment!.streetone?.isNotEmpty ?? false) &&
-        (shipment!.city?.isNotEmpty ?? false) &&
-        (shipment!.state?.isNotEmpty ?? false) &&
-        (shipment!.zipCode?.isNotEmpty ?? false);
-
-    if (!isAddressComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Shipping address is incomplete. Please update customer information first.',
+            backgroundColor: Colors.red,
           ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
-    }
+        );
+        return false;
 
-    if (shipment?.trackingNumber == null || shipment!.trackingNumber!.isEmpty) {
-      return await _showTrackingNumberDialog();
+      case OrderDetailsManagementController.NO_TRACKING:
+        return await _showTrackingNumberDialog();
+
+      case OrderDetailsManagementController.VALIDATION_OK:
+        return true;
+
+      default:
+        return false;
     }
-    return true;
   }
 
+  // Show payment warning dialog
+  Future<bool> _showPaymentWarningDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Payment Not Confirmed'),
+        content: const Text(
+          'This order does not have a recorded payment method. Are you sure you want to ship it?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Proceed Anyway'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  // Handle receive to completed transition
   Future<bool> _handleReceiveToCompleted() async {
     return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Complete Order'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Mark this order as completed?'),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.amber[700], size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'This action cannot be undone. The order will be marked as delivered.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.amber[900],
-                          ),
-                        ),
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mark this order as completed?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.amber[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone. The order will be marked as delivered.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.amber[900],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await widget.firestore
-                      .collection('users')
-                      .doc(widget.order.customerId)
-                      .collection('order')
-                      .doc(widget.order.id)
-                      .update({'completedDate': Timestamp.now()});
-                  Navigator.pop(context, true);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Complete Order'),
-              ),
-            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-        ) ??
-        false;
+          ElevatedButton(
+            onPressed: () async {
+              await _controller.updateOrderCompletion(
+                customerId: widget.order.customerId!,
+                orderId: widget.order.id,
+              );
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Complete Order'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
+  // Handle order cancellation
   Future<bool> _handleCancellation() async {
     final reasonController = TextEditingController();
+
     return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Cancel Order'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (currentStatus == 'to_receive')
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.red[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.red[700], size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'This order has already been shipped. Cancellation may require return shipping.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.red[900],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                TextField(
-                  controller: reasonController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cancellation Reason *',
-                    hintText: 'Enter reason for cancellation',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  autofocus: true,
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (currentStatus == 'to_receive')
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Back'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (reasonController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please provide a cancellation reason'),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This order has already been shipped. Cancellation may require return shipping.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.red[900],
+                        ),
                       ),
-                    );
-                    return;
-                  }
-                  await widget.firestore
-                      .collection('users')
-                      .doc(widget.order.customerId)
-                      .collection('order')
-                      .doc(widget.order.id)
-                      .update({
-                        'cancellationReason': reasonController.text.trim(),
-                        'canceledDate': Timestamp.now(),
-                      });
-                  Navigator.pop(context, true);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Cancel Order'),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Cancellation Reason *',
+                hintText: 'Enter reason for cancellation',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Back'),
           ),
-        ) ??
-        false;
+          ElevatedButton(
+            onPressed: () async {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please provide a cancellation reason'),
+                  ),
+                );
+                return;
+              }
+              await _controller.updateOrderCancellation(
+                customerId: widget.order.customerId!,
+                orderId: widget.order.id,
+                cancellationReason: reasonController.text.trim(),
+              );
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
+  // Show tracking number dialog
   Future<bool> _showTrackingNumberDialog() async {
     final trackingNumberController = TextEditingController();
+
     return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Enter Tracking Number'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'A tracking number is required to update the status to "To Receive".',
-                  style: TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: trackingNumberController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tracking Number *',
-                    hintText: 'Enter tracking number',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'The shipped date will be set to current date/time.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Tracking Number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'A tracking number is required to update the status to "To Receive".',
+              style: TextStyle(fontSize: 14),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: trackingNumberController,
+              decoration: const InputDecoration(
+                labelText: 'Tracking Number *',
+                hintText: 'Enter tracking number',
+                border: OutlineInputBorder(),
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (trackingNumberController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a tracking number'),
-                      ),
-                    );
-                    return;
-                  }
-                  try {
-                    final shipmentRef = widget.firestore
-                        .collection('users')
-                        .doc(widget.order.customerId)
-                        .collection('order')
-                        .doc(widget.order.id)
-                        .collection('shipment');
-                    final snapshot = await shipmentRef.get();
-                    final updateData = {
-                      'trackingNumber': trackingNumberController.text.trim(),
-                      'shippedDate': Timestamp.now(),
-                    };
-                    if (snapshot.docs.isNotEmpty) {
-                      await snapshot.docs.first.reference.update(updateData);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Shipment document not found'),
-                        ),
-                      );
-                      Navigator.pop(context, false);
-                      return;
-                    }
-                    if (context.mounted) {
-                      Navigator.pop(context, true);
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error updating tracking number: $e'),
-                        ),
-                      );
-                      Navigator.pop(context, false);
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                ),
-                child: const Text('Confirm'),
-              ),
-            ],
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The shipped date will be set to current date/time.',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-        ) ??
-        false;
+          ElevatedButton(
+            onPressed: () async {
+              if (trackingNumberController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a tracking number'),
+                  ),
+                );
+                return;
+              }
+
+              try {
+                final success = await _controller.updateTrackingNumber(
+                  customerId: widget.order.customerId!,
+                  orderId: widget.order.id,
+                  trackingNumber: trackingNumberController.text.trim(),
+                );
+
+                if (!success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Shipment document not found'),
+                    ),
+                  );
+                  Navigator.pop(context, false);
+                  return;
+                }
+
+                if (context.mounted) {
+                  Navigator.pop(context, true);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString())),
+                  );
+                  Navigator.pop(context, false);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
+  // Show delete confirmation dialog
   void _showDeleteConfirmationDialog() {
     showDialog(
       context: context,
@@ -1892,21 +1895,18 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         Navigator.pop(context);
-                        Navigator.pop(context);
+                        Navigator.pop(context); // Close order details page
+
                         try {
-                          await widget.firestore
-                              .collection('users')
-                              .doc(widget.order.customerId)
-                              .collection('order')
-                              .doc(widget.order.id)
-                              .delete();
+                          await _controller.deleteOrder(
+                            customerId: widget.order.customerId!,
+                            orderId: widget.order.id,
+                          );
                           await widget.onOrdersReload();
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error deleting order: $e'),
-                              ),
+                              SnackBar(content: Text('Error deleting order: $e')),
                             );
                           }
                         }
@@ -1933,30 +1933,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  // Utility methods
-  List<String> _getAvailableStatuses(String currentStatus) {
-    List<String> statuses = [currentStatus];
-    statuses.addAll(allowedTransitions[currentStatus] ?? []);
-    return statuses;
-  }
 
-  bool _isTransitionAllowed(String fromStatus, String toStatus) {
-    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
-  }
+  //already in controller ***************
 
-  void _showTransitionError(String fromStatus, String toStatus) {
-    String message = '';
-    if (fromStatus == 'completed') {
-      message = 'Completed orders cannot be modified.';
-    } else if (fromStatus == 'canceled') {
-      message = 'Canceled orders cannot be reactivated.';
-    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
-      message = 'Cannot revert to "To Ship" once tracking number is provided.';
-    } else {
-      message = 'This status transition is not allowed.';
-    }
+  // Show transition error
+  void _showTransitionError(String from, String to) {
+    final errorMessage = _controller.getTransitionErrorMessage(from, to);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+      ),
     );
   }
 

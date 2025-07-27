@@ -550,21 +550,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                 const SizedBox(width: 12),
               ],
               // Overdue indicator
-              if (isOverdue && !controller.bulkMode) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.priority_high,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
+
               Expanded(
                 flex: 2,
                 child: Column(

@@ -1,22 +1,47 @@
-// FILE: order_details_controller.dart
+// ===== ORDER MANAGEMENT CONTROLLER =====
+// order_management_controller.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:secondsight/view/widgets/order_status_utils.dart';
+
 import '../../../model/order_model.dart';
-import '../../../model/shipment_model.dart';
+import '../../../model/order_product_model.dart';
 import '../../../model/payment_cards_model.dart';
+import '../../../model/shipment_model.dart';
 
-class OrderDetailsController extends ChangeNotifier {
-  final OrdersModel order;
+class TimelineItem {
+  final String title;
+  final DateTime? date;
+  final IconData icon;
+  final Color color;
+  final bool isCompleted;
+  final bool isFirst;
+  final bool isLast;
+
+  TimelineItem({
+    required this.title,
+    this.date,
+    required this.icon,
+    required this.color,
+    required this.isCompleted,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+}
+
+class OrderData {
+  final ShipmentModel? shipment;
+  final PaymentCard? paymentCard;
+
+  OrderData({this.shipment, this.paymentCard});
+}
+
+class OrderDetailsManagementController {
   final FirebaseFirestore firestore;
-  final Future<void> Function() onOrdersReload;
 
-  late String currentStatus;
-  ShipmentModel? shipment;
-  PaymentCard? paymentCard;
-  bool isLoading = true;
+  OrderDetailsManagementController({required this.firestore});
 
-  // Define allowed status transitions
+  // Status transition validation constants
   static const Map<String, List<String>> allowedTransitions = {
     'to_ship': ['to_receive', 'canceled'],
     'to_receive': ['completed', 'canceled'],
@@ -24,457 +49,371 @@ class OrderDetailsController extends ChangeNotifier {
     'canceled': [],
   };
 
-  OrderDetailsController({
-    required this.order,
-    required this.firestore,
-    required this.onOrdersReload,
-  }) {
-    currentStatus = order.orderStatus;
-    _loadOrderData();
+  // Validation result constants
+  static const int VALIDATION_OK = 0;
+  static const int NO_PAYMENT = 1;
+  static const int INCOMPLETE_ADDRESS = 2;
+  static const int NO_TRACKING = 3;
+  static const int INVALID_TRANSITION = 4;
+
+  // Check if status transition is allowed
+  bool isTransitionAllowed(String fromStatus, String toStatus) {
+    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
   }
 
-  Future<void> _loadOrderData() async {
-    await Future.wait([
-      _fetchShipmentData(),
-      _fetchPaymentData(),
-    ]);
-    isLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> _fetchShipmentData() async {
-    try {
-      final shipmentSnapshot = await firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .collection('shipment')
-          .get();
-      if (shipmentSnapshot.docs.isNotEmpty) {
-        shipment = ShipmentModel.fromMap(
-          shipmentSnapshot.docs.first.data(),
-          shipmentSnapshot.docs.first.id,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error fetching shipment: $e');
-    }
-  }
-
-  Future<void> _fetchPaymentData() async {
-    try {
-      if (order.payment != null && order.payment != 'Pending') {
-        final paymentMethodsSnapshot = await firestore
-            .collection('users')
-            .doc(order.customerId)
-            .collection('paymentMethods')
-            .get();
-
-        if (paymentMethodsSnapshot.docs.isNotEmpty) {
-          QueryDocumentSnapshot<Map<String, dynamic>>? defaultPaymentDoc;
-
-          for (var doc in paymentMethodsSnapshot.docs) {
-            if (doc.data()['isDefault'] == true) {
-              defaultPaymentDoc = doc;
-              break;
-            }
-          }
-
-          defaultPaymentDoc ??= paymentMethodsSnapshot.docs.first;
-          paymentCard = PaymentCard.fromDocument(defaultPaymentDoc);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching payment card: $e');
-    }
-  }
-
-  Future<void> handleStatusChange(String? newStatus, BuildContext context) async {
-    if (newStatus != null && newStatus != currentStatus) {
-      if (!isTransitionAllowed(currentStatus, newStatus)) {
-        showTransitionError(currentStatus, newStatus, context);
-        return;
-      }
-
-      bool proceedWithUpdate = false;
-      switch ('$currentStatus->$newStatus') {
-        case 'to_ship->to_receive':
-          proceedWithUpdate = await handleShipToReceive(context);
-          break;
-        case 'to_receive->completed':
-          proceedWithUpdate = await handleReceiveToCompleted(context);
-          break;
-        case 'to_ship->canceled':
-        case 'to_receive->canceled':
-          proceedWithUpdate = await handleCancellation(context);
-          break;
-        default:
-          proceedWithUpdate = true;
-      }
-
-      if (proceedWithUpdate) {
-        currentStatus = newStatus;
-        notifyListeners();
-        await updateOrderStatus(newStatus, context);
-        if (newStatus == 'to_receive') {
-          await _fetchShipmentData();
-          notifyListeners();
-        }
-      }
-    }
-  }
-
-  Future<void> updateOrderStatus(String newStatus, BuildContext context) async {
-    try {
-      await firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .update({'orderStatus': newStatus});
-      await onOrdersReload();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order status updated successfully')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating order: $e')),
-        );
-      }
-    }
-  }
-
-  Future<bool> handleShipToReceive(BuildContext context) async {
-    if (order.payment == null) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Payment Not Confirmed'),
-          content: const Text(
-              'This order does not have a recorded payment method. Are you sure you want to ship it?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('Proceed Anyway'),
-            ),
-          ],
-        ),
-      ) ?? false;
-      if (!proceed) return false;
-    }
-
-    bool isAddressComplete = shipment != null &&
-        (shipment!.fullName?.isNotEmpty ?? false) &&
-        (shipment!.phoneNum != null && shipment!.phoneNum! > 0) &&
-        (shipment!.streetone?.isNotEmpty ?? false) &&
-        (shipment!.city?.isNotEmpty ?? false) &&
-        (shipment!.state?.isNotEmpty ?? false) &&
-        (shipment!.zipCode?.isNotEmpty ?? false);
-
-    if (!isAddressComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Shipping address is incomplete. Please update customer information first.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
-    }
-
-    if (shipment?.trackingNumber == null || shipment!.trackingNumber!.isEmpty) {
-      return await showTrackingNumberDialog(context);
-    }
-    return true;
-  }
-
-  Future<bool> handleReceiveToCompleted(BuildContext context) async {
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Complete Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Mark this order as completed?'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.amber[700], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'This action cannot be undone. The order will be marked as delivered.',
-                      style: TextStyle(fontSize: 13, color: Colors.amber[900]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await firestore
-                  .collection('users')
-                  .doc(order.customerId)
-                  .collection('order')
-                  .doc(order.id)
-                  .update({
-                'completedDate': Timestamp.now(),
-              });
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Complete Order'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Future<bool> handleCancellation(BuildContext context) async {
-    final reasonController = TextEditingController();
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (currentStatus == 'to_receive')
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This order has already been shipped. Cancellation may require return shipping.',
-                        style: TextStyle(fontSize: 13, color: Colors.red[900]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Cancellation Reason *',
-                hintText: 'Enter reason for cancellation',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              autofocus: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Back'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please provide a cancellation reason')),
-                );
-                return;
-              }
-              await firestore
-                  .collection('users')
-                  .doc(order.customerId)
-                  .collection('order')
-                  .doc(order.id)
-                  .update({
-                'cancellationReason': reasonController.text.trim(),
-                'canceledDate': Timestamp.now(),
-              });
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Cancel Order'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Future<bool> showTrackingNumberDialog(BuildContext context) async {
-    final trackingNumberController = TextEditingController();
-    return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter Tracking Number'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'A tracking number is required to update the status to "To Receive".',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: trackingNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Tracking Number *',
-                hintText: 'Enter tracking number',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'The shipped date will be set to current date/time.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (trackingNumberController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a tracking number')),
-                );
-                return;
-              }
-              try {
-                final shipmentRef = firestore
-                    .collection('users')
-                    .doc(order.customerId)
-                    .collection('order')
-                    .doc(order.id)
-                    .collection('shipment');
-                final snapshot = await shipmentRef.get();
-                final updateData = {
-                  'trackingNumber': trackingNumberController.text.trim(),
-                  'shippedDate': Timestamp.now(),
-                };
-                if (snapshot.docs.isNotEmpty) {
-                  await snapshot.docs.first.reference.update(updateData);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Shipment document not found')),
-                  );
-                  Navigator.pop(context, false);
-                  return;
-                }
-                if (context.mounted) {
-                  Navigator.pop(context, true);
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating tracking number: $e')),
-                  );
-                  Navigator.pop(context, false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
-
-  Future<void> deleteOrder(BuildContext context) async {
-    try {
-      await firestore
-          .collection('users')
-          .doc(order.customerId)
-          .collection('order')
-          .doc(order.id)
-          .delete();
-      await onOrdersReload();
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting order: $e'))
-        );
-      }
-    }
-  }
-
-  void checkDeletePermission(BuildContext context) {
-    if (order.orderStatus == 'completed' || order.orderStatus == 'to_receive') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Cannot delete ${OrderStatusUtils.formatStatus(order.orderStatus)} orders'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
+  // Get available statuses for dropdown
   List<String> getAvailableStatuses(String currentStatus) {
     List<String> statuses = [currentStatus];
     statuses.addAll(allowedTransitions[currentStatus] ?? []);
     return statuses;
   }
 
-  bool isTransitionAllowed(String fromStatus, String toStatus) {
-    return allowedTransitions[fromStatus]?.contains(toStatus) ?? false;
+  // Get transition error message
+  String getTransitionErrorMessage(String fromStatus, String toStatus) {
+    if (fromStatus == 'completed') {
+      return 'Completed orders cannot be modified.';
+    } else if (fromStatus == 'canceled') {
+      return 'Canceled orders cannot be reactivated.';
+    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
+      return 'Cannot revert to "To Ship" once tracking number is provided.';
+    } else {
+      return 'This status transition is not allowed.';
+    }
   }
 
-  void showTransitionError(String fromStatus, String toStatus, BuildContext context) {
-    String message = '';
-    if (fromStatus == 'completed') {
-      message = 'Completed orders cannot be modified.';
-    } else if (fromStatus == 'canceled') {
-      message = 'Canceled orders cannot be reactivated.';
-    } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
-      message = 'Cannot revert to "To Ship" once tracking number is provided.';
-    } else {
-      message = 'This status transition is not allowed.';
+  // Validate ship to receive transition
+  int validateShipToReceive({
+    required OrdersModel order,
+    required ShipmentModel? shipment,
+  }) {
+    // Check payment
+    if (order.payment == null) {
+      return NO_PAYMENT;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+
+    // Check shipping address
+    if (!isShippingAddressComplete(shipment)) {
+      return INCOMPLETE_ADDRESS;
+    }
+
+    // Check tracking number
+    if (!hasTrackingNumber(shipment)) {
+      return NO_TRACKING;
+    }
+
+    return VALIDATION_OK;
+  }
+
+  // Helper methods
+  bool isShippingAddressComplete(ShipmentModel? shipment) {
+    return shipment != null &&
+        (shipment.fullName?.isNotEmpty ?? false) &&
+        (shipment.phoneNum != null && shipment.phoneNum! > 0) &&
+        (shipment.streetone?.isNotEmpty ?? false) &&
+        (shipment.city?.isNotEmpty ?? false) &&
+        (shipment.state?.isNotEmpty ?? false) &&
+        (shipment.zipCode?.isNotEmpty ?? false);
+  }
+
+  bool hasTrackingNumber(ShipmentModel? shipment) {
+    return shipment?.trackingNumber != null &&
+        shipment!.trackingNumber!.isNotEmpty;
+  }
+
+  // Update order status
+  Future<void> updateOrderStatus({
+    required String customerId,
+    required String orderId,
+    required String newStatus,
+  }) async {
+    await firestore
+        .collection('users')
+        .doc(customerId)
+        .collection('order')
+        .doc(orderId)
+        .update({'orderStatus': newStatus});
+  }
+
+  // Update order completion
+  Future<void> updateOrderCompletion({
+    required String customerId,
+    required String orderId,
+  }) async {
+    await firestore
+        .collection('users')
+        .doc(customerId)
+        .collection('order')
+        .doc(orderId)
+        .update({'completedDate': Timestamp.now()});
+  }
+
+  // Update order cancellation
+  Future<void> updateOrderCancellation({
+    required String customerId,
+    required String orderId,
+    required String cancellationReason,
+  }) async {
+    await firestore
+        .collection('users')
+        .doc(customerId)
+        .collection('order')
+        .doc(orderId)
+        .update({
+      'cancellationReason': cancellationReason,
+      'canceledDate': Timestamp.now(),
+    });
+  }
+
+  // Update tracking number
+  Future<bool> updateTrackingNumber({
+    required String customerId,
+    required String orderId,
+    required String trackingNumber,
+  }) async {
+    try {
+      final shipmentRef = firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('order')
+          .doc(orderId)
+          .collection('shipment');
+
+      final snapshot = await shipmentRef.get();
+
+      if (snapshot.docs.isNotEmpty) {
+        await snapshot.docs.first.reference.update({
+          'trackingNumber': trackingNumber,
+          'shippedDate': Timestamp.now(),
+        });
+        return true;
+      }
+      return false;
+    } catch (e) {
+      throw Exception('Error updating tracking number: $e');
+    }
+  }
+
+  // Delete order
+  Future<void> deleteOrder({
+    required String customerId,
+    required String orderId,
+  }) async {
+    await firestore
+        .collection('users')
+        .doc(customerId)
+        .collection('order')
+        .doc(orderId)
+        .delete();
+  }
+
+  static const double SHIPPING_FEE = 8.00;
+
+  double getShippingFee() => SHIPPING_FEE;
+
+  double calculateSubtotal(List<OrderProductModel> products) {
+    return products.fold(0, (sum, product) => sum + product.totalPrice);
+  }
+
+  double calculateGrandTotal(List<OrderProductModel> products) {
+    return calculateSubtotal(products) + getShippingFee();
+  }
+
+  List<TimelineItem> getTimelineItems(OrdersModel order) {
+    List<TimelineItem> items = [];
+
+    // Order Created (always present)
+    items.add(TimelineItem(
+      title: 'Order Created',
+      date: order.orderDate,
+      icon: Icons.shopping_cart,
+      color: Colors.grey[700]!,
+      isCompleted: true,
+      isFirst: true,
+    ));
+
+    // Order Confirmed
+    if (order.confirmedDate != null) {
+      items.add(TimelineItem(
+        title: 'Order Confirmed',
+        date: order.confirmedDate,
+        icon: Icons.check_circle,
+        color: Colors.grey[700]!,
+        isCompleted: true,
+      ));
+    } else if (order.orderStatus != 'canceled') {
+      items.add(TimelineItem(
+        title: 'Order Confirmed',
+        date: null,
+        icon: Icons.check_circle_outline,
+        color: Colors.grey[400]!,
+        isCompleted: false,
+      ));
+    }
+
+    // To Ship
+    if (order.toShipDate != null) {
+      items.add(TimelineItem(
+        title: 'Ready to Ship',
+        date: order.toShipDate,
+        icon: Icons.inventory,
+        color: Colors.grey[700]!,
+        isCompleted: true,
+      ));
+    } else if (['to_ship', 'to_receive', 'completed'].contains(order.orderStatus)) {
+      items.add(TimelineItem(
+        title: 'Ready to Ship',
+        date: null,
+        icon: Icons.inventory_outlined,
+        color: Colors.grey[400]!,
+        isCompleted: false,
+      ));
+    }
+
+    // To Receive (Shipped)
+    if (order.toReceiveDate != null) {
+      items.add(TimelineItem(
+        title: 'Shipped',
+        date: order.toReceiveDate,
+        icon: Icons.local_shipping,
+        color: Colors.grey[700]!,
+        isCompleted: true,
+      ));
+    } else if (['to_receive', 'completed'].contains(order.orderStatus)) {
+      items.add(TimelineItem(
+        title: 'Shipped',
+        date: null,
+        icon: Icons.local_shipping_outlined,
+        color: Colors.grey[400]!,
+        isCompleted: false,
+      ));
+    }
+
+    // Completed or Cancelled
+    if (order.completedDate != null) {
+      items.add(TimelineItem(
+        title: 'Delivered',
+        date: order.completedDate,
+        icon: Icons.done_all,
+        color: Colors.green[700]!,
+        isCompleted: true,
+        isLast: true,
+      ));
+    } else if (order.cancelledDate != null) {
+      items.add(TimelineItem(
+        title: 'Cancelled',
+        date: order.cancelledDate,
+        icon: Icons.cancel,
+        color: Colors.red[700]!,
+        isCompleted: true,
+        isLast: true,
+      ));
+    } else if (order.orderStatus != 'canceled') {
+      items.add(TimelineItem(
+        title: 'Delivered',
+        date: null,
+        icon: Icons.done_all_outlined,
+        color: Colors.grey[400]!,
+        isCompleted: false,
+        isLast: true,
+      ));
+    }
+
+    return items;
+  }
+
+
+  Future<OrderData> loadOrderData({
+    required String customerId,
+    required String orderId,
+    String? paymentStatus,
+  }) async {
+    final results = await Future.wait([
+      fetchShipmentData(customerId: customerId, orderId: orderId),
+      fetchPaymentData(customerId: customerId, paymentStatus: paymentStatus),
+    ]);
+
+    return OrderData(
+      shipment: results[0] as ShipmentModel?,
+      paymentCard: results[1] as PaymentCard?,
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  Future<ShipmentModel?> fetchShipmentData({
+    required String customerId,
+    required String orderId,
+  }) async {
+    try {
+      final shipmentSnapshot = await firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('order')
+          .doc(orderId)
+          .collection('shipment')
+          .get();
+
+      if (shipmentSnapshot.docs.isNotEmpty) {
+        return ShipmentModel.fromMap(
+          shipmentSnapshot.docs.first.data(),
+          shipmentSnapshot.docs.first.id,
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching shipment: $e');
+      return null;
+    }
   }
+
+  Future<PaymentCard?> fetchPaymentData({
+    required String customerId,
+    String? paymentStatus,
+  }) async {
+    try {
+      if (paymentStatus == null || paymentStatus == 'Pending') {
+        return null;
+      }
+
+      final paymentMethodsSnapshot = await firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('paymentMethods')
+          .get();
+
+      if (paymentMethodsSnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      // Find default payment method
+      QueryDocumentSnapshot<Map<String, dynamic>>? defaultPaymentDoc;
+      for (var doc in paymentMethodsSnapshot.docs) {
+        if (doc.data()['isDefault'] == true) {
+          defaultPaymentDoc = doc;
+          break;
+        }
+      }
+
+      defaultPaymentDoc ??= paymentMethodsSnapshot.docs.first;
+      return PaymentCard.fromDocument(defaultPaymentDoc);
+    } catch (e) {
+      debugPrint('Error fetching payment card: $e');
+      return null;
+    }
+  }
+
+  Future<bool> hasReturnRequest(String orderId) async {
+    try {
+      final query = await firestore
+          .collection('returnRequests')
+          .where('orderId', isEqualTo: orderId)
+          .limit(1)
+          .get();
+
+      return query.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking return request: $e');
+      return false;
+    }
+  }
+
+
 }
