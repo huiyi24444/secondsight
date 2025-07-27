@@ -1,4 +1,4 @@
-// admin_order.dart (Enhanced UI)
+// admin_order.dart (Updated with integrated bulk shipment)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,6 +19,7 @@ class OrderManagementPage extends StatefulWidget {
 
 class _OrderManagementPageState extends State<OrderManagementPage> {
   late OrderManagementController _controller;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -41,6 +42,89 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
+  Future<void> _processBulkUpdate() async {
+    // Validate selections
+    if (_controller.selectedCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one order')),
+      );
+      return;
+    }
+
+    // Confirm action
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Bulk Update'),
+        content: Text('Mark ${_controller.selectedCount} orders as shipped?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirmed) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final result = await _controller.bulkUpdateOrders();
+
+      if (mounted) {
+        final message = result['success'] > 0
+            ? 'Successfully updated ${result['success']} orders'
+            : 'Failed to update orders';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: result['success'] > 0 ? Colors.green : Colors.red,
+          ),
+        );
+
+        if (result['errors'].isNotEmpty) {
+          // Show detailed error dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Update Errors'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: result['errors'].map<Widget>((error) =>
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text('• $error'),
+                      )
+                  ).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } finally {
+      setState(() => _isProcessing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -58,6 +142,9 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                       // Overdue Alert Banner
                       if (controller.overdueOrdersCount > 0)
                         _buildOverdueAlertBanner(controller),
+                      // Bulk Mode Banner
+                      if (controller.bulkMode)
+                        _buildBulkModeBanner(controller),
                       Expanded(
                         child: Container(
                           margin: const EdgeInsets.all(20),
@@ -130,6 +217,60 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
+  Widget _buildBulkModeBanner(OrderManagementController controller) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      color: Colors.blue[50],
+      child: Row(
+        children: [
+          Icon(Icons.checklist_rtl, color: Colors.blue[700], size: 20),
+          const SizedBox(width: 10),
+          Text(
+            'Bulk Update Mode - ${controller.selectedCount} orders selected',
+            style: TextStyle(
+              color: Colors.blue[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          // Select All Checkbox (only for "To Ship" tab)
+          if (controller.selectedTab == 'To Ship') ...[
+            Checkbox(
+              value: controller.allToShipSelected,
+              onChanged: (_) => controller.toggleSelectAll(),
+            ),
+            Text(
+              'Select All',
+              style: TextStyle(color: Colors.blue[700]),
+            ),
+            const SizedBox(width: 16),
+          ],
+          TextButton.icon(
+            onPressed: _isProcessing ? null : _processBulkUpdate,
+            icon: _isProcessing
+                ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+              ),
+            )
+                : Icon(Icons.local_shipping, color: Colors.blue[700]),
+            label: Text(
+              _isProcessing ? 'Processing...' : 'Mark as Shipped',
+              style: TextStyle(
+                color: Colors.blue[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader(OrderManagementController controller) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -149,7 +290,19 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
               ),
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 12),
+          // Bulk Update Toggle Button
+          ElevatedButton.icon(
+            onPressed: controller.toggleBulkMode,
+            icon: Icon(controller.bulkMode ? Icons.close : Icons.checklist_rtl),
+            label: Text(controller.bulkMode ? 'Exit Bulk Mode' : 'Bulk Update'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: controller.bulkMode ? Colors.grey : Colors.orange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
           ElevatedButton.icon(
             onPressed: _showCreateOrderDialog,
             icon: const Icon(Icons.add),
@@ -365,166 +518,197 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
 
   Widget _buildOrderCard(OrdersModel order, OrderManagementController controller) {
     final products = controller.orderProducts[order.id] ?? [];
-    final isExpanded = controller.isOrderExpanded(order.id);
     final isOverdue = controller.isOrderOverdue(order);
     final daysOverdue = controller.getDaysOverdue(order);
+    final isSelected = controller.selectedOrders[order.id] ?? false;
+    final canSelect = controller.bulkMode && order.orderStatus.toLowerCase() == 'to_ship';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
         border: Border.all(
-          color: isOverdue ? Colors.grey[200]! : Colors.grey[200]!,
-          width: isOverdue ? 2 : 1,
+          color: isSelected ? Colors.blue[400]! : Colors.grey[200]!,
+          width: isSelected ? 2 : 1,
         ),
         borderRadius: BorderRadius.circular(8),
-        color: isOverdue ? Colors.white : Colors.white,
+        color: isSelected ? Colors.blue[50] : Colors.white,
       ),
-      child: Column(
-        children: [
-          // Main order row
-          InkWell(
-            onTap: () => controller.toggleOrderExpansion(order.id),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Overdue indicator
-                  if (isOverdue) ...[
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.priority_high,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Icon(
-                    isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey[600],
+      child: InkWell(
+        onTap: canSelect ? () => controller.toggleOrderSelection(order.id) : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Checkbox (only shown in bulk mode for "to_ship" orders)
+              if (controller.bulkMode) ...[
+                Checkbox(
+                  value: isSelected,
+                  onChanged: canSelect ? (_) => controller.toggleOrderSelection(order.id) : null,
+                ),
+                const SizedBox(width: 12),
+              ],
+              // Overdue indicator
+              if (isOverdue && !controller.bulkMode) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Icon(
+                    Icons.priority_high,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              '#${order.shortOrderId}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            if (isOverdue) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${daysOverdue}d overdue',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
                         Text(
-                          '${products.length} product${products.length > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
+                          '#${order.shortOrderId}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
                         ),
+                        if (isOverdue) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${daysOverdue}d overdue',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      controller.formatDate(order.orderDate),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${products.length} product${products.length > 1 ? 's' : ''}',
                       style: TextStyle(
-                        fontSize: 13,
+                        color: Colors.grey[600],
+                        fontSize: 12,
                       ),
                     ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  controller.formatDate(order.orderDate),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  controller.customerNames[order.customerId] ?? 'Unknown',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Text(
+                  'RM ${order.totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      controller.customerNames[order.customerId] ?? 'Unknown',
+                ),
+              ),
+              // Tracking Number Input (shown in bulk mode for selected "to_ship" orders)
+              if (controller.bulkMode && canSelect && isSelected) ...[
+                Expanded(
+                  flex: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: TextFormField(
+                      controller: controller.getTrackingController(order.id),
+                      decoration: InputDecoration(
+                        hintText: 'Enter tracking number',
+                        hintStyle: TextStyle(fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          borderSide: BorderSide(color: Colors.blue[400]!),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
                       style: const TextStyle(fontSize: 13),
                     ),
                   ),
-                  Expanded(
-                    flex: 1,
+                ),
+              ] else ...[
+                Expanded(
+                  flex: controller.bulkMode ? 3 : 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: OrderStatusUtils.getStatusColor(order.orderStatus).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Text(
-                      'RM ${order.totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                      OrderStatusUtils.formatStatus(order.orderStatus),
+                      style: TextStyle(
+                        color: OrderStatusUtils.getStatusColor(order.orderStatus),
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
+              // Action buttons (hidden in bulk mode)
+              if (!controller.bulkMode) ...[
+                IconButton(
+                  icon: const Icon(Icons.visibility_outlined),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => OrderDetailsPage(
+                        order: order,
+                        products: controller.orderProducts[order.id] ?? [],
+                        productDetails: controller.productDetails,
+                        customerNames: controller.customerNames,
+                        firestore: FirebaseFirestore.instance,
+                        onOrdersReload: controller.loadOrders,
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 1,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: OrderStatusUtils.getStatusColor(order.orderStatus).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        OrderStatusUtils.formatStatus(order.orderStatus),
-                        style: TextStyle(
-                          color: OrderStatusUtils.getStatusColor(order.orderStatus),
-                          fontSize: 12,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.visibility_outlined),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsPage(
-                          order: order,
-                          products: controller.orderProducts[order.id] ?? [],
-                          productDetails: controller.productDetails,
-                          customerNames: controller.customerNames,
-                          firestore: FirebaseFirestore.instance,
-                          onOrdersReload: controller.loadOrders,
-                        ),
-                      ),
-                    ),
-                    tooltip: 'View Details',
-                  ),
-                  _buildOrderActions(order, controller),
-                ],
-              ),
-            ),
+                  tooltip: 'View Details',
+                ),
+                _buildOrderActions(order, controller),
+              ],
+            ],
           ),
-          // Expandable products section
-          if (isExpanded) _buildExpandedProducts(order, controller),
-        ],
+        ),
       ),
     );
   }
@@ -545,82 +729,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
           child: Text('Delete Order', style: TextStyle(color: Colors.red)),
         ),
       ],
-    );
-  }
-
-  Widget _buildExpandedProducts(OrdersModel order, OrderManagementController controller) {
-    final products = controller.orderProducts[order.id] ?? [];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: products.map((product) {
-          final productId = (product.productID as DocumentReference).id;
-          final details = controller.productDetails[productId] ?? {};
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  margin: const EdgeInsets.only(left: 36, right: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: details['imageUrl'] != ''
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      details['imageUrl'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(Icons.image, size: 20, color: Colors.grey);
-                      },
-                    ),
-                  )
-                      : const Icon(Icons.image, size: 20, color: Colors.grey),
-                ),
-                Expanded(
-                  child: Text(
-                    details['name'] ?? 'Unknown Product',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-                Text(
-                  'Qty: ${product.productQuantity}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Text(
-                  'RM ${product.totalPrice.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 40),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 

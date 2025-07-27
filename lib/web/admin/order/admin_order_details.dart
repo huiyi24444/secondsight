@@ -10,6 +10,7 @@ import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
 import '../../../model/payment_cards_model.dart';
 import '../../../view/widgets/product_status_utils.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../customer/admin_customer.dart';
 import '../returnrefund/admin_return.dart';
 import '../widget/sidebar.dart';
@@ -496,7 +497,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ),
       child: Column(
         children: [
-          // Invoice Header
+
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -520,20 +521,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'INVOICE',
+                      'Product Items',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF7C3AED),
                         letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Order #${widget.order.id ?? 'N/A'}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
                       ),
                     ),
                   ],
@@ -584,6 +577,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   flex: 3,
                   child: Text(
                     'SKU',
+                    textAlign: TextAlign.center, // ADD THIS
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -608,8 +602,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    'PRICE',
-                    textAlign: TextAlign.right,
+                    'PRICE (Per Unit)',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -702,7 +696,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                     //sku
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Text(
                         '${ProductStatusUtils.shortProductId(product.productID.id)}',
                         textAlign: TextAlign.center,
@@ -1129,16 +1123,23 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           const SizedBox(height: 12),
           if (shipment?.fullName?.isNotEmpty ?? false) ...[
-            Text(
-              '${shipment!.fullName!}',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[800],
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                const Icon(Icons.person, size: 16, color: Colors.grey),
+                const SizedBox(width: 6),
+                Text(
+                  '${shipment!.fullName!}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey[800],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
           ],
+
           if (shipment?.phoneNum != null) ...[
             Row(
               children: [
@@ -1243,10 +1244,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'ID: ${widget.order.customerId}',
+    'User ID: ${shortUserId(widget.order.customerId ?? "")}',
             style: TextStyle(
-              fontSize: 9,
-              color: Colors.grey[500],
+              fontSize: 14,
               fontFamily: 'monospace',
             ),
           ),

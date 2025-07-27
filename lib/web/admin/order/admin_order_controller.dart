@@ -1,4 +1,4 @@
-// admin_order_controller.dart (Enhanced version)
+// admin_order_controller.dart (Updated with bulk selection)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,7 +15,11 @@ class OrderManagementController extends ChangeNotifier {
   Map<String, List<OrderProductModel>> _orderProducts = {};
   Map<String, Map<String, dynamic>> _productDetails = {};
   Map<String, String> _customerNames = {};
-  Set<String> _expandedOrders = {};
+
+  // Bulk selection properties
+  Map<String, bool> _selectedOrders = {};
+  Map<String, TextEditingController> _trackingControllers = {};
+  bool _bulkMode = false;
 
   bool _isLoading = true;
   String _selectedTab = 'All';
@@ -32,7 +36,9 @@ class OrderManagementController extends ChangeNotifier {
   Map<String, List<OrderProductModel>> get orderProducts => _orderProducts;
   Map<String, Map<String, dynamic>> get productDetails => _productDetails;
   Map<String, String> get customerNames => _customerNames;
-  Set<String> get expandedOrders => _expandedOrders;
+  Map<String, bool> get selectedOrders => _selectedOrders;
+  Map<String, TextEditingController> get trackingControllers => _trackingControllers;
+  bool get bulkMode => _bulkMode;
   bool get isLoading => _isLoading;
   String get selectedTab => _selectedTab;
   int get currentPage => _currentPage;
@@ -44,6 +50,15 @@ class OrderManagementController extends ChangeNotifier {
   int get totalPages => (_filteredOrders.length / _itemsPerPage).ceil();
   int get startIndex => (_currentPage - 1) * _itemsPerPage;
   int get endIndex => startIndex + _itemsPerPage;
+  int get selectedCount => _selectedOrders.values.where((selected) => selected).length;
+
+  // Check if all "to_ship" orders are selected
+  bool get allToShipSelected {
+    final toShipOrders = _filteredOrders.where((order) =>
+    order.orderStatus.toLowerCase() == 'to_ship').toList();
+    if (toShipOrders.isEmpty) return false;
+    return toShipOrders.every((order) => _selectedOrders[order.id] ?? false);
+  }
 
   // New computed property for overdue count
   int get overdueOrdersCount => _orders.where((order) => isOrderOverdue(order)).length;
@@ -60,6 +75,43 @@ class OrderManagementController extends ChangeNotifier {
 
   void _onSearchChanged() {
     filterOrders();
+  }
+
+  // Toggle bulk mode
+  void toggleBulkMode() {
+    _bulkMode = !_bulkMode;
+    if (!_bulkMode) {
+      // Clear selections when exiting bulk mode
+      _selectedOrders.clear();
+    }
+    notifyListeners();
+  }
+
+  // Toggle individual order selection
+  void toggleOrderSelection(String orderId) {
+    _selectedOrders[orderId] = !(_selectedOrders[orderId] ?? false);
+    notifyListeners();
+  }
+
+  // Toggle all "to_ship" orders selection
+  void toggleSelectAll() {
+    final toShipOrders = _filteredOrders.where((order) =>
+    order.orderStatus.toLowerCase() == 'to_ship').toList();
+
+    final shouldSelectAll = !allToShipSelected;
+
+    for (final order in toShipOrders) {
+      _selectedOrders[order.id] = shouldSelectAll;
+    }
+    notifyListeners();
+  }
+
+  // Get tracking controller for an order
+  TextEditingController getTrackingController(String orderId) {
+    if (!_trackingControllers.containsKey(orderId)) {
+      _trackingControllers[orderId] = TextEditingController();
+    }
+    return _trackingControllers[orderId]!;
   }
 
   // Check if an order is overdue
@@ -145,6 +197,78 @@ class OrderManagementController extends ChangeNotifier {
     }
   }
 
+  // Bulk update selected orders
+  Future<Map<String, dynamic>> bulkUpdateOrders() async {
+    final selectedOrderIds = _selectedOrders.entries
+        .where((entry) => entry.value)
+        .map((entry) => entry.key)
+        .toList();
+
+    int successCount = 0;
+    int failCount = 0;
+    List<String> errors = [];
+
+    for (final orderId in selectedOrderIds) {
+      final order = _orders.firstWhere((o) => o.id == orderId);
+      final trackingNumber = getTrackingController(orderId).text.trim();
+
+      if (trackingNumber.isEmpty) {
+        errors.add('Order #${order.shortOrderId}: Missing tracking number');
+        failCount++;
+        continue;
+      }
+
+      try {
+        // Update order status
+        await _firestore
+            .collection('users')
+            .doc(order.customerId)
+            .collection('order')
+            .doc(orderId)
+            .update({'orderStatus': 'to_receive'});
+
+        // Update or create shipment document
+        final shipmentRef = _firestore
+            .collection('users')
+            .doc(order.customerId)
+            .collection('order')
+            .doc(orderId)
+            .collection('shipment');
+
+        final shipmentSnapshot = await shipmentRef.get();
+
+        final shipmentData = {
+          'trackingNumber': trackingNumber,
+          'shippedDate': Timestamp.now(),
+        };
+
+        if (shipmentSnapshot.docs.isNotEmpty) {
+          await shipmentSnapshot.docs.first.reference.update(shipmentData);
+        } else {
+          await shipmentRef.add(shipmentData);
+        }
+
+        successCount++;
+      } catch (e) {
+        errors.add('Order #${order.shortOrderId}: $e');
+        failCount++;
+      }
+    }
+
+    // Clear selections and exit bulk mode on success
+    if (successCount > 0) {
+      _selectedOrders.clear();
+      _bulkMode = false;
+      await loadOrders();
+    }
+
+    return {
+      'success': successCount,
+      'failed': failCount,
+      'errors': errors,
+    };
+  }
+
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
@@ -199,7 +323,6 @@ class OrderManagementController extends ChangeNotifier {
           final bOverdue = isOrderOverdue(b);
           if (aOverdue && !bOverdue) return -1;
           if (!aOverdue && bOverdue) return 1;
-          // If both overdue or both not overdue, sort by date
           return b.orderDate.compareTo(a.orderDate);
         });
         break;
@@ -230,22 +353,8 @@ class OrderManagementController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleOrderExpansion(String orderId) {
-    if (_expandedOrders.contains(orderId)) {
-      _expandedOrders.remove(orderId);
-    } else {
-      _expandedOrders.add(orderId);
-    }
-    notifyListeners();
-  }
-
-  bool isOrderExpanded(String orderId) {
-    return _expandedOrders.contains(orderId);
-  }
-
   Future<void> updateOrderStatus(OrdersModel order, String newStatus) async {
     try {
-      // Find the user document that contains this order
       final usersSnapshot = await _firestore.collection('users').get();
 
       for (final userDoc in usersSnapshot.docs) {
@@ -256,7 +365,6 @@ class OrderManagementController extends ChangeNotifier {
         }
       }
 
-      // Reload orders to reflect changes
       await loadOrders();
     } catch (e) {
       print('Error updating order status: $e');
@@ -265,25 +373,21 @@ class OrderManagementController extends ChangeNotifier {
 
   Future<void> deleteOrder(OrdersModel order) async {
     try {
-      // Find the user document that contains this order
       final usersSnapshot = await _firestore.collection('users').get();
 
       for (final userDoc in usersSnapshot.docs) {
         final orderDoc = await userDoc.reference.collection('order').doc(order.id).get();
         if (orderDoc.exists) {
-          // Delete order products first
           final orderProductsSnapshot = await orderDoc.reference.collection('orderProducts').get();
           for (final productDoc in orderProductsSnapshot.docs) {
             await productDoc.reference.delete();
           }
 
-          // Then delete the order
           await orderDoc.reference.delete();
           break;
         }
       }
 
-      // Reload orders to reflect changes
       await loadOrders();
     } catch (e) {
       print('Error deleting order: $e');
@@ -299,6 +403,8 @@ class OrderManagementController extends ChangeNotifier {
   void dispose() {
     searchController.removeListener(_onSearchChanged);
     searchController.dispose();
+    // Dispose all tracking controllers
+    _trackingControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
   }
 }
