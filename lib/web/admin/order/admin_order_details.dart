@@ -45,6 +45,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   PaymentCard? paymentCard;
   bool isLoading = true;
   String currentPage = 'orders';
+  String? customerFullName;
 
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
@@ -59,13 +60,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     super.initState();
     currentStatus = widget.order.orderStatus;
     _loadOrderData();
+    fetchCustomerName();
   }
 
   Future<void> _loadOrderData() async {
-    await Future.wait([
-      _fetchShipmentData(),
-      _fetchPaymentData(),
-    ]);
+    await Future.wait([_fetchShipmentData(), _fetchPaymentData()]);
     setState(() {
       isLoading = false;
     });
@@ -132,38 +131,46 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               // Handle navigation based on selected page
               switch (page) {
                 case 'dashboard':
-                // Navigate to dashboard - since we're in a sub-page, we go back to main
+                  // Navigate to dashboard - since we're in a sub-page, we go back to main
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => AdminNavigator()),
-                        (route) => false,
+                    (route) => false,
                   );
                   break;
                 case 'products':
-                // Already on products page, might want to go back to product list
+                  // Already on products page, might want to go back to product list
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => ProductManagementPage()),
+                    MaterialPageRoute(
+                      builder: (context) => ProductManagementPage(),
+                    ),
                   );
                   break;
                 case 'orders':
-                // Navigate to order management
+                  // Navigate to order management
                   Navigator.pop(context);
                   break;
                 case 'returns':
-                // Navigate to return management
+                  // Navigate to return management
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => ReturnManagementPage()),
+                    MaterialPageRoute(
+                      builder: (context) => ReturnManagementPage(),
+                    ),
                   );
                   break;
                 case 'customers':
-                // Navigate to customer management
+                  // Navigate to customer management
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => CustomerManagementPage()),
+                    MaterialPageRoute(
+                      builder: (context) => CustomerManagementPage(),
+                    ),
                   );
                   break;
                 case 'reports':
-                // Navigate to reports - you'll need to create this page
+                  // Navigate to reports - you'll need to create this page
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Reports page not implemented yet')),
+                    const SnackBar(
+                      content: Text('Reports page not implemented yet'),
+                    ),
                   );
                   break;
               }
@@ -174,10 +181,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             child: Column(
               children: [
                 // Top Bar
-                CustomTopBar(
-                  title: 'Order',
-                  subtitle: 'Order Details',
-                ),
+                CustomTopBar(title: 'Order', subtitle: 'Order Details'),
                 // Content Area
                 Expanded(
                   child: SingleChildScrollView(
@@ -288,10 +292,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ),
                 const SizedBox(width: 24),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
-                    color: OrderStatusUtils.getStatusColor(currentStatus).withOpacity(0.1),
-                    border: Border.all(color: OrderStatusUtils.getStatusColor(currentStatus)),
+                    color: OrderStatusUtils.getStatusColor(
+                      currentStatus,
+                    ).withOpacity(0.1),
+                    border: Border.all(
+                      color: OrderStatusUtils.getStatusColor(currentStatus),
+                    ),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: DropdownButton<String>(
@@ -299,27 +310,31 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     underline: const SizedBox(),
                     isDense: true,
                     items: _getAvailableStatuses(currentStatus)
-                        .map((status) => DropdownMenuItem(
-                      value: status,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.only(right: 6),
-                            decoration: BoxDecoration(
-                              color: OrderStatusUtils.getStatusColor(status),
-                              shape: BoxShape.circle,
+                        .map(
+                          (status) => DropdownMenuItem(
+                            value: status,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    color: OrderStatusUtils.getStatusColor(
+                                      status,
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                Text(
+                                  OrderStatusUtils.formatStatus(status),
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(
-                            OrderStatusUtils.formatStatus(status),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ))
+                        )
                         .toList(),
                     onChanged: _handleStatusChange,
                   ),
@@ -336,10 +351,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ),
             child: TextButton.icon(
               onPressed: () {
-                if (widget.order.orderStatus == 'completed' || widget.order.orderStatus == 'to_receive') {
+                if (widget.order.orderStatus == 'completed' ||
+                    widget.order.orderStatus == 'to_receive') {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders'),
+                      content: Text(
+                        'Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders',
+                      ),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -347,8 +365,15 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 }
                 _showDeleteConfirmationDialog();
               },
-              icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-              label: const Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13)),
+              icon: const Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: Colors.red,
+              ),
+              label: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red, fontSize: 13),
+              ),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
@@ -393,10 +418,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(width: 12),
               const Text(
                 'Order Information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -436,7 +458,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget _buildInfoTile(String label, String value, IconData icon, Color color) {
+  Widget _buildInfoTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -478,8 +505,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   Widget _buildOrderSummaryCard() {
     const double shippingFee = 8.00;
     final double subtotal = widget.products.fold(
-        0,
-            (sum, product) => sum + product.totalPrice
+      0,
+      (sum, product) => sum + product.totalPrice,
     );
     final double grandTotal = subtotal + shippingFee;
 
@@ -497,7 +524,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ),
       child: Column(
         children: [
-
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -532,7 +558,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF7C3AED).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -555,9 +584,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.grey[50],
-              border: Border(
-                bottom: BorderSide(color: Colors.grey[200]!),
-              ),
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
             ),
             child: Row(
               children: [
@@ -626,7 +653,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   ),
                 ),
               ],
-
             ),
           ),
 
@@ -640,16 +666,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               final productId = (product.productID as DocumentReference).id;
               final details = widget.productDetails[productId] ?? {};
               final imageUrl = details['imageUrl'] as String?;
-              final productName = details['name'] as String? ?? 'Unknown Product';
+              final productName =
+                  details['name'] as String? ?? 'Unknown Product';
 
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(
-                      color: Colors.grey[200]!,
-                      width: 0.5,
-                    ),
+                    bottom: BorderSide(color: Colors.grey[200]!, width: 0.5),
                   ),
                 ),
                 child: Row(
@@ -669,15 +696,23 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                             ),
                             child: (imageUrl?.isNotEmpty ?? false)
                                 ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Icon(Icons.image, color: Colors.grey[400], size: 20),
-                              ),
-                            )
-                                : Icon(Icons.image, color: Colors.grey[400], size: 20),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) => Icon(
+                                            Icons.image,
+                                            color: Colors.grey[400],
+                                            size: 20,
+                                          ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.image,
+                                    color: Colors.grey[400],
+                                    size: 20,
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -719,10 +754,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       child: Text(
                         'RM ${product.price.toStringAsFixed(2)}',
                         textAlign: TextAlign.right,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
                     ),
                     // Total Price
@@ -754,10 +786,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   children: [
                     Text(
                       'Subtotal',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
                     Text(
                       'RM ${subtotal.toStringAsFixed(2)}',
@@ -803,10 +832,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 const SizedBox(height: 16),
 
                 // Divider
-                Divider(
-                  color: Colors.grey[300],
-                  thickness: 1,
-                ),
+                Divider(color: Colors.grey[300], thickness: 1),
                 const SizedBox(height: 16),
 
                 // Grand Total
@@ -873,7 +899,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-
   Widget _buildOrderTimeline() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -899,26 +924,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.timeline,
-                  color: Colors.blue,
-                  size: 16,
-                ),
+                child: const Icon(Icons.timeline, color: Colors.blue, size: 16),
               ),
               const SizedBox(width: 12),
               const Text(
                 'Order Timeline',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Column(
-            children: _buildTimelineItems(),
-          ),
+          Column(children: _buildTimelineItems()),
         ],
       ),
     );
@@ -952,29 +968,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(
-                  Icons.payment,
-                  color: Colors.green,
-                  size: 14,
-                ),
+                child: const Icon(Icons.payment, color: Colors.green, size: 14),
               ),
               const SizedBox(width: 8),
               const Text(
                 'Payment',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             widget.order.payment ?? 'Pending',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
           if (paymentCard != null) ...[
             const SizedBox(height: 4),
@@ -1027,10 +1033,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(width: 8),
               const Text(
                 'Shipment Information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -1049,18 +1052,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           if (shipment?.shippedDate != null) ...[
             Text(
               'Shipped: ${_formatDate(shipment!.shippedDate!)}',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
             ),
           ] else ...[
             Text(
               'Not yet shipped',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.orange[600],
-              ),
+              style: TextStyle(fontSize: 15, color: Colors.orange[600]),
             ),
           ],
           const SizedBox(height: 4),
@@ -1114,10 +1111,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(width: 8),
               const Text(
                 'Address Information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -1147,10 +1141,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 const SizedBox(width: 6),
                 Text(
                   '${shipment!.phoneNum}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -1159,20 +1150,14 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           if (shipment?.streetone?.isNotEmpty ?? false) ...[
             Text(
               '${shipment!.streetone}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 4),
           ],
           if (shipment?.streettwo?.isNotEmpty ?? false) ...[
             Text(
               '${shipment!.streettwo}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 4),
           ],
@@ -1180,16 +1165,33 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               (shipment?.state?.isNotEmpty ?? false) ||
               (shipment?.zipCode?.isNotEmpty ?? false)) ...[
             Text(
-              '${shipment?.city ?? ""}${(shipment?.city?.isNotEmpty ?? false) && (shipment?.state?.isNotEmpty ?? false) ? ", " : ""}${shipment?.state ?? ""} ${shipment?.zipCode ?? ""}'.trim(),
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              '${shipment?.city ?? ""}${(shipment?.city?.isNotEmpty ?? false) && (shipment?.state?.isNotEmpty ?? false) ? ", " : ""}${shipment?.state ?? ""} ${shipment?.zipCode ?? ""}'
+                  .trim(),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Future<void> fetchCustomerName() async {
+    if (widget.order.customerId != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.order.customerId)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          customerFullName = doc['fullName'];
+        });
+      } else {
+        setState(() {
+          customerFullName = "Unknown";
+        });
+      }
+    }
   }
 
   Widget _buildCustomerInfoCard() {
@@ -1218,37 +1220,29 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   color: Colors.purple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.purple,
-                  size: 14,
-                ),
+                child: const Icon(Icons.person, color: Colors.purple, size: 14),
               ),
               const SizedBox(width: 8),
               const Text(
                 'Customer',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             widget.customerNames[widget.order.customerId] ?? 'Unknown Customer',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-    'User ID: ${shortUserId(widget.order.customerId ?? "")}',
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: 'monospace',
-            ),
+            'User ID: ${shortUserId(widget.order.customerId ?? "")}',
+            style: TextStyle(fontSize: 14, fontFamily: 'monospace'),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Full Name: ${customerFullName ?? "Not found"}',
+            style: TextStyle(fontSize: 14, fontFamily: 'monospace'),
           ),
         ],
       ),
@@ -1260,114 +1254,138 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     List<Widget> timelineItems = [];
 
     // Order Created (always present)
-    timelineItems.add(_buildTimelineItem(
-      'Order Created',
-      widget.order.orderDate,
-      Icons.shopping_cart,
-      Colors.grey[700]!,
-      isCompleted: true,
-      isFirst: true,
-    ));
+    timelineItems.add(
+      _buildTimelineItem(
+        'Order Created',
+        widget.order.orderDate,
+        Icons.shopping_cart,
+        Colors.grey[700]!,
+        isCompleted: true,
+        isFirst: true,
+      ),
+    );
 
     // Order Confirmed
     if (widget.order.confirmedDate != null) {
-      timelineItems.add(_buildTimelineItem(
-        'Order Confirmed',
-        widget.order.confirmedDate!,
-        Icons.check_circle,
-        Colors.grey[700]!,
-        isCompleted: true,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Order Confirmed',
+          widget.order.confirmedDate!,
+          Icons.check_circle,
+          Colors.grey[700]!,
+          isCompleted: true,
+        ),
+      );
     } else if (widget.order.orderStatus != 'canceled') {
-      timelineItems.add(_buildTimelineItem(
-        'Order Confirmed',
-        null,
-        Icons.check_circle_outline,
-        Colors.grey[400]!,
-        isCompleted: false,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Order Confirmed',
+          null,
+          Icons.check_circle_outline,
+          Colors.grey[400]!,
+          isCompleted: false,
+        ),
+      );
     }
 
     // To Ship
     if (widget.order.toShipDate != null) {
-      timelineItems.add(_buildTimelineItem(
-        'Ready to Ship',
-        widget.order.toShipDate!,
-        Icons.inventory,
-        Colors.grey[700]!,
-        isCompleted: true,
-      ));
-    } else if (['to_ship', 'to_receive', 'completed'].contains(widget.order.orderStatus)) {
-      timelineItems.add(_buildTimelineItem(
-        'Ready to Ship',
-        null,
-        Icons.inventory_outlined,
-        Colors.grey[400]!,
-        isCompleted: false,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Ready to Ship',
+          widget.order.toShipDate!,
+          Icons.inventory,
+          Colors.grey[700]!,
+          isCompleted: true,
+        ),
+      );
+    } else if ([
+      'to_ship',
+      'to_receive',
+      'completed',
+    ].contains(widget.order.orderStatus)) {
+      timelineItems.add(
+        _buildTimelineItem(
+          'Ready to Ship',
+          null,
+          Icons.inventory_outlined,
+          Colors.grey[400]!,
+          isCompleted: false,
+        ),
+      );
     }
 
     // To Receive (Shipped)
     if (widget.order.toReceiveDate != null) {
-      timelineItems.add(_buildTimelineItem(
-        'Shipped',
-        widget.order.toReceiveDate!,
-        Icons.local_shipping,
-        Colors.grey[700]!,
-        isCompleted: true,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Shipped',
+          widget.order.toReceiveDate!,
+          Icons.local_shipping,
+          Colors.grey[700]!,
+          isCompleted: true,
+        ),
+      );
     } else if (['to_receive', 'completed'].contains(widget.order.orderStatus)) {
-      timelineItems.add(_buildTimelineItem(
-        'Shipped',
-        null,
-        Icons.local_shipping_outlined,
-        Colors.grey[400]!,
-        isCompleted: false,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Shipped',
+          null,
+          Icons.local_shipping_outlined,
+          Colors.grey[400]!,
+          isCompleted: false,
+        ),
+      );
     }
 
     // Completed or Cancelled
     if (widget.order.completedDate != null) {
-      timelineItems.add(_buildTimelineItem(
-        'Delivered',
-        widget.order.completedDate!,
-        Icons.done_all,
-        Colors.green[700]!,
-        isCompleted: true,
-        isLast: true,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Delivered',
+          widget.order.completedDate!,
+          Icons.done_all,
+          Colors.green[700]!,
+          isCompleted: true,
+          isLast: true,
+        ),
+      );
     } else if (widget.order.cancelledDate != null) {
-      timelineItems.add(_buildTimelineItem(
-        'Cancelled',
-        widget.order.cancelledDate!,
-        Icons.cancel,
-        Colors.red[700]!,
-        isCompleted: true,
-        isLast: true,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Cancelled',
+          widget.order.cancelledDate!,
+          Icons.cancel,
+          Colors.red[700]!,
+          isCompleted: true,
+          isLast: true,
+        ),
+      );
     } else if (widget.order.orderStatus != 'canceled') {
-      timelineItems.add(_buildTimelineItem(
-        'Delivered',
-        null,
-        Icons.done_all_outlined,
-        Colors.grey[400]!,
-        isCompleted: false,
-        isLast: true,
-      ));
+      timelineItems.add(
+        _buildTimelineItem(
+          'Delivered',
+          null,
+          Icons.done_all_outlined,
+          Colors.grey[400]!,
+          isCompleted: false,
+          isLast: true,
+        ),
+      );
     }
 
     return timelineItems;
   }
 
   Widget _buildTimelineItem(
-      String title,
-      DateTime? date,
-      IconData icon,
-      Color color, {
-        bool isCompleted = false,
-        bool isFirst = false,
-        bool isLast = false,
-      }) {
+    String title,
+    DateTime? date,
+    IconData icon,
+    Color color, {
+    bool isCompleted = false,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1424,10 +1442,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 if (date != null)
                   Text(
                     _formatDateTime(date),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   )
                 else if (!isCompleted)
                   Text(
@@ -1496,38 +1511,44 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating order: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating order: $e')));
       }
     }
   }
 
   Future<bool> _handleShipToReceive() async {
     if (widget.order.payment == null) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Payment Not Confirmed'),
-          content: const Text(
-              'This order does not have a recorded payment method. Are you sure you want to ship it?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+      final proceed =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Payment Not Confirmed'),
+              content: const Text(
+                'This order does not have a recorded payment method. Are you sure you want to ship it?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                  child: const Text('Proceed Anyway'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('Proceed Anyway'),
-            ),
-          ],
-        ),
-      ) ?? false;
+          ) ??
+          false;
       if (!proceed) return false;
     }
 
-    bool isAddressComplete = shipment != null &&
+    bool isAddressComplete =
+        shipment != null &&
         (shipment!.fullName?.isNotEmpty ?? false) &&
         (shipment!.phoneNum != null && shipment!.phoneNum! > 0) &&
         (shipment!.streetone?.isNotEmpty ?? false) &&
@@ -1538,7 +1559,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     if (!isAddressComplete) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Shipping address is incomplete. Please update customer information first.'),
+          content: Text(
+            'Shipping address is incomplete. Please update customer information first.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -1553,221 +1576,238 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Future<bool> _handleReceiveToCompleted() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Complete Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Mark this order as completed?'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.amber[700], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'This action cannot be undone. The order will be marked as delivered.',
-                      style: TextStyle(fontSize: 13, color: Colors.amber[900]),
-                    ),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Complete Order'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Mark this order as completed?'),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber[200]!),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.amber[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This action cannot be undone. The order will be marked as delivered.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.amber[900],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await widget.firestore
+                      .collection('users')
+                      .doc(widget.order.customerId)
+                      .collection('order')
+                      .doc(widget.order.id)
+                      .update({'completedDate': Timestamp.now()});
+                  Navigator.pop(context, true);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: const Text('Complete Order'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              await widget.firestore
-                  .collection('users')
-                  .doc(widget.order.customerId)
-                  .collection('order')
-                  .doc(widget.order.id)
-                  .update({
-                'completedDate': Timestamp.now(),
-              });
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Complete Order'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<bool> _handleCancellation() async {
     final reasonController = TextEditingController();
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (currentStatus == 'to_receive')
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This order has already been shipped. Cancellation may require return shipping.',
-                        style: TextStyle(fontSize: 13, color: Colors.red[900]),
-                      ),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cancel Order'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (currentStatus == 'to_receive')
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[200]!),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.red[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'This order has already been shipped. Cancellation may require return shipping.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.red[900],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cancellation Reason *',
+                    hintText: 'Enter reason for cancellation',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  autofocus: true,
                 ),
-              ),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Cancellation Reason *',
-                hintText: 'Enter reason for cancellation',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              autofocus: true,
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Back'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Back'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (reasonController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please provide a cancellation reason'),
+                      ),
+                    );
+                    return;
+                  }
+                  await widget.firestore
+                      .collection('users')
+                      .doc(widget.order.customerId)
+                      .collection('order')
+                      .doc(widget.order.id)
+                      .update({
+                        'cancellationReason': reasonController.text.trim(),
+                        'canceledDate': Timestamp.now(),
+                      });
+                  Navigator.pop(context, true);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Cancel Order'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please provide a cancellation reason')),
-                );
-                return;
-              }
-              await widget.firestore
-                  .collection('users')
-                  .doc(widget.order.customerId)
-                  .collection('order')
-                  .doc(widget.order.id)
-                  .update({
-                'cancellationReason': reasonController.text.trim(),
-                'canceledDate': Timestamp.now(),
-              });
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Cancel Order'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<bool> _showTrackingNumberDialog() async {
     final trackingNumberController = TextEditingController();
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter Tracking Number'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'A tracking number is required to update the status to "To Receive".',
-              style: TextStyle(fontSize: 14),
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Enter Tracking Number'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'A tracking number is required to update the status to "To Receive".',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: trackingNumberController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tracking Number *',
+                    hintText: 'Enter tracking number',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The shipped date will be set to current date/time.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: trackingNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Tracking Number *',
-                hintText: 'Enter tracking number',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'The shipped date will be set to current date/time.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+              ElevatedButton(
+                onPressed: () async {
+                  if (trackingNumberController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a tracking number'),
+                      ),
+                    );
+                    return;
+                  }
+                  try {
+                    final shipmentRef = widget.firestore
+                        .collection('users')
+                        .doc(widget.order.customerId)
+                        .collection('order')
+                        .doc(widget.order.id)
+                        .collection('shipment');
+                    final snapshot = await shipmentRef.get();
+                    final updateData = {
+                      'trackingNumber': trackingNumberController.text.trim(),
+                      'shippedDate': Timestamp.now(),
+                    };
+                    if (snapshot.docs.isNotEmpty) {
+                      await snapshot.docs.first.reference.update(updateData);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Shipment document not found'),
+                        ),
+                      );
+                      Navigator.pop(context, false);
+                      return;
+                    }
+                    if (context.mounted) {
+                      Navigator.pop(context, true);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error updating tracking number: $e'),
+                        ),
+                      );
+                      Navigator.pop(context, false);
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                ),
+                child: const Text('Confirm'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (trackingNumberController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a tracking number')),
-                );
-                return;
-              }
-              try {
-                final shipmentRef = widget.firestore
-                    .collection('users')
-                    .doc(widget.order.customerId)
-                    .collection('order')
-                    .doc(widget.order.id)
-                    .collection('shipment');
-                final snapshot = await shipmentRef.get();
-                final updateData = {
-                  'trackingNumber': trackingNumberController.text.trim(),
-                  'shippedDate': Timestamp.now(),
-                };
-                if (snapshot.docs.isNotEmpty) {
-                  await snapshot.docs.first.reference.update(updateData);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Shipment document not found')),
-                  );
-                  Navigator.pop(context, false);
-                  return;
-                }
-                if (context.mounted) {
-                  Navigator.pop(context, true);
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating tracking number: $e')),
-                  );
-                  Navigator.pop(context, false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showDeleteConfirmationDialog() {
@@ -1796,18 +1836,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(height: 16),
               const Text(
                 'Delete Order',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
                 'Are you sure you want to delete this order?',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -1816,9 +1850,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.red.withOpacity(0.3),
-                  ),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1831,10 +1863,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     const SizedBox(width: 6),
                     Text(
                       'This action cannot be undone.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.red[700],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.red[700]),
                     ),
                   ],
                 ),
@@ -1875,7 +1904,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error deleting order: $e'))
+                              SnackBar(
+                                content: Text('Error deleting order: $e'),
+                              ),
                             );
                           }
                         }
@@ -1887,7 +1918,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                       ),
-                      child: const Text('Delete Order', style: TextStyle(fontSize: 13)),
+                      child: const Text(
+                        'Delete Order',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ),
                   ),
                 ],
@@ -1922,10 +1956,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       message = 'This status transition is not allowed.';
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -1938,5 +1969,4 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final formatter = DateFormat('dd MMM yyyy, HH:mm');
     return formatter.format(dateTime);
   }
-
 }

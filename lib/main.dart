@@ -9,8 +9,10 @@ import 'package:secondsight/services/auth_wrapper.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
 import 'package:secondsight/admin_main.dart';
 import 'package:secondsight/view/login/forgot_password_view.dart';
+import 'package:secondsight/view/login/intro_decision_view.dart';
 import 'package:secondsight/view/login/login_view.dart';
 import 'package:secondsight/view/login/register_view.dart';
+import 'package:secondsight/view/login/splash_screen.dart';
 import 'package:secondsight/view/login/verification_view.dart';
 import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -88,10 +90,11 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Gabarito',
         useMaterial3: true,
       ),
-      home: const AuthWrapper(
-        authenticatedWidget: MyHomePage(),
-      ),
+      home: const SplashScreen(),  // ← now shows intro only once
+      debugShowCheckedModeBanner: false,
+
       routes: {
+        '/intro': (context) => const IntroDecisionScreen(),
         '/login': (context) => const LoginView(),
         '/register': (context) => const RegisterView(),
         '/home': (context) => const MyHomePage(),

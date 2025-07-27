@@ -55,6 +55,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   collection: ^1.17.0
+  lottie: ^3.0.0
 
 
 
@@ -90,6 +91,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/animations/loading.json
 
   fonts:
     - family: Gabarito
