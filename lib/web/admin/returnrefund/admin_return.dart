@@ -7,6 +7,7 @@ import '../../../model/return_request_model.dart';
 import '../../../web/admin/returnrefund/return_details_dialog.dart';
 import '../widget/topbar.dart';
 import 'admin_return_controller.dart';
+import 'admin_return_details.dart';
 
 class ReturnManagementPage extends StatelessWidget {
   const ReturnManagementPage({super.key});
@@ -161,17 +162,37 @@ class ReturnManagementView extends StatelessWidget {
                                       icon: const Icon(Icons.more_vert),
                                       onSelected: (value) async {
                                         if (value == 'view') {
-                                          await ReturnDetailsDialog.show(
+                                          // Navigate to the new ReturnDetailsPage instead of showing dialog
+                                          Navigator.push(
                                             context,
-                                            returnItem: item,
-                                            onUpdateReturnStatus: (returnId, newStatus) { // Updated signature
-                                              return controller.updateReturnStatus(context, item['userEmail'], returnId, newStatus);
-                                            },
-                                            formatDate: controller.formatDate,
-                                            formatStatus: controller.formatStatus,
-                                            firestore: FirebaseFirestore.instance,
-                                            getOrderProductDoc: controller.getOrderProductDoc, // Added this parameter
-                                          );
+                                            MaterialPageRoute(
+                                              builder: (context) => ReturnDetailsPage(
+                                                returnItem: item,
+                                                onUpdateReturnStatus: (returnId, newStatus) async {
+                                                  try {
+                                                    await controller.updateReturnStatus(
+                                                        context,
+                                                        item['userEmail'],
+                                                        returnId,
+                                                        newStatus
+                                                    );
+                                                    return true;
+                                                  } catch (e) {
+                                                    return false;
+                                                  }
+                                                },
+                                                formatDate: (timestamp) {
+                                                  // Convert Timestamp to milliseconds for your controller
+                                                  return controller.formatDate(timestamp.millisecondsSinceEpoch);
+                                                },
+                                                formatStatus: controller.formatStatus,
+                                                firestore: FirebaseFirestore.instance,
+                                                getOrderProductDoc: controller.getOrderProductDoc,
+                                              ),
+                                            ),
+                                          ).then((_) {
+                                            controller.loadReturns();
+                                          });
                                         }
                                         else if (value == 'delete') {
                                           showDialog(
@@ -187,9 +208,8 @@ class ReturnManagementView extends StatelessWidget {
                                                 ElevatedButton(
                                                   onPressed: () async {
                                                     Navigator.pop(context);
-                                                    // Updated to use top-level returnRequests collection
                                                     await FirebaseFirestore.instance
-                                                        .collection('returnRequests') // Updated collection path
+                                                        .collection('returnRequests')
                                                         .doc(item['id'])
                                                         .delete();
                                                     controller.loadReturns();
