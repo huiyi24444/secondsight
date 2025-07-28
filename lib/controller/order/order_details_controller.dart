@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../../model/cancel_model.dart';
 import '../../model/shipment_model.dart';
 
 class OrderDetailsController extends ChangeNotifier {
@@ -296,6 +297,205 @@ class OrderDetailsController extends ChangeNotifier {
       return false;
     }
   }
+
+  showCancelOrderDialog({
+    required BuildContext context,
+    required String orderId,
+    required OrderDetailsController controller,
+    required String userId, // Current user ID
+    VoidCallback? onCancel,
+  }) {
+    final reasonController = TextEditingController();
+    final noteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cancel Order #$orderId?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Please provide a reason for cancellation:',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Cancellation Reason *',
+                    hintText: 'e.g., Changed mind, Found better price',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional Notes (Optional)',
+                    hintText: 'Any additional information',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onCancel?.call();
+              },
+              child: const Text('Keep Order'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please provide a cancellation reason'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // Show loading
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+
+                // Cancel the order
+                final success = await controller.cancelOrder(
+                  cancelReason: reasonController.text.trim(),
+                  cancelNote: noteController.text.trim().isEmpty
+                      ? null
+                      : noteController.text.trim(),
+                  canceledBy: userId,
+                );
+
+                // Close loading dialog
+                Navigator.of(context).pop();
+
+                if (success) {
+                  // Close cancel dialog
+                  Navigator.of(context).pop();
+
+                  // Show success message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Order canceled successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+
+                  // Navigate back or refresh
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to cancel order. Please try again.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text('Cancel Order'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  Future<bool> cancelOrder({
+    required String cancelReason,
+    String? cancelNote,
+    required String canceledBy,
+  }) async {
+    try {
+      // Create cancellation document reference
+      final cancellationRef = FirebaseFirestore.instance
+          .collection('cancellation')
+          .doc();
+
+      // Prepare cancellation data
+      final cancellationData = {
+        'orderID': orderId,
+        'cancelReason': cancelReason,
+        'cancelDate': FieldValue.serverTimestamp(),
+        'cancelNote': cancelNote,
+        'canceledBy': canceledBy,
+      };
+
+      // Use batch write for atomicity
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Create cancellation document
+      batch.set(cancellationRef, cancellationData);
+
+      // Update order document
+      batch.update(
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('order')
+            .doc(orderId),
+        {
+          'orderStatus': 'cancelled',
+          'cancelDate': FieldValue.serverTimestamp(),
+          'cancelID': cancellationRef.id,
+        },
+      );
+
+      // Commit batch
+      await batch.commit();
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error canceling order: $e');
+      return false;
+    }
+  }
+
+  Future<CancellationModel?> getCancellationDetails(String cancelID) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('cancellation')
+          .doc(cancelID)
+          .get();
+
+      if (!doc.exists) return null;
+
+      return CancellationModel.fromDocument(doc);
+    } catch (e) {
+      debugPrint('Error fetching cancellation details: $e');
+      return null;
+    }
+  }
+
+// Check if order can be canceled
+  bool canCancelOrder(OrdersModel order) {
+    // Only allow cancellation for 'to_ship' status
+    return order.orderStatus.toLowerCase() == 'to_ship';
+  }
+
 
   /// Get return eligibility message
   String getReturnIneligibilityMessage() {

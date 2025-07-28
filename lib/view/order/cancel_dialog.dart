@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class CancelOrderDialog extends StatefulWidget {
   final String orderId;
   final VoidCallback? onCancel;
-  final VoidCallback? onConfirm;
+  final Function(String reason, String? note)? onConfirm; // Modified to pass data
 
   const CancelOrderDialog({
     super.key,
@@ -408,63 +408,34 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
       _isProcessing = true;
     });
 
-    // Simulate processing delay
-    await Future.delayed(const Duration(seconds: 2));
+    // Prepare the cancellation data
+    String finalReason = _selectedReason!;
+    String? note;
+
+    if (_selectedReason == 'Other (please specify)') {
+      // Use the custom reason as the main reason
+      finalReason = _customReasonController.text.trim();
+    } else {
+      // Use selected reason and add any custom text as a note
+      if (_customReasonController.text.trim().isNotEmpty) {
+        note = _customReasonController.text.trim();
+      }
+    }
+
+    // Small delay to show processing state
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (mounted) {
-      setState(() {
-        _isProcessing = false;
-      });
-
       // Close dialog with animation
       _animationController.reverse().then((_) {
         Navigator.of(context).pop();
-        widget.onConfirm?.call();
 
-        // Show success message
-        _showCancellationSuccess();
+        // Call the onConfirm callback with reason and note
+        if (widget.onConfirm != null) {
+          widget.onConfirm!(finalReason, note);
+        }
       });
     }
-  }
-
-  void _showCancellationSuccess() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Order cancelled successfully. Refund will be processed soon.',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 }
 
@@ -473,7 +444,7 @@ Future<void> showCancelOrderDialog({
   required BuildContext context,
   required String orderId,
   VoidCallback? onCancel,
-  VoidCallback? onConfirm,
+  Function(String reason, String? note)? onConfirm,
 }) {
   return showDialog<void>(
     context: context,

@@ -8,6 +8,7 @@ import '../../model/order_product_model.dart';
 import '../../model/shipment_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
+import '../widgets/order_status_utils.dart';
 import '../widgets/progress_stepper.dart';
 import 'cancel_dialog.dart';
 import 'cancel_unavail_dialog.dart';
@@ -73,54 +74,87 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
 
             actions: [
         // Wrap PopupMenuButton in StreamBuilder to access current order status
-        StreamBuilder<DocumentSnapshot>(
-        stream: _controller.getOrderStream(),
-          builder: (context, orderSnapshot) {
-            return PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) {
-                if (value == 'cancel') {
-                  // Check if we have order data
-                  if (orderSnapshot.hasData) {
-                    final data = orderSnapshot.data!;
-                    final order = _controller.createOrderFromDocument(data);
+              // In your order details page
+              StreamBuilder<DocumentSnapshot>(
+                stream: _controller.getOrderStream(),
+                builder: (context, orderSnapshot) {
+                  return PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) {
+                      if (value == 'cancel') {
+                        if (orderSnapshot.hasData) {
+                          final data = orderSnapshot.data!;
+                          final order = _controller.createOrderFromDocument(data);
 
-                    // Check if order status is 'to_ship' (case insensitive)
-                    if (order.orderStatus.toLowerCase() == 'to_ship') {
-                      // Show cancel dialog
-                      showCancelOrderDialog(
-                        context: context,
-                        orderId: _controller.shortOrderId,
-                        onCancel: () {
-                          // Handle when user chooses to keep the order
-                          print('User chose to keep the order');
-                        },
-                        // onConfirm: () {
-                        //   // Handle the actual cancellation logic here
-                        //   _controller.cancelOrder().then((_) {
-                        //     // Navigate back or refresh the order status
-                        //   });
-                        // },
-                      );
-                    } else {
-                      // Show cancel unavailable dialog
-                      showDialog(
-                        context: context,
-                        builder: (context) => const CancelUnavailableDialog(),
-                      );
-                    }
-                  }
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem<String>(
-                  value: 'cancel',
-                  child: Text('Cancel order'),
-                ),
-              ],
-            );
-          },
-        ),
+                          if (_controller.canCancelOrder(order)) {
+                            showCancelOrderDialog(
+                              context: context,
+                              orderId: _controller.shortOrderId,
+                              onCancel: () {
+                                print('User chose to keep the order');
+                              },
+                              onConfirm: (reason, note) async {
+                                // Show loading
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+
+                                // Cancel the order
+                                final success = await _controller.cancelOrder(
+                                  cancelReason: reason,
+                                  cancelNote: note,
+                                  canceledBy: _controller.userId,
+                                );
+
+                                // Close loading
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+
+                                if (success && context.mounted) {
+                                  // Show success message
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Order cancelled successfully'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+
+                                  // Navigate back
+                                  Navigator.of(context).pop();
+                                } else if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to cancel order'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) => const CancelUnavailableDialog(),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'cancel',
+                        child: Text('Cancel order'),
+                      ),
+                    ],
+                  );
+                },
+              )
+
             ],
         ),
         body: StreamBuilder<DocumentSnapshot>(
@@ -223,15 +257,15 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(order.orderStatus).withOpacity(0.1),
+                  color: OrderStatusUtils.getStatusColor(order.orderStatus).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _getStatusDisplayText(order.orderStatus),
+                  OrderStatusUtils.getStatusDisplayText(order.orderStatus),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _getStatusColor(order.orderStatus),
+                    color: OrderStatusUtils.getStatusColor(order.orderStatus),
                   ),
                 ),
               ),
@@ -415,10 +449,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     });
 
     // Completed or Cancelled
-    if (status == 'cancelled' && order.cancelledDate != null) {
+    if (status == 'cancelled' && order.cancelDate != null) {
       steps.add({
         'title': 'Order Cancelled',
-        'date': order.cancelledDate,
+        'date': order.cancelDate,
         'isCompleted': true,
         'isActive': false,
         'color': Colors.red,
@@ -453,40 +487,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     }
   }
 
-  // Helper methods
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return Colors.blue;
-      case 'to_ship':
-        return Colors.orange;
-      case 'to_receive':
-        return Colors.blue[700]!;
-      case 'completed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusDisplayText(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return 'Confirmed';
-      case 'to_ship':
-        return 'Preparing';
-      case 'to_receive':
-        return 'In Transit';
-      case 'completed':
-        return 'Delivered';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
   Widget _buildProductsSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),

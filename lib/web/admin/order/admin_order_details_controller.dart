@@ -298,10 +298,10 @@ class OrderDetailsManagementController {
         isCompleted: true,
         isLast: true,
       ));
-    } else if (order.cancelledDate != null) {
+    } else if (order.cancelDate != null) {
       items.add(TimelineItem(
         title: 'Cancelled',
-        date: order.cancelledDate,
+        date: order.cancelDate,
         icon: Icons.cancel,
         color: Colors.red[700]!,
         isCompleted: true,

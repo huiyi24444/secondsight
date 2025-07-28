@@ -48,6 +48,23 @@ class OrderStatusUtils {
     }
   }
 
+  static String getStatusDisplayText(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Confirmed';
+      case 'to_ship':
+        return 'Preparing';
+      case 'to_receive':
+        return 'In Transit';
+      case 'completed':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
+
   static Color getConditionColor(String condition) {
     switch (condition.toLowerCase()) {
       case 'brand_new':

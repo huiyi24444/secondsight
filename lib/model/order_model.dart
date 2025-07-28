@@ -10,13 +10,14 @@ class OrdersModel {
   final bool eligibilityForReturn;
   final String? shipmentID;
   final String payment;
+  final String? cancelID;
 
   // New status tracking fields
   final DateTime? confirmedDate;     // When order was confirmed
   final DateTime? toShipDate;        // When moved to "to_ship" status
   final DateTime? toReceiveDate;     // When shipped (moved to "to_receive")
   final DateTime? completedDate;     // When delivered/completed
-  final DateTime? cancelledDate;     // When cancelled
+  final DateTime? cancelDate;     // When cancelled
   final DateTime lastStatusUpdate;   // Most recent status change
 
   // Optional: Track who made the status change
@@ -31,11 +32,12 @@ class OrdersModel {
     required this.eligibilityForReturn,
     this.shipmentID,
     this.payment = "Mastercard",
+    this.cancelID,
     this.confirmedDate,
     this.toShipDate,
     this.toReceiveDate,
     this.completedDate,
-    this.cancelledDate,
+    this.cancelDate,
     DateTime? lastStatusUpdate,
     this.lastUpdatedBy,
   }) : lastStatusUpdate = lastStatusUpdate ?? orderDate;
@@ -63,8 +65,8 @@ class OrdersModel {
       completedDate: json['completedDate'] != null
           ? (json['completedDate'] as Timestamp).toDate()
           : null,
-      cancelledDate: json['cancelledDate'] != null
-          ? (json['cancelledDate'] as Timestamp).toDate()
+      cancelDate: json['cancelDate'] != null
+          ? (json['cancelDate'] as Timestamp).toDate()
           : null,
       lastStatusUpdate: json['lastStatusUpdate'] != null
           ? (json['lastStatusUpdate'] as Timestamp).toDate()
@@ -82,12 +84,13 @@ class OrdersModel {
       'eligibilityForReturn': eligibilityForReturn,
       'shipmentID': shipmentID,
       'payment': payment,
+      'cancelID': cancelID,
       // Include new date fields
       'confirmedDate': confirmedDate != null ? Timestamp.fromDate(confirmedDate!) : null,
       'toShipDate': toShipDate != null ? Timestamp.fromDate(toShipDate!) : null,
       'toReceiveDate': toReceiveDate != null ? Timestamp.fromDate(toReceiveDate!) : null,
       'completedDate': completedDate != null ? Timestamp.fromDate(completedDate!) : null,
-      'cancelledDate': cancelledDate != null ? Timestamp.fromDate(cancelledDate!) : null,
+      'cancelledDate': cancelDate != null ? Timestamp.fromDate(cancelDate!) : null,
       'lastStatusUpdate': Timestamp.fromDate(lastStatusUpdate),
       'lastUpdatedBy': lastUpdatedBy,
     };
@@ -102,11 +105,12 @@ class OrdersModel {
     bool? eligibilityForReturn,
     String? shipmentID,
     String? payment,
+    String? cancelID,
     DateTime? confirmedDate,
     DateTime? toShipDate,
     DateTime? toReceiveDate,
     DateTime? completedDate,
-    DateTime? cancelledDate,
+    DateTime? cancelDate,
     DateTime? lastStatusUpdate,
     String? lastUpdatedBy,
   }) {
@@ -119,11 +123,12 @@ class OrdersModel {
       eligibilityForReturn: eligibilityForReturn ?? this.eligibilityForReturn,
       shipmentID: shipmentID ?? this.shipmentID,
       payment: payment ?? this.payment,
+      cancelID: cancelID ?? this.cancelID,
       confirmedDate: confirmedDate ?? this.confirmedDate,
       toShipDate: toShipDate ?? this.toShipDate,
       toReceiveDate: toReceiveDate ?? this.toReceiveDate,
       completedDate: completedDate ?? this.completedDate,
-      cancelledDate: cancelledDate ?? this.cancelledDate,
+      cancelDate: cancelDate ?? this.cancelDate,
       lastStatusUpdate: lastStatusUpdate ?? this.lastStatusUpdate,
       lastUpdatedBy: lastUpdatedBy ?? this.lastUpdatedBy,
     );
