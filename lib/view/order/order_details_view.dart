@@ -1,8 +1,9 @@
-// Updated order_details_view.dart with MVC pattern
+// order_details_view.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../controller/order/order_details_controller.dart';
+import '../../model/cancel_model.dart';
 import '../../model/order_model.dart';
 import '../../model/order_product_model.dart';
 import '../../model/shipment_model.dart';
@@ -12,6 +13,7 @@ import '../widgets/order_status_utils.dart';
 import '../widgets/progress_stepper.dart';
 import 'cancel_dialog.dart';
 import 'cancel_unavail_dialog.dart';
+import 'cancellation_details_widget.dart';
 import 'order_details_bottom.dart';
 import 'order_notice.dart';
 import 'order_rating_dialog.dart';
@@ -107,7 +109,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                                 final success = await _controller.cancelOrder(
                                   cancelReason: reason,
                                   cancelNote: note,
-                                  canceledBy: _controller.userId,
+                                  cancelledBy: _controller.userId,
                                 );
 
                                 // Close loading
@@ -191,6 +193,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildEnhancedOrderStatusCard(order),
+                      _buildCancellationSection(order),
                       _buildProductsSection(),
                       _buildTotalSummary(order, shipment),
                       const SizedBox(height: 100),
@@ -223,6 +226,84 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       ),
     );
   }
+
+  Widget _buildCancellationSection(OrdersModel order) {
+    debugPrint('_buildCancellationSection called for orderID: ${order.id}');
+    debugPrint('orderStatus: "${order.orderStatus}"');
+    debugPrint('cancelID: ${order.cancelID}');
+
+    if (order.orderStatus.trim().toLowerCase() != 'cancelled' || order.cancelID == null) {
+      debugPrint('Skipping _buildCancellationSection: Not cancelled or cancelID is null');
+      return const SizedBox.shrink();
+    }
+
+
+    return FutureBuilder<CancellationModel?>(
+      future: _controller.getCancellationDetails(order.cancelID!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          debugPrint('Loading cancellation details for cancelID: ${order.cancelID}');
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF8E6CEF),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error in FutureBuilder for cancelID: ${order.cancelID} -> ${snapshot.error}');
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[600]),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Failed to load cancellation details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final cancellation = snapshot.data;
+        if (cancellation == null) {
+          debugPrint('CancellationModel is null for cancelID: ${order.cancelID}');
+          return const SizedBox.shrink();
+        }
+
+        debugPrint('CancellationModel loaded for cancelID: ${order.cancelID}');
+        return Column(
+          children: [
+            CancellationDetailsWidget(cancellation: cancellation),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
 
   // NEW: Enhanced order status card with timeline
   Widget _buildEnhancedOrderStatusCard(OrdersModel order) {

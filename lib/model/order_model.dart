@@ -52,6 +52,7 @@ class OrdersModel {
       eligibilityForReturn: json['eligibilityForReturn'] ?? false,
       shipmentID: json['shipmentID'],
       payment: json['payment'] ?? 'Mastercard',
+      cancelID: json['cancelID'],
       // Parse new date fields
       confirmedDate: json['confirmedDate'] != null
           ? (json['confirmedDate'] as Timestamp).toDate()

@@ -1,3 +1,5 @@
+//order_details_controller.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -381,7 +383,7 @@ class OrderDetailsController extends ChangeNotifier {
                   cancelNote: noteController.text.trim().isEmpty
                       ? null
                       : noteController.text.trim(),
-                  canceledBy: userId,
+                  cancelledBy: userId,
                 );
 
                 // Close loading dialog
@@ -394,7 +396,7 @@ class OrderDetailsController extends ChangeNotifier {
                   // Show success message
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Order canceled successfully'),
+                      content: Text('Order cancelled successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -426,7 +428,7 @@ class OrderDetailsController extends ChangeNotifier {
   Future<bool> cancelOrder({
     required String cancelReason,
     String? cancelNote,
-    required String canceledBy,
+    required String cancelledBy,
   }) async {
     try {
       // Create cancellation document reference
@@ -440,7 +442,7 @@ class OrderDetailsController extends ChangeNotifier {
         'cancelReason': cancelReason,
         'cancelDate': FieldValue.serverTimestamp(),
         'cancelNote': cancelNote,
-        'canceledBy': canceledBy,
+        'cancelledBy': cancelledBy,
       };
 
       // Use batch write for atomicity
@@ -476,19 +478,27 @@ class OrderDetailsController extends ChangeNotifier {
 
   Future<CancellationModel?> getCancellationDetails(String cancelID) async {
     try {
+      print('Fetching cancellation details for cancelID: $cancelID');
+
       final doc = await FirebaseFirestore.instance
           .collection('cancellation')
           .doc(cancelID)
           .get();
 
-      if (!doc.exists) return null;
+      if (!doc.exists) {
+        debugPrint('Cancellation document not found for ID: $cancelID');
+        return null;
+      }
 
+      debugPrint('Cancellation document fetched successfully for ID: $cancelID');
       return CancellationModel.fromDocument(doc);
-    } catch (e) {
-      debugPrint('Error fetching cancellation details: $e');
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching cancellation details for ID: $cancelID -> $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
+
 
 // Check if order can be canceled
   bool canCancelOrder(OrdersModel order) {

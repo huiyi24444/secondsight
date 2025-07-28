@@ -1,9 +1,14 @@
+// cancel_order_dialog_view.dart
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../controller/order/cancel_dialog_controller.dart';
 
 class CancelOrderDialog extends StatefulWidget {
   final String orderId;
   final VoidCallback? onCancel;
-  final Function(String reason, String? note)? onConfirm; // Modified to pass data
+  final Function(String reason, String? note)? onConfirm;
 
   const CancelOrderDialog({
     super.key,
@@ -21,21 +26,13 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
-
-  String? _selectedReason;
-  final TextEditingController _customReasonController = TextEditingController();
-  bool _isProcessing = false;
-
-  final List<String> _cancellationReasons = [
-    'Changed my mind',
-    'Found a better price elsewhere',
-    'Product no longer needed',
-    'Other (please specify)',
-  ];
+  late CancelOrderDialogController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = CancelOrderDialogController();
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -63,51 +60,62 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
   @override
   void dispose() {
     _animationController.dispose();
-    _customReasonController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _opacityAnimation.value,
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 10,
-              backgroundColor: Colors.transparent,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+    return ChangeNotifierProvider<CancelOrderDialogController>.value(
+      value: _controller,
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _opacityAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildHeader(),
-                    _buildContent(),
-                    _buildActions(),
-                  ],
+                elevation: 10,
+                backgroundColor: Colors.transparent,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: 400,
+                    maxHeight: MediaQuery.of(context).size.height * 0.8, // Max 80% of screen height
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildHeader(),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: _buildContent(),
+                        ),
+                      ),
+                      _buildActions(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -173,100 +181,102 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
   }
 
   Widget _buildContent() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'We\'re sorry to see you cancel your order. Please let us know why:',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.black87,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Cancellation reasons
-          ...(_cancellationReasons.map((reason) => _buildReasonTile(reason))),
-
-          // Custom reason input
-          if (_selectedReason == 'Other (please specify)') ...[
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _customReasonController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Please specify your reason...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                  hintStyle: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 14,
-                  ),
-                ),
-                style: const TextStyle(
-                  fontSize: 14,
+    return Consumer<CancelOrderDialogController>(
+      builder: (context, controller, child) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'We\'re sorry to see you cancel your order. Please let us know why:',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black87,
                   height: 1.4,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
 
-          const SizedBox(height: 20),
+              // Cancellation reasons
+              ...(controller.cancellationReasons.map((reason) =>
+                  _buildReasonTile(reason, controller))),
 
-          // Warning message
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.orange.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_outlined,
-                  color: Colors.orange[700],
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Once cancelled, this action cannot be undone. Any payment will be refunded within 3-5 business days.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.orange[800],
-                      height: 1.3,
+              // Custom reason input
+              if (controller.showCustomReasonField) ...[
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: TextField(
+                    controller: controller.customReasonController,
+                    maxLines: 3,
+                    onChanged: (_) => controller.notifyListeners(), // Update state on text change
+                    decoration: const InputDecoration(
+                      hintText: 'Please specify your reason...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(16),
+                      hintStyle: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
                     ),
                   ),
                 ),
               ],
-            ),
+
+              const SizedBox(height: 20),
+
+              // Warning message
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.orange.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_outlined,
+                      color: Colors.orange[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Once cancelled, this action cannot be undone. Any payment will be refunded within 3-5 business days.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.orange[800],
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildReasonTile(String reason) {
-    final isSelected = _selectedReason == reason;
+  Widget _buildReasonTile(String reason, CancelOrderDialogController controller) {
+    final isSelected = controller.selectedReason == reason;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedReason = reason;
-        });
-      },
+      onTap: () => controller.setSelectedReason(reason),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(16),
@@ -327,115 +337,102 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
   }
 
   Widget _buildActions() {
-    final canProceed = _selectedReason != null &&
-        (_selectedReason != 'Other (please specify)' ||
-            _customReasonController.text.trim().isNotEmpty);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextButton(
-              onPressed: _isProcessing ? null : () {
-                _animationController.reverse().then((_) {
-                  Navigator.of(context).pop();
-                  widget.onCancel?.call();
-                });
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Keep Order',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
-                ),
+    return Consumer<CancelOrderDialogController>(
+      builder: (context, controller, child) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(20),
+              bottomRight: Radius.circular(20),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: Colors.grey[200]!,
+                width: 1,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: (canProceed && !_isProcessing) ? _handleCancelOrder : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: controller.isProcessing
+                      ? null
+                      : () {
+                    _animationController.reverse().then((_) {
+                      Navigator.of(context).pop();
+                      widget.onCancel?.call();
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Keep Order',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                 ),
-                elevation: 0,
               ),
-              child: _isProcessing
-                  ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-                  : const Text(
-                'Cancel Order',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: (controller.canProceed && !controller.isProcessing)
+                      ? () => _handleCancelOrder(controller)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: controller.isProcessing
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Text(
+                    'Cancel Order',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  void _handleCancelOrder() async {
-    setState(() {
-      _isProcessing = true;
-    });
-
-    // Prepare the cancellation data
-    String finalReason = _selectedReason!;
-    String? note;
-
-    if (_selectedReason == 'Other (please specify)') {
-      // Use the custom reason as the main reason
-      finalReason = _customReasonController.text.trim();
-    } else {
-      // Use selected reason and add any custom text as a note
-      if (_customReasonController.text.trim().isNotEmpty) {
-        note = _customReasonController.text.trim();
-      }
-    }
-
-    // Small delay to show processing state
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (mounted) {
-      // Close dialog with animation
-      _animationController.reverse().then((_) {
-        Navigator.of(context).pop();
-
-        // Call the onConfirm callback with reason and note
-        if (widget.onConfirm != null) {
-          widget.onConfirm!(finalReason, note);
+  void _handleCancelOrder(CancelOrderDialogController controller) async {
+    await controller.processCancellation(
+      onConfirm: widget.onConfirm ?? (_, __) {},
+      onComplete: () {
+        if (mounted) {
+          _animationController.reverse().then((_) {
+            Navigator.of(context).pop();
+          });
         }
-      });
-    }
+      },
+    );
   }
 }
 
