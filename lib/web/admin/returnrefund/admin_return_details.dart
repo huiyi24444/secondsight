@@ -7,6 +7,7 @@ import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
 
 import '../../../model/order_product_model.dart';
+import '../../../view/widgets/order_status_utils.dart';
 import '../customer/admin_customer.dart';
 import '../order/admin_order.dart';
 import '../product/admin_product.dart';
@@ -58,7 +59,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     try {
       // Load order details
       final orderDoc = await widget.firestore
-          .collection('orders')
+          .collection('order')
           .doc(widget.returnItem['orderId'])
           .get();
 
@@ -510,14 +511,19 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Return Item Details',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange,
-                    letterSpacing: 1.2,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Return Item',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -542,121 +548,264 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ),
           ),
 
-          // Product Details
+          // Table Header
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+            ),
             child: Row(
               children: [
-                // Product Image
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: (imageUrl?.isNotEmpty ?? false)
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        Icons.image,
-                        color: Colors.grey[400],
-                        size: 30,
-                      ),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    'ITEM DESCRIPTION',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
                     ),
-                  )
-                      : Icon(
-                    Icons.image,
-                    color: Colors.grey[400],
-                    size: 30,
                   ),
                 ),
-                const SizedBox(width: 20),
-                // Product Info
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  flex: 3,
+                  child: Text(
+                    'ORDER ID',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'QTY',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'PRICE (Per Unit)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'TOTAL',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Product Item Row
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[200]!, width: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Product Image and Name
+                Expanded(
+                  flex: 4,
+                  child: Row(
                     children: [
-                      Text(
-                        productName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: (imageUrl?.isNotEmpty ?? false)
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (context, error, stackTrace) => Icon(
+                              Icons.image,
+                              color: Colors.grey[400],
+                              size: 20,
+                            ),
+                          ),
+                        )
+                            : Icon(
+                          Icons.image,
+                          color: Colors.grey[400],
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _buildInfoChip('Order ID', '#${widget.returnItem['shortOrderId']}'),
-                          const SizedBox(width: 12),
-                          _buildInfoChip('Product ID', widget.returnItem['orderProductId']),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            'Quantity: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          productName,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
-                          Text(
-                            '$quantity',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Text(
-                            'Unit Price: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          Text(
-                            'RM ${price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                // Return Amount
+                // Order ID
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    '#${widget.returnItem['shortOrderId']}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                // Quantity
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '$quantity',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                // Unit Price
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'RM ${price.toStringAsFixed(2)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ),
+                // Total Price
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'RM ${totalPrice.toStringAsFixed(2)}',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Summary Section
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Product ID info row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Product ID',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    Text(
+                      widget.returnItem['orderProductId'],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Divider
+                Divider(color: Colors.grey[300], thickness: 1),
+                const SizedBox(height: 16),
+
+                // Return Amount Total
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.withOpacity(0.1),
+                        Colors.orange.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: Colors.orange.withOpacity(0.2),
                     ),
                   ),
-                  child: Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Return Amount',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet,
+                              color: Colors.orange,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'RETURN AMOUNT',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
                       Text(
                         'RM ${totalPrice.toStringAsFixed(2)}',
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.orange,
                         ),
@@ -840,7 +989,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
               : 'N/A'),
           const SizedBox(height: 8),
           _buildInfoRow('Order Status', order != null
-              ? _formatOrderStatus(order!.orderStatus)
+              ? OrderStatusUtils.getStatusDisplayText(order!.orderStatus)
               : 'N/A'),
         ],
       ),
@@ -1023,34 +1172,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildInfoChip(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   List<Map<String, dynamic>> _getReturnTimeline() {
     final List<Map<String, dynamic>> timeline = [];
@@ -1114,18 +1236,4 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     return timeline;
   }
 
-  String _formatOrderStatus(String status) {
-    switch (status) {
-      case 'to_ship':
-        return 'To Ship';
-      case 'to_receive':
-        return 'To Receive';
-      case 'completed':
-        return 'Completed';
-      case 'canceled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
 }

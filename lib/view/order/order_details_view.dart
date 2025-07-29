@@ -467,7 +467,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                     const SizedBox(height: 4),
                     if (step['date'] != null)
                       Text(
-                        _formatStatusDate(step['date'] as DateTime),
+                        _controller.formatStatusDate(step['date'] as DateTime),
                         style: TextStyle(
                           fontSize: 13,
                           color: isCompleted || isActive
@@ -553,20 +553,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
     return steps;
   }
 
-  // Helper method to format status dates
-  String _formatStatusDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
 
-    if (difference.inDays == 0) {
-      return 'Today at ${DateFormat('HH:mm').format(date)}';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
-    }  else {
-      return '${DateFormat('EEEE').format(date)}, ${DateFormat('MMM d, yyyy').format(date)} at ${DateFormat('h:mm a').format(date)}';
-
-    }
-  }
 
   Widget _buildProductsSection() {
     return Container(

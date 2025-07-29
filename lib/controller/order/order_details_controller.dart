@@ -577,5 +577,20 @@ class OrderDetailsController extends ChangeNotifier {
     super.dispose();
   }
 
+  // Helper method to format status dates
+  String formatStatusDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
+    }  else {
+      return '${DateFormat('EEEE').format(date)}, ${DateFormat('MMM d, yyyy').format(date)} at ${DateFormat('h:mm a').format(date)}';
+
+    }
+  }
+
 
 }
