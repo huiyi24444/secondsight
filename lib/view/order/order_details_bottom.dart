@@ -341,93 +341,120 @@ class OrderBottomButtons extends StatelessWidget {
     showRatingDialog(context: context, order: order);
   }
 
-  void _showProductSelectionDialog(BuildContext context) {
+  Future<void> _showProductSelectionDialog(BuildContext context) async {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return FutureBuilder<Set<String>>(
+          future: controller.getSubmittedOrderProductIDs(),
+          builder: (context, submittedSnapshot) {
+            if (!submittedSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final submittedOrderProductIDs = submittedSnapshot.data!;
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Select Item to Return',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Select Item to Return',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              StreamBuilder<QuerySnapshot>(
-                stream: controller.getOrderProductsStream(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF8E6CEF)),
-                    );
-                  }
+                  const SizedBox(height: 16),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: controller.getOrderProductsStream(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(color: Color(0xFF8E6CEF)),
+                        );
+                      }
 
-                  final products = snapshot.data!.docs;
+                      final allProducts = snapshot.data!.docs;
 
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      final data = products[index].data() as Map<String, dynamic>;
-                      final orderProduct = controller.createOrderProductFromDocument(data);
-                      final productRef = orderProduct.productID;
-                      final orderProductId = products[index].id;
+                      // Filter products: exclude those with existing return requests
+                      final products = allProducts.where((doc) {
+                        final orderProductId = doc.id;
+                        return !submittedOrderProductIDs.contains(orderProductId);
+                      }).toList();
 
-                      return FutureBuilder<DocumentSnapshot>(
-                        future: controller.getProductDocument(productRef),
-                        builder: (context, productSnapshot) {
-                          if (!productSnapshot.hasData) {
-                            return const SizedBox(
-                              height: 60,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Color(0xFF8E6CEF),
-                                ),
-                              ),
-                            );
-                          }
+                      if (products.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text('No products available for return.'),
+                          ),
+                        );
+                      }
 
-                          final product = productSnapshot.data!.data() as Map<String, dynamic>?;
-                          final productURL = controller.extractProductImageUrl(product);
-                          final productName = controller.extractProductName(product);
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          final data = products[index].data() as Map<String, dynamic>;
+                          final orderProduct = controller.createOrderProductFromDocument(data);
+                          final productRef = orderProduct.productID;
+                          final orderProductId = products[index].id;
 
-                          return _buildProductSelectionItem(
-                            context,
-                            orderProduct,
-                            productURL,
-                            productName,
-                            orderProductId,
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: controller.getProductDocument(productRef),
+                            builder: (context, productSnapshot) {
+                              if (!productSnapshot.hasData) {
+                                return const SizedBox(
+                                  height: 60,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF8E6CEF),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final product = productSnapshot.data!.data() as Map<String, dynamic>?;
+                              final productURL = controller.extractProductImageUrl(product);
+                              final productName = controller.extractProductName(product);
+
+                              return _buildProductSelectionItem(
+                                context,
+                                orderProduct,
+                                productURL,
+                                productName,
+                                orderProductId,
+                              );
+                            },
                           );
                         },
                       );
                     },
-                  );
-                },
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
+
 
   Widget _buildProductSelectionItem(
       BuildContext context,
@@ -499,6 +526,8 @@ class OrderBottomButtons extends StatelessWidget {
       ),
     );
   }
+
+
 
   void _showIneligibleDialog(BuildContext context) {
     showDialog(

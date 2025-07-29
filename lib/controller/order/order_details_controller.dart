@@ -592,5 +592,14 @@ class OrderDetailsController extends ChangeNotifier {
     }
   }
 
+  Future<Set<String>> getSubmittedOrderProductIDs() async {
+    final query = await FirebaseFirestore.instance
+        .collection('returnRequests')
+        .where('userID', isEqualTo: userId)
+        .get();
+
+    return query.docs.map((doc) => doc['orderProductID'] as String).toSet();
+  }
+
 
 }

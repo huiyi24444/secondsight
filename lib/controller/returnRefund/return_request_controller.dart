@@ -23,6 +23,7 @@ class ReturnRequestController extends ChangeNotifier {
   List<String> uploadedImageUrls = [];
   bool isSubmitting = false;
   bool isUploadingImages = false;
+  bool hasExistingReturnRequest = false;
 
   // Data
   OrderProductModel? orderProduct;
@@ -82,6 +83,22 @@ class ReturnRequestController extends ChangeNotifier {
     return orderProduct?.productQuantity ?? 1;
   }
 
+  Future<void> checkExistingReturnRequest() async {
+    try {
+      final existingRequests = await FirebaseFirestore.instance
+          .collection('returnRequests')
+          .where('userID', isEqualTo: userId)
+          .where('orderProductID', isEqualTo: orderProductId)
+          .get();
+
+      hasExistingReturnRequest = existingRequests.docs.isNotEmpty;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error checking existing return request: $e');
+      rethrow;
+    }
+  }
+
   // Load order product data (only needed when creating new return)
   Future<void> loadOrderProduct() async {
     try {
@@ -94,19 +111,18 @@ class ReturnRequestController extends ChangeNotifier {
           .doc(orderProductId)
           .get();
 
-      if (orderProductDoc.exists) {
-        final orderProductData = orderProductDoc.data() as Map<String, dynamic>;
-        orderProduct = OrderProductModel.fromJson(orderProductData);
-
-        // Load product details
-        if (orderProduct?.productID != null) {
-          final productDoc = await orderProduct!.productID!.get();
-          if (productDoc.exists) {
-            productData = productDoc.data() as Map<String, dynamic>?;
-          }
+      if (orderProduct?.productID != null) {
+        final productDoc = await orderProduct!.productID!.get();
+        if (productDoc.exists) {
+          productData = productDoc.data() as Map<String, dynamic>?;
         }
       }
+
+// 🔍 Check for existing return request
+      await checkExistingReturnRequest();
+
       notifyListeners();
+
     } catch (e) {
       debugPrint('Error loading order product: $e');
       rethrow;
