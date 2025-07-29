@@ -50,15 +50,39 @@ class ReturnRequestController extends ChangeNotifier {
   bool get isViewingExistingRequest => existingReturnRequestId != null;
 
   String get productURL {
+    // When viewing existing return, use denormalized data
+    if (returnRequest != null) {
+      return returnRequest!.productImageUrl;
+    }
+
+    // When creating new return, use product data
     final productURLList = productData?['productURL'];
     return (productURLList is List && productURLList.isNotEmpty)
         ? productURLList.first.toString()
         : '';
   }
 
-  String get productName => productData?['productName'] ?? 'Unknown Product';
+  String get productName {
+    // When viewing existing return, use denormalized data
+    if (returnRequest != null) {
+      return returnRequest!.productName;
+    }
 
-  // Load order product data
+    // When creating new return, use product data
+    return productData?['productName'] ?? 'Unknown Product';
+  }
+
+  int get quantity {
+    // When viewing existing return, use denormalized data
+    if (returnRequest != null) {
+      return returnRequest!.returnQuantity;
+    }
+
+    // When creating new return, use order product data
+    return orderProduct?.productQuantity ?? 1;
+  }
+
+  // Load order product data (only needed when creating new return)
   Future<void> loadOrderProduct() async {
     try {
       final orderProductDoc = await FirebaseFirestore.instance
@@ -99,28 +123,14 @@ class ReturnRequestController extends ChangeNotifier {
         .snapshots();
   }
 
-  // Load return request data
+  // Load return request data - SIMPLIFIED!
   Future<void> loadReturnRequest(DocumentSnapshot snapshot) async {
     try {
       returnRequest = ReturnRequestModel.fromDocument(snapshot);
 
-      // Load associated order product
-      final orderProductDoc = await FirebaseFirestore.instance
-          .doc(returnRequest!.orderProductID)
-          .get();
+      // No need to load orderProduct or product data anymore!
+      // All necessary data is denormalized in returnRequest
 
-      if (orderProductDoc.exists) {
-        final orderProductData = orderProductDoc.data() as Map<String, dynamic>;
-        orderProduct = OrderProductModel.fromJson(orderProductData);
-
-        // Load product details
-        if (orderProduct?.productID != null) {
-          final productDoc = await orderProduct!.productID!.get();
-          if (productDoc.exists) {
-            productData = productDoc.data() as Map<String, dynamic>?;
-          }
-        }
-      }
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading return request: $e');
@@ -146,7 +156,6 @@ class ReturnRequestController extends ChangeNotifier {
         isUploadingImages = true;
         notifyListeners();
 
-        // Note: We're not uploading immediately anymore
         selectedImages.addAll(images);
 
         isUploadingImages = false;
@@ -192,7 +201,7 @@ class ReturnRequestController extends ChangeNotifier {
     return descriptionController.text.trim().isNotEmpty;
   }
 
-  // Submit return request
+  // Submit return request with denormalized data
   Future<void> submitRequest() async {
     if (!validateForm()) {
       throw Exception('Please provide a description');
@@ -209,8 +218,14 @@ class ReturnRequestController extends ChangeNotifier {
       }
 
       final double returnPrice = orderProduct?.totalPrice ?? 0.0;
+      final int returnQuantity = orderProduct?.productQuantity ?? 1;
+      final String productName = productData?['productName'] ?? 'Unknown Product';
+      final productURLList = productData?['productURL'];
+      final String productImageUrl = (productURLList is List && productURLList.isNotEmpty)
+          ? productURLList.first.toString()
+          : '';
 
-      // Create return request
+      // Create return request with denormalized data
       final returnRequest = ReturnRequestModel(
         id: '', // Firestore will assign this
         userID: userId,
@@ -222,6 +237,9 @@ class ReturnRequestController extends ChangeNotifier {
         returnStatus: 'submitted',
         returnComment: descriptionController.text,
         returnPrice: returnPrice,
+        returnQuantity: returnQuantity,        // Denormalized
+        productName: productName,              // Denormalized
+        productImageUrl: productImageUrl,      // Denormalized
       );
 
       await FirebaseFirestore.instance

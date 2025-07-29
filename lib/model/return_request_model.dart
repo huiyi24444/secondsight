@@ -13,6 +13,10 @@ class ReturnRequestModel {
   final String? rejectReason;
   final double returnPrice;
 
+  final int returnQuantity;      // From orderProduct
+  final String productName;      // From product
+  final String productImageUrl;  // From product (just the main image)
+
   ReturnRequestModel({
     required this.id,
     required this.orderProductID,
@@ -25,6 +29,12 @@ class ReturnRequestModel {
     required this.returnComment,
     this.rejectReason,
     required this.returnPrice,
+
+    required this.returnQuantity,
+    required this.productName,
+    required this.productImageUrl,
+
+
   });
 
   factory ReturnRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -42,6 +52,9 @@ class ReturnRequestModel {
       returnComment: data['returnComment'] as String,
       rejectReason: data['rejectReason'],
       returnPrice: (data['returnPrice'] as num).toDouble(),
+      returnQuantity: data['returnQuantity'] as int,
+      productName: data['productName'] as String,
+      productImageUrl: data['productImageUrl'] as String,
     );
   }
 
@@ -56,6 +69,9 @@ class ReturnRequestModel {
       'returnStatus': returnStatus,
       'returnComment': returnComment,
       'returnPrice': returnPrice,
+      'returnQuantity': returnQuantity,
+      'productName': productName,
+      'productImageUrl': productImageUrl,
     };
 
     // Only include rejectReason if it's not null, cast to Object
