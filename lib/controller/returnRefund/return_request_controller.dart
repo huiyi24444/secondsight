@@ -111,6 +111,10 @@ class ReturnRequestController extends ChangeNotifier {
           .doc(orderProductId)
           .get();
 
+      if (orderProductDoc.exists) {
+        orderProduct = OrderProductModel.fromDocument(orderProductDoc);
+      }
+
       if (orderProduct?.productID != null) {
         final productDoc = await orderProduct!.productID!.get();
         if (productDoc.exists) {
@@ -118,16 +122,14 @@ class ReturnRequestController extends ChangeNotifier {
         }
       }
 
-// 🔍 Check for existing return request
       await checkExistingReturnRequest();
-
       notifyListeners();
-
     } catch (e) {
       debugPrint('Error loading order product: $e');
       rethrow;
     }
   }
+
 
   // Load return request for status page
   Stream<DocumentSnapshot> getReturnRequestStream() {
@@ -241,7 +243,7 @@ class ReturnRequestController extends ChangeNotifier {
           ? productURLList.first.toString()
           : '';
 
-      // Create return request with denormalized data
+      // Create return request with denormalized data and new date fields
       final returnRequest = ReturnRequestModel(
         id: '', // Firestore will assign this
         userID: userId,
@@ -252,10 +254,20 @@ class ReturnRequestController extends ChangeNotifier {
         returnReason: selectedReason,
         returnStatus: 'submitted',
         returnComment: descriptionController.text,
+        rejectReason: null, // Only set when rejected
         returnPrice: returnPrice,
         returnQuantity: returnQuantity,        // Denormalized
         productName: productName,              // Denormalized
         productImageUrl: productImageUrl,      // Denormalized
+
+        // New date fields - initially null, will be set when status changes
+        pendingDate: null,
+        approvedDate: null,
+        rejectedDate: null,
+        completedDate: null,
+        pendinginspectionDate: null,
+        completedinsepectionDate: null,
+        cancelledDate: null,
       );
 
       await FirebaseFirestore.instance
@@ -270,11 +282,24 @@ class ReturnRequestController extends ChangeNotifier {
     }
   }
 
-  // Get progress step information
   int getCurrentStep(String status) {
-    final steps = ['submitted', 'pending', 'approved'];
-    int currentStep = steps.indexOf(status.toLowerCase());
-    return currentStep == -1 ? 0 : currentStep;
+    switch (status.toLowerCase()) {
+      case 'submitted':
+      case 'request_submitted':
+        return 0;
+      case 'pending':
+      case 'pending_approval':
+        return 1;
+      case 'approved':
+      case 'request_approved':
+        return 2;
+      case 'rejected':
+        return -1; // Special case for rejected
+      case 'cancelled':
+        return -1; // Special case for cancelled
+      default:
+        return 0;
+    }
   }
 
   @override

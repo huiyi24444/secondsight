@@ -17,6 +17,14 @@ class ReturnRequestModel {
   final String productName;      // From product
   final String productImageUrl;  // From product (just the main image)
 
+  final Timestamp? pendingDate;
+  final Timestamp? approvedDate;
+  final Timestamp? rejectedDate;
+  final Timestamp? completedDate;
+  final Timestamp? pendinginspectionDate;
+  final Timestamp? completedinsepectionDate;
+  final Timestamp? cancelledDate;
+
   ReturnRequestModel({
     required this.id,
     required this.orderProductID,
@@ -34,7 +42,13 @@ class ReturnRequestModel {
     required this.productName,
     required this.productImageUrl,
 
-
+    this.pendingDate,
+    this.approvedDate,
+    this.rejectedDate,
+    this.completedDate,
+    this.pendinginspectionDate,
+    this.completedinsepectionDate,
+    this.cancelledDate,
   });
 
   factory ReturnRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -55,6 +69,13 @@ class ReturnRequestModel {
       returnQuantity: data['returnQuantity'] as int,
       productName: data['productName'] as String,
       productImageUrl: data['productImageUrl'] as String,
+      pendingDate: data['pendingDate'] as Timestamp,
+      approvedDate: data['approvedDate'] as Timestamp,
+      rejectedDate: data['rejectedDate'] as Timestamp,
+      completedDate: data['completedDate'] as Timestamp,
+      pendinginspectionDate: data['pendinginspectionDate'] as Timestamp,
+      completedinsepectionDate: data['completedinsepectionDate'] as Timestamp,
+      cancelledDate: data['cancelledDate'] as Timestamp,
     );
   }
 
@@ -72,6 +93,13 @@ class ReturnRequestModel {
       'returnQuantity': returnQuantity,
       'productName': productName,
       'productImageUrl': productImageUrl,
+      'pendingDate': pendingDate,
+      'approvedDate': approvedDate,
+      'rejectedDate': rejectedDate,
+      'completedDate': completedDate,
+      'pendinginspectionDate': pendinginspectionDate,
+      'completedinsepectionDate': completedinsepectionDate,
+      'cancelledDate': cancelledDate,
     };
 
     // Only include rejectReason if it's not null, cast to Object

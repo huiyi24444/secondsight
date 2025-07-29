@@ -31,4 +31,15 @@ class OrderProductModel {
       'totalPrice': totalPrice,
     };
   }
+
+  factory OrderProductModel.fromDocument(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    return OrderProductModel(
+      price: (data['price'] ?? 0).toDouble(),
+      productID: data['productID'] as DocumentReference,
+      productQuantity: data['productQuantity'] ?? 1,
+      totalPrice: (data['totalPrice'] ?? 0).toDouble(),
+    );
+  }
 }

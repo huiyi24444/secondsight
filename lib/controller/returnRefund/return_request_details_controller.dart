@@ -42,8 +42,4 @@ class ReturnRequestDetailsController {
   String formatDate(DateTime dateTime) {
     return DateFormat('dd MMM yyyy').format(dateTime);
   }
-
-
-
-
 } // End of controller

@@ -25,12 +25,21 @@ class ReturnRequestView extends StatefulWidget {
   State<ReturnRequestView> createState() => _ReturnRequestViewState();
 }
 
+
 class _ReturnRequestViewState extends State<ReturnRequestView> {
   late ReturnRequestController _controller;
 
   @override
   void initState() {
     super.initState();
+
+    print('=== ReturnRequestView initState ===');
+    print('Widget parameters:');
+    print('  - orderId: ${widget.orderId}');
+    print('  - userId: ${widget.userId}');
+    print('  - orderProductId: ${widget.orderProductId}');
+    print('  - existingReturnRequestId: ${widget.existingReturnRequestId}');
+
     _controller = ReturnRequestController(
       orderId: widget.orderId,
       userId: widget.userId,
@@ -38,10 +47,18 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
       existingReturnRequestId: widget.existingReturnRequestId,
     );
 
+    print('Controller created');
+    print('  - isViewingExistingRequest: ${_controller.isViewingExistingRequest}');
+
     // Load initial data
     if (!_controller.isViewingExistingRequest) {
+      print('Loading order product for new request...');
       _controller.loadOrderProduct();
+    } else {
+      print('Viewing existing request, skipping loadOrderProduct');
     }
+
+    print('initState completed');
   }
 
   @override
@@ -437,10 +454,33 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
   }
 
   Widget _buildStatusPage() {
+    print('=== _buildStatusPage called ===');
+
     return StreamBuilder(
       stream: _controller.getReturnRequestStream(),
       builder: (context, snapshot) {
+        print('StreamBuilder state:');
+        print('  - connectionState: ${snapshot.connectionState}');
+        print('  - hasData: ${snapshot.hasData}');
+        print('  - hasError: ${snapshot.hasError}');
+        print('  - data: ${snapshot.data}');
+
+        if (snapshot.hasError) {
+          print('  - error: ${snapshot.error}');
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                SizedBox(height: 16),
+                Text('Error: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
         if (!snapshot.hasData) {
+          print('  - No data yet, showing loading...');
           return const Center(
             child: CircularProgressIndicator(
               color: Color(0xFF8E6CEF),
@@ -448,14 +488,24 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
           );
         }
 
+        print('  - Data received, loading return request...');
         // Load return request data
         _controller.loadReturnRequest(snapshot.data!);
 
         return Consumer<ReturnRequestController>(
           builder: (context, controller, child) {
+            print('Consumer builder called:');
+            print('  - returnRequest: ${controller.returnRequest}');
+            print('  - orderProduct: ${controller.orderProduct}');
+            print('  - productData: ${controller.productData}');
+            print('  - returnRequest != null: ${controller.returnRequest != null}');
+            print('  - orderProduct != null: ${controller.orderProduct != null}');
+            print('  - productData != null: ${controller.productData != null}');
+
             if (controller.returnRequest == null ||
                 controller.orderProduct == null ||
                 controller.productData == null) {
+              print('  - Some data is null, showing loading...');
               return const Center(
                 child: CircularProgressIndicator(
                   color: Color(0xFF8E6CEF),
@@ -463,6 +513,7 @@ class _ReturnRequestViewState extends State<ReturnRequestView> {
               );
             }
 
+            print('  - All data loaded, building UI...');
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

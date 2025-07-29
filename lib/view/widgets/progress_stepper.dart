@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../model/return_request_model.dart';
+
 class ProgressStepper extends StatelessWidget {
   final String title;
   final List<String> steps;
@@ -154,40 +156,186 @@ class ProgressStepper extends StatelessWidget {
 
 class ReturnStatusStepper extends StatelessWidget {
   final String returnStatus;
+  final ReturnRequestModel request; // Add the request model to access dates
 
   const ReturnStatusStepper({
     Key? key,
     required this.returnStatus,
+    required this.request,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final steps = ['Request Submitted', 'Pending Approval', 'Request Approved'];
-    int currentStep = _getCurrentStep(returnStatus);
+    final statusSteps = _getReturnStatusSteps();
 
-    return ProgressStepper(
-      title: 'Return & Refund',
-      steps: steps,
-      currentStep: currentStep,
-      activeColor: Colors.purple,
-      completedColor: Colors.purple,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Return & Refund Status',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Column(
+          children: List.generate(statusSteps.length, (index) {
+            final step = statusSteps[index];
+            final isLast = index == statusSteps.length - 1;
+            final isActive = step['isActive'] as bool;
+            final isCompleted = step['isCompleted'] as bool;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Timeline indicator
+                Column(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isCompleted
+                            ? Colors.purple
+                            : Colors.grey[300],
+                        border: isActive && !isCompleted
+                            ? Border.all(
+                          color: Colors.purple,
+                          width: 2,
+                        )
+                            : null,
+                      ),
+                      child: Center(
+                        child: isCompleted
+                            ? const Icon(
+                          Icons.check,
+                          size: 16,
+                          color: Colors.white,
+                        )
+                            : Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isActive
+                                ? Colors.purple
+                                : Colors.grey[400],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!isLast)
+                      Container(
+                        width: 2,
+                        height: 40,
+                        color: isCompleted
+                            ? (statusSteps[index + 1]['isCompleted'] as bool
+                            ? Colors.purple
+                            : Colors.grey[300])
+                            : Colors.grey[300],
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                // Status info
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          step['title'] as String,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: isCompleted || isActive
+                                ? Colors.black87
+                                : Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (step['date'] != null)
+                          Text(
+                            _formatStatusDate(step['date'] as DateTime),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isCompleted || isActive
+                                  ? Colors.grey[600]
+                                  : Colors.grey[400],
+                            ),
+                          )
+                        else
+                          Text(
+                            step['pendingText'] as String,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[400],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
-  int _getCurrentStep(String status) {
-    switch (status.toLowerCase()) {
+  List<Map<String, dynamic>> _getReturnStatusSteps() {
+    final status = returnStatus.toLowerCase();
+
+    return [
+      {
+        'title': 'Request Submitted',
+        'isCompleted': _isStepCompleted('submitted'),
+        'isActive': status == 'submitted' || status == 'request_submitted',
+        'date': request.returnDate?.toDate(), // Assuming returnDate is the submission date
+        'pendingText': 'Pending submission',
+      },
+      {
+        'title': 'Pending Approval',
+        'isCompleted': _isStepCompleted('pending'),
+        'isActive': status == 'pending' || status == 'pending_approval',
+        'date': request.pendingDate?.toDate(), // Add pendingDate to your model if available
+        'pendingText': 'Awaiting approval',
+      },
+      {
+        'title': 'Request Approved',
+        'isCompleted': _isStepCompleted('approved'),
+        'isActive': status == 'approved' || status == 'request_approved',
+        'date': request.approvedDate?.toDate(), // Add approvedDate to your model if available
+        'pendingText': 'Approval pending',
+      },
+    ];
+  }
+
+  bool _isStepCompleted(String stepStatus) {
+    final currentStatus = returnStatus.toLowerCase();
+
+    switch (stepStatus) {
       case 'submitted':
-      case 'request_submitted':
-        return 0;
+        return ['submitted', 'request_submitted', 'pending', 'pending_approval', 'approved', 'request_approved']
+            .contains(currentStatus);
       case 'pending':
-      case 'pending_approval':
-        return 1;
+        return ['pending', 'pending_approval', 'approved', 'request_approved']
+            .contains(currentStatus);
       case 'approved':
-      case 'request_approved':
-        return 2;
+        return ['approved', 'request_approved'].contains(currentStatus);
       default:
-        return 0;
+        return false;
     }
+  }
+  String _formatStatusDate(DateTime date) {
+    // You can customize this format as needed
+    return "${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
   }
 }
 

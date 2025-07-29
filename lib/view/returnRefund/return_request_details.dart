@@ -84,7 +84,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
                         if (_getStatusFromRequest(returnRequest) != ReturnStatus.pending_approval)
                           ReturnStatusCard(status: _getStatusFromRequest(returnRequest)),
 
-                        _buildProductCard(productURL, productName, orderProduct),
+                        _buildProductCard(returnRequest),
                         _buildReturnDetails(returnRequest, orderProduct),
 
                         // Show refund details if refund document exists (refund processed)
@@ -259,7 +259,13 @@ class ReturnRequestDetailsView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,45 +348,38 @@ class ReturnRequestDetailsView extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          Builder(
-            builder: (context) {
-              final config = ReturnStatusUtils.getReturnStatusConfig(request.returnStatus);
-              return ProgressStepper(
-                title: config['title'],
-                steps: config['steps'],
-                currentStep: config['currentStep'],
-              );
-            },
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey[600]),
-              const SizedBox(width: 8),
-              Text(controller.formatDate(request.returnDate.toDate()), style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-
-            ],
+          // Use the new timeline-style stepper
+          ReturnStatusStepper(
+            returnStatus: request.returnStatus,
+            request: request,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProductCard(String url, String name, OrderProductModel orderProduct) {
+  Widget _buildProductCard(ReturnRequestModel returnRequest) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Product Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const Text(
+            'Product Details',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +394,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(11),
                   child: Image.network(
-                    url,
+                    returnRequest.productImageUrl,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: Colors.grey[200],
@@ -409,14 +408,29 @@ class ReturnRequestDetailsView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(
+                      returnRequest.productName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 4),
-                    Text('Quantity: ${orderProduct.productQuantity}', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                    Text(
+                      'Quantity: ${returnRequest.returnQuantity}',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text('RM ${orderProduct.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        Text(
+                          'RM ${returnRequest.returnPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                   ],
@@ -428,7 +442,6 @@ class ReturnRequestDetailsView extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildReturnDetails(ReturnRequestModel request, OrderProductModel orderProduct) {
     return Container(
       margin: const EdgeInsets.all(16),
