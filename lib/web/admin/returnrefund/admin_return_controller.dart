@@ -180,4 +180,43 @@ class ReturnManagementController extends ChangeNotifier {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
+
+  Future<List<ReturnRequestModel>> loadReturnsAsModels() async {
+    try {
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('returnRequests')
+          .orderBy('returnDate', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return ReturnRequestModel(
+          id: doc.id,
+          orderProductID: data['orderProductID'] ?? '',
+          orderID: data['orderID'] ?? '',
+          userID: data['userID'] ?? '',
+          returnDate: data['returnDate'] ?? Timestamp.now(),
+          returnImages: List<String>.from(data['returnImages'] ?? []),
+          returnReason: data['returnReason'] ?? '',
+          returnStatus: data['returnStatus'] ?? 'pending',
+          returnComment: data['returnComment'] ?? '',
+          rejectReason: data['rejectReason'],
+          returnPrice: (data['returnPrice'] ?? 0.0).toDouble(),
+          returnQuantity: data['returnQuantity'] ?? 1,
+          productName: data['productName'] ?? 'Unknown Product',
+          productImageUrl: data['productImageUrl'] ?? '',
+          pendingDate: data['pendingDate'] as Timestamp?,
+          approvedDate: data['approvedDate'] as Timestamp?,
+          rejectedDate: data['rejectedDate'] as Timestamp?,
+          completedDate: data['completedDate'] as Timestamp?,
+          pendinginspectionDate: data['pendinginspectionDate'] as Timestamp?,
+          completedinsepectionDate: data['completedinsepectionDate'] as Timestamp?,
+          cancelledDate: data['cancelledDate'] as Timestamp?,
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading returns: $e');
+      return [];
+    }
+  }
 }

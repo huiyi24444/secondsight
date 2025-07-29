@@ -29,15 +29,18 @@ class ReturnStatusUtils {
 
   static Color getReturnStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'pending_approval':
-        return const Color(0xFF8E6CEF);
+      case 'pending':
+        return Colors.orange;
+      case 'submitted':
+        return Colors.blue;
       case 'approved':
         return Colors.green;
       case 'rejected':
-      case 'cancelled':
         return Colors.red;
-      case 'pending_inspection':
-        return Colors.orange;
+      case 'completed':
+        return Colors.teal;
+      case 'cancelled':
+        return Colors.grey;
       default:
         return Colors.grey;
     }

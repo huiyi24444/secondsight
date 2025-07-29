@@ -162,17 +162,53 @@ class ReturnManagementView extends StatelessWidget {
                                       icon: const Icon(Icons.more_vert),
                                       onSelected: (value) async {
                                         if (value == 'view') {
-                                          // Navigate to the new ReturnDetailsPage instead of showing dialog
+                                          // Convert the item map to ReturnRequestModel before navigation
+                                          // Note: Adjust field names based on your actual Map structure
+                                          final returnRequest = ReturnRequestModel(
+                                            id: item['id'] ?? '',
+                                            orderProductID: item['orderProductId'] ?? item['orderProductID'] ?? '',
+                                            orderID: item['orderId'] ?? item['orderID'] ?? '',
+                                            userID: item['userEmail'] ?? item['userID'] ?? '',
+                                            returnDate: item['date'] is Timestamp
+                                                ? item['date'] as Timestamp
+                                                : item['returnDate'] is Timestamp
+                                                ? item['returnDate'] as Timestamp
+                                                : Timestamp.now(),
+                                            returnImages: item['images'] != null
+                                                ? List<String>.from(item['images'])
+                                                : item['returnImages'] != null
+                                                ? List<String>.from(item['returnImages'])
+                                                : [],
+                                            returnReason: item['reason'] ?? item['returnReason'] ?? '',
+                                            returnStatus: item['status'] ?? item['returnStatus'] ?? 'pending',
+                                            returnComment: item['comment'] ?? item['returnComment'] ?? '',
+                                            rejectReason: item['rejectReason'],
+                                            returnPrice: item['returnPrice'] != null
+                                                ? (item['returnPrice'] as num).toDouble()
+                                                : 0.0,
+                                            returnQuantity: item['quantity'] ?? item['returnQuantity'] ?? 1,
+                                            productName: item['productName'] ?? 'Unknown Product',
+                                            productImageUrl: item['productImage'] ?? item['productImageUrl'] ?? '',
+                                            pendingDate: item['pendingDate'] as Timestamp?,
+                                            approvedDate: item['approvedDate'] as Timestamp?,
+                                            rejectedDate: item['rejectedDate'] as Timestamp?,
+                                            completedDate: item['completedDate'] as Timestamp?,
+                                            pendinginspectionDate: item['pendinginspectionDate'] as Timestamp?,
+                                            completedinsepectionDate: item['completedinsepectionDate'] as Timestamp?,
+                                            cancelledDate: item['cancelledDate'] as Timestamp?,
+                                          );
+
+                                          // Navigate to the ReturnDetailsPage with ReturnRequestModel
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) => ReturnDetailsPage(
-                                                returnItem: item,
+                                                returnRequest: returnRequest,
                                                 onUpdateReturnStatus: (returnId, newStatus) async {
                                                   try {
                                                     await controller.updateReturnStatus(
                                                         context,
-                                                        item['userEmail'],
+                                                        item['userEmail'] ?? item['userID'] ?? '',
                                                         returnId,
                                                         newStatus
                                                     );

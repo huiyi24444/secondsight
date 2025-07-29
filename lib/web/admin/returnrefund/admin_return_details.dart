@@ -17,7 +17,7 @@ import '../widget/topbar.dart';
 import 'admin_return_controller.dart';
 
 class ReturnDetailsPage extends StatefulWidget {
-  final Map<String, dynamic> returnItem;
+  final ReturnRequestModel returnRequest;
   final Future<bool> Function(String, String) onUpdateReturnStatus;
   final String Function(Timestamp) formatDate;
   final String Function(String) formatStatus;
@@ -26,7 +26,7 @@ class ReturnDetailsPage extends StatefulWidget {
 
   const ReturnDetailsPage({
     Key? key,
-    required this.returnItem,
+    required this.returnRequest,
     required this.onUpdateReturnStatus,
     required this.formatDate,
     required this.formatStatus,
@@ -51,58 +51,73 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
   @override
   void initState() {
     super.initState();
-    currentStatus = widget.returnItem['status'] ?? 'submitted';
+    currentStatus = widget.returnRequest.returnStatus == 'submitted'
+        ? 'submitted'
+        : widget.returnRequest.returnStatus;
     _loadReturnData();
   }
 
   Future<void> _loadReturnData() async {
     try {
-      // Load order details
-      final orderDoc = await widget.firestore
-          .collection('order')
-          .doc(widget.returnItem['orderId'])
-          .get();
+      // Only load order details if orderID is not empty
+      if (widget.returnRequest.orderID.isNotEmpty) {
+        final orderDoc = await widget.firestore
+            .collection('order')
+            .doc(widget.returnRequest.orderID)
+            .get();
 
-      if (orderDoc.exists) {
-        order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+        if (orderDoc.exists) {
+          order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+        }
+      } else {
+        print('Order ID is empty, skipping order fetch');
       }
 
-      // Load order product details with null safety
-      final orderProductDoc = await widget.getOrderProductDoc(
-        widget.returnItem['userEmail'],
-        widget.returnItem['orderId'],
-        widget.returnItem['orderProductId'],
-      );
-
-      if (orderProductDoc != null && orderProductDoc.exists) {
-        orderProduct = OrderProductModel.fromJson(
-            orderProductDoc.data() as Map<String, dynamic>
+      // Only load order product details if all required IDs are available
+      if (widget.returnRequest.userID.isNotEmpty &&
+          widget.returnRequest.orderID.isNotEmpty &&
+          widget.returnRequest.orderProductID.isNotEmpty) {
+        final orderProductDoc = await widget.getOrderProductDoc(
+          widget.returnRequest.userID,
+          widget.returnRequest.orderID,
+          widget.returnRequest.orderProductID,
         );
 
-        // Load product details with null safety
-        if (orderProduct!.productID != null) {
-          try {
-            final productRef = orderProduct!.productID as DocumentReference;
-            final productDoc = await productRef.get();
-            if (productDoc.exists) {
-              productDetails = productDoc.data() as Map<String, dynamic>;
+        if (orderProductDoc != null && orderProductDoc.exists) {
+          orderProduct = OrderProductModel.fromJson(
+              orderProductDoc.data() as Map<String, dynamic>
+          );
+
+          // Load product details with null safety
+          if (orderProduct!.productID != null) {
+            try {
+              final productRef = orderProduct!.productID as DocumentReference;
+              final productDoc = await productRef.get();
+              if (productDoc.exists) {
+                productDetails = productDoc.data() as Map<String, dynamic>;
+              }
+            } catch (e) {
+              print('Error loading product details: $e');
+              productDetails = null;
             }
-          } catch (e) {
-            print('Error loading product details: $e');
-            // Handle case where productID is not a DocumentReference
-            productDetails = null;
           }
         }
+      } else {
+        print('Missing required IDs for order product fetch');
       }
 
-      // Load customer details
-      final customerDoc = await widget.firestore
-          .collection('customers')
-          .doc(widget.returnItem['userEmail'])
-          .get();
+      // Only load customer details if userID is not empty
+      if (widget.returnRequest.userID.isNotEmpty) {
+        final customerDoc = await widget.firestore
+            .collection('customers')
+            .doc(widget.returnRequest.userID)
+            .get();
 
-      if (customerDoc.exists) {
-        customerDetails = customerDoc.data() as Map<String, dynamic>;
+        if (customerDoc.exists) {
+          customerDetails = customerDoc.data() as Map<String, dynamic>;
+        }
+      } else {
+        print('User ID is empty, skipping customer fetch');
       }
 
       setState(() {
@@ -116,161 +131,81 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     }
   }
 
-  // Add this helper method to safely format dates
-  String _safeFormatDate(dynamic dateValue) {
-    if (dateValue == null) return 'N/A';
+  // Helper method to format dates
+  String _formatDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(date);
 
-    try {
-      if (dateValue is Timestamp) {
-        return widget.formatDate(dateValue);
-      } else if (dateValue is int) {
-        // Handle Unix timestamp in milliseconds
-        final timestamp = Timestamp.fromMillisecondsSinceEpoch(dateValue);
-        return widget.formatDate(timestamp);
-      } else if (dateValue is String) {
-        // Try to parse string as timestamp
-        final parsed = int.tryParse(dateValue);
-        if (parsed != null) {
-          final timestamp = Timestamp.fromMillisecondsSinceEpoch(parsed);
-          return widget.formatDate(timestamp);
-        }
-      }
-      return 'Invalid Date';
-    } catch (e) {
-      print('Error formatting date: $e');
-      return 'Invalid Date';
+    if (difference.inDays == 0) {
+      return 'Today at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return DateFormat('MMM dd, yyyy').format(date);
     }
   }
 
-  // Update the _buildHeaderSection method to use safe date formatting
   Widget _buildHeaderSection() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 5,
       ),
-      child: Row(
-        children: [
-          // Return ID and Status
-          Expanded(
-            child: Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Return #${widget.returnItem['returnId'] ?? 'Unknown'}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _safeFormatDate(widget.returnItem['date']), // Use safe formatting
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+      decoration: BoxDecoration(
+        color: ReturnStatusUtils.getReturnStatusColor(currentStatus)
+            .withOpacity(0.1),
+        border: Border.all(
+          color: ReturnStatusUtils.getReturnStatusColor(currentStatus),
+        ),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: DropdownButton<String>(
+        value: currentStatus,
+        underline: const SizedBox(),
+        isDense: true,
+        items: ['pending', 'submitted', 'approved', 'rejected', 'completed', 'cancelled'] // Added 'submitted'
+            .map((status) => DropdownMenuItem(
+          value: status,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: ReturnStatusUtils.getReturnStatusColor(status),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 24),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ReturnStatusUtils.getReturnStatusColor(currentStatus)
-                        .withOpacity(0.1),
-                    border: Border.all(
-                      color: ReturnStatusUtils.getReturnStatusColor(currentStatus),
-                    ),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: DropdownButton<String>(
-                    value: currentStatus,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    items: ['submitted', 'approved', 'rejected', 'completed', 'cancelled']
-                        .map((status) => DropdownMenuItem(
-                      value: status,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.only(right: 6),
-                            decoration: BoxDecoration(
-                              color: ReturnStatusUtils.getReturnStatusColor(status),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Text(
-                            widget.formatStatus(status),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ))
-                        .toList(),
-                    onChanged: _handleStatusChange,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              Text(
+                widget.formatStatus(status),
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
           ),
-          // Delete Button
-          Container(
-            height: 36,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: TextButton.icon(
-              onPressed: _showDeleteConfirmationDialog,
-              icon: const Icon(
-                Icons.delete_outline,
-                size: 16,
-                color: Colors.red,
-              ),
-              label: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red, fontSize: 13),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-            ),
-          ),
-        ],
+        ))
+            .toList(),
+        onChanged: _handleStatusChange,
       ),
     );
+
   }
 
   Future<void> _handleStatusChange(String? newStatus) async {
     if (newStatus != null && newStatus != currentStatus) {
       try {
         final success = await widget.onUpdateReturnStatus(
-          widget.returnItem['id'],
+          widget.returnRequest.id,
           newStatus,
         );
 
         if (success) {
           setState(() {
             currentStatus = newStatus;
-            widget.returnItem['status'] = newStatus;
           });
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -316,7 +251,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 try {
                   await widget.firestore
                       .collection('returnRequests')
-                      .doc(widget.returnItem['id'])
+                      .doc(widget.returnRequest.id)
                       .delete();
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -460,6 +395,10 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                     _buildPaymentInfoCard(),
                     const SizedBox(height: 16),
                     _buildReasonInfoCard(),
+                    if (widget.returnRequest.returnImages.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildImagesCard(),
+                    ],
                   ],
                 ),
               ),
@@ -470,12 +409,11 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-
   Widget _buildReturnSummaryCard() {
-    final productName = productDetails?['name'] ?? 'Unknown Product';
-    final imageUrl = productDetails?['imageUrl'];
-    final quantity = orderProduct?.productQuantity ?? 1;
-    final price = orderProduct?.price ?? widget.returnItem['returnPrice'] ?? 0.0;
+    final productName = widget.returnRequest.productName;
+    final imageUrl = widget.returnRequest.productImageUrl;
+    final quantity = widget.returnRequest.returnQuantity;
+    final price = widget.returnRequest.returnPrice;
     final totalPrice = price * quantity;
 
     return Container(
@@ -651,11 +589,11 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey[300]!),
                         ),
-                        child: (imageUrl?.isNotEmpty ?? false)
+                        child: imageUrl.isNotEmpty
                             ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            imageUrl!,
+                            imageUrl,
                             fit: BoxFit.cover,
                             errorBuilder:
                                 (context, error, stackTrace) => Icon(
@@ -690,7 +628,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 Expanded(
                   flex: 3,
                   child: Text(
-                    '#${widget.returnItem['shortOrderId']}',
+                    '#${widget.returnRequest.orderID.length > 8 ? widget.returnRequest.orderID.substring(0, 8) : widget.returnRequest.orderID}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 14),
                   ),
@@ -743,7 +681,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
                     Text(
-                      widget.returnItem['orderProductId'],
+                      widget.returnRequest.orderProductID,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -982,7 +920,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Order ID', '#${widget.returnItem['shortOrderId']}'),
+          _buildInfoRow('Order ID', '#${widget.returnRequest.orderID.length > 8 ? widget.returnRequest.orderID.substring(0, 8) : widget.returnRequest.orderID}'),
           const SizedBox(height: 8),
           _buildInfoRow('Order Date', order != null
               ? DateFormat('MMM dd, yyyy').format(order!.orderDate)
@@ -1032,7 +970,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Email', widget.returnItem['userEmail'] ?? 'N/A'),
+          _buildInfoRow('Email', widget.returnRequest.userID),
           if (customerDetails != null) ...[
             const SizedBox(height: 8),
             _buildInfoRow('Name',
@@ -1084,7 +1022,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
           _buildInfoRow('Method', 'Credit Card'),
           const SizedBox(height: 8),
           _buildInfoRow('Return Amount',
-              'RM ${widget.returnItem['returnPrice'].toStringAsFixed(2)}'),
+              'RM ${widget.returnRequest.returnPrice.toStringAsFixed(2)}'),
           const SizedBox(height: 8),
           _buildInfoRow('Refund Status',
               currentStatus == 'completed' ? 'Refunded' : 'Pending'),
@@ -1136,16 +1074,179 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.grey[200]!),
             ),
-            child: Text(
-              widget.returnItem['reason'] ?? 'No reason provided',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[700],
-                height: 1.5,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.returnRequest.returnReason,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (widget.returnRequest.returnComment.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Comment: ${widget.returnRequest.returnComment}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+                if (widget.returnRequest.rejectReason != null &&
+                    widget.returnRequest.rejectReason!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.cancel, color: Colors.red, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Rejection Reason: ${widget.returnRequest.rejectReason}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildImagesCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.image, color: Colors.indigo, size: 14),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Return Images',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: widget.returnRequest.returnImages.length,
+            itemBuilder: (context, index) {
+              return InkWell(
+                onTap: () {
+                  _showImageDialog(widget.returnRequest.returnImages[index]);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      widget.returnRequest.returnImages[index],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[200],
+                        child: Icon(
+                          Icons.error_outline,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImageDialog(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.8,
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.error_outline,
+                      color: Colors.grey[400],
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1172,68 +1273,105 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-
-
   List<Map<String, dynamic>> _getReturnTimeline() {
     final List<Map<String, dynamic>> timeline = [];
 
-    // Return Submitted
+    // Always show pending as the first step
     timeline.add({
-      'title': 'Return Submitted',
-      'date': _safeFormatDate(widget.returnItem['date']), // Use safe formatting
-      'icon': Icons.assignment_return,
+      'title': 'Return Requested',
+      'date': widget.returnRequest.pendingDate != null
+          ? _formatDate(widget.returnRequest.pendingDate!)
+          : _formatDate(widget.returnRequest.returnDate),
+      'icon': Icons.refresh,
       'color': Colors.blue,
       'isCompleted': true,
     });
 
-    // Approved/Rejected
-    if (currentStatus == 'approved' || currentStatus == 'rejected' ||
-        currentStatus == 'completed' || currentStatus == 'cancelled') {
+    // Add approved step if applicable
+    if (widget.returnRequest.approvedDate != null) {
       timeline.add({
-        'title': currentStatus == 'rejected' ? 'Return Rejected' : 'Return Approved',
-        'date': currentStatus == 'rejected' ? 'Return request was rejected' : 'Return request approved',
-        'icon': currentStatus == 'rejected' ? Icons.cancel : Icons.check_circle,
-        'color': currentStatus == 'rejected' ? Colors.red : Colors.green,
-        'isCompleted': true,
-      });
-    } else {
-      timeline.add({
-        'title': 'Pending Review',
-        'date': 'Awaiting approval',
-        'icon': Icons.hourglass_empty,
-        'color': Colors.orange,
-        'isCompleted': false,
-      });
-    }
-
-    // Processing
-    if (currentStatus == 'completed') {
-      timeline.add({
-        'title': 'Refund Processed',
-        'date': 'Refund completed',
-        'icon': Icons.paid,
+        'title': 'Return Approved',
+        'date': _formatDate(widget.returnRequest.approvedDate!),
+        'icon': Icons.check_circle,
         'color': Colors.green,
         'isCompleted': true,
       });
-    } else if (currentStatus == 'approved') {
+    }
+
+    // Add rejected step if applicable
+    if (widget.returnRequest.rejectedDate != null) {
       timeline.add({
-        'title': 'Refund Processing',
-        'date': 'Processing refund',
-        'icon': Icons.payment,
-        'color': Colors.orange,
-        'isCompleted': false,
+        'title': 'Return Rejected',
+        'date': _formatDate(widget.returnRequest.rejectedDate!),
+        'icon': Icons.cancel,
+        'color': Colors.red,
+        'isCompleted': true,
       });
-    } else if (currentStatus == 'cancelled') {
+    }
+
+    // Add pending inspection step if applicable
+    if (widget.returnRequest.pendinginspectionDate != null) {
+      timeline.add({
+        'title': 'Pending Inspection',
+        'date': _formatDate(widget.returnRequest.pendinginspectionDate!),
+        'icon': Icons.search,
+        'color': Colors.orange,
+        'isCompleted': true,
+      });
+    }
+
+    // Add completed inspection step if applicable
+    if (widget.returnRequest.completedinsepectionDate != null) {
+      timeline.add({
+        'title': 'Inspection Completed',
+        'date': _formatDate(widget.returnRequest.completedinsepectionDate!),
+        'icon': Icons.verified,
+        'color': Colors.teal,
+        'isCompleted': true,
+      });
+    }
+
+    // Add completed step if applicable
+    if (widget.returnRequest.completedDate != null) {
+      timeline.add({
+        'title': 'Return Completed',
+        'date': _formatDate(widget.returnRequest.completedDate!),
+        'icon': Icons.done_all,
+        'color': Colors.green,
+        'isCompleted': true,
+      });
+    }
+
+    // Add cancelled step if applicable
+    if (widget.returnRequest.cancelledDate != null) {
       timeline.add({
         'title': 'Return Cancelled',
-        'date': 'Return request was cancelled',
-        'icon': Icons.cancel,
+        'date': _formatDate(widget.returnRequest.cancelledDate!),
+        'icon': Icons.block,
         'color': Colors.grey,
         'isCompleted': true,
       });
     }
 
+    // Add future steps based on current status
+    if (currentStatus == 'pending') {
+      timeline.add({
+        'title': 'Awaiting Approval',
+        'date': 'Pending',
+        'icon': Icons.hourglass_empty,
+        'color': Colors.grey,
+        'isCompleted': false,
+      });
+    } else if (currentStatus == 'approved' && widget.returnRequest.completedDate == null) {
+      timeline.add({
+        'title': 'Processing Refund',
+        'date': 'In Progress',
+        'icon': Icons.payment,
+        'color': Colors.orange,
+        'isCompleted': false,
+      });
+    }
+
     return timeline;
   }
-
 }

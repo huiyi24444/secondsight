@@ -69,13 +69,13 @@ class ReturnRequestModel {
       returnQuantity: data['returnQuantity'] as int,
       productName: data['productName'] as String,
       productImageUrl: data['productImageUrl'] as String,
-      pendingDate: data['pendingDate'] as Timestamp,
-      approvedDate: data['approvedDate'] as Timestamp,
-      rejectedDate: data['rejectedDate'] as Timestamp,
-      completedDate: data['completedDate'] as Timestamp,
-      pendinginspectionDate: data['pendinginspectionDate'] as Timestamp,
-      completedinsepectionDate: data['completedinsepectionDate'] as Timestamp,
-      cancelledDate: data['cancelledDate'] as Timestamp,
+      pendingDate: data['pendingDate'] as Timestamp?, // ✅ nullable
+      approvedDate: data['approvedDate'] as Timestamp?,
+      rejectedDate: data['rejectedDate'] as Timestamp?,
+      completedDate: data['completedDate'] as Timestamp?,
+      pendinginspectionDate: data['pendinginspectionDate'] as Timestamp?,
+      completedinsepectionDate: data['completedinsepectionDate'] as Timestamp?,
+      cancelledDate: data['cancelledDate'] as Timestamp?,
     );
   }
 

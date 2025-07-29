@@ -156,23 +156,38 @@ class _OrdersViewState extends State<OrdersView> with SingleTickerProviderStateM
 
   Widget _buildReturnRequestsList(OrdersController controller) {
     final userId = Provider.of<AuthProvider>(context, listen: false).userId!;
+    debugPrint('[_buildReturnRequestsList] Current user ID: $userId');
 
     final query = controller.buildReturnRequestsQuery();
-
-    debugPrint('[_buildReturnRequestsList] Building return requests list for user: $userId');
+    debugPrint('[_buildReturnRequestsList] Query built for return requests.');
 
     return LazyLoadingList(
       query: query,
       itemBuilder: (doc) {
-        debugPrint('[_buildReturnRequestsList] Processing return request document ID: ${doc.id}');
-        final returnRequest = controller.createReturnRequestFromDocument(doc);
-        return ReturnRequestCard(
-          returnRequest: returnRequest,
-          userId: userId,
-        );
+        debugPrint('[_buildReturnRequestsList] Fetched document snapshot: ${doc.id}');
+        try {
+          final returnRequest = controller.createReturnRequestFromDocument(doc);
+          debugPrint(
+            '[_buildReturnRequestsList] Created ReturnRequestModel:\n'
+                '  - orderProductID: ${returnRequest.orderProductID}\n'
+                '  - productName: ${returnRequest.productName}\n'
+                '  - returnStatus: ${returnRequest.returnStatus}\n'
+                '  - returnQuantity: ${returnRequest.returnQuantity}\n'
+                '  - returnDate: ${returnRequest.returnDate.toDate()}',
+          );
+          return ReturnRequestCard(
+            returnRequest: returnRequest,
+            userId: userId,
+          );
+        } catch (e, stackTrace) {
+          debugPrint('[_buildReturnRequestsList] Error creating ReturnRequestModel: $e');
+          debugPrintStack(stackTrace: stackTrace);
+          return const SizedBox.shrink();
+        }
       },
       emptyMessage: controller.getEmptyMessage('returns'),
     );
   }
+
 
 }
