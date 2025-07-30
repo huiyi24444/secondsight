@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/return_status_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
@@ -16,6 +17,7 @@ import '../product/admin_product.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_return_controller.dart';
+import 'admin_return_details_controller.dart';
 
 class ReturnDetailsPage extends StatefulWidget {
   final ReturnRequestModel returnRequest;
@@ -43,6 +45,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
   late String currentStatus;
   bool isLoading = true;
   String currentPage = 'returns';
+  late AdminReturnDetailsController _controller;
 
   OrdersModel? order;
   OrderProductModel? orderProduct;
@@ -55,149 +58,12 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     currentStatus = widget.returnRequest.returnStatus == 'submitted'
         ? 'submitted'
         : widget.returnRequest.returnStatus;
-    print('=== initState called ===');
-    print('Return Request Data:');
-    print('- ID: ${widget.returnRequest.id}');
-    print('- OrderID: ${widget.returnRequest.orderID}');
-    print('- UserID: ${widget.returnRequest.userID}');
-    print('- ProductName: ${widget.returnRequest.productName}');
 
     currentStatus = widget.returnRequest.returnStatus == 'submitted'
         ? 'submitted'
         : widget.returnRequest.returnStatus;
-    print('- Current Status: $currentStatus');
-    _loadReturnData();
-  }
 
-  Future<void> _loadReturnData() async {
-    print('=== _loadReturnData STARTED ===');
-
-    try {
-      final orderID = widget.returnRequest.orderID;
-      final userID = widget.returnRequest.userID;
-      final orderProductID = widget.returnRequest.orderProductID;
-
-      print('OrderID: "$orderID"');
-      print('UserID: "$userID"');
-      print('OrderProductID: "$orderProductID"');
-      print('Return Request ID: "${widget.returnRequest.id}"');
-      print('Product Name: "${widget.returnRequest.productName}"');
-      print('Product Image URL: "${widget.returnRequest.productImageUrl}"');
-
-      // Only load order details if orderID is not empty
-      if (orderID != null && orderID.isNotEmpty && userID != null && userID.isNotEmpty) {
-        print('Loading order details for orderID: $orderID, userID: $userID');
-        try {
-          final orderDoc = await widget.firestore
-              .collection('users')        // ← CORRECT PATH
-              .doc(userID)               // ← User document
-              .collection('order')       // ← User's orders subcollection
-              .doc(orderID)             // ← Specific order
-              .get();
-
-          if (orderDoc.exists) {
-            print('Order document found');
-            order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
-            print('Order loaded - Date: ${order!.orderDate}, Status: ${order!.orderStatus}');
-          } else {
-            print('Order document not found for userID: $userID, orderID: $orderID');
-          }
-        } catch (e) {
-          print('Error loading order: $e');
-        }
-      } else {
-        print('Order ID or User ID is empty - OrderID: "$orderID", UserID: "$userID"');
-      }
-
-      // Only load order product details if all required IDs are available
-      if (userID != null && userID.isNotEmpty &&
-          orderID != null && orderID.isNotEmpty &&
-          orderProductID != null && orderProductID.isNotEmpty) {
-
-        print('Loading order product details...');
-        try {
-          final orderProductDoc = await widget.getOrderProductDoc(
-            userID,
-            orderID,
-            orderProductID,
-          );
-
-          if (orderProductDoc != null && orderProductDoc.exists) {
-            print('Order product document found');
-            orderProduct = OrderProductModel.fromJson(
-                orderProductDoc.data() as Map<String, dynamic>
-            );
-
-            // Load product details with null safety
-            if (orderProduct!.productID != null) {
-              try {
-                print('Loading product details...');
-                final productRef = orderProduct!.productID as DocumentReference;
-                final productDoc = await productRef.get();
-                if (productDoc.exists) {
-                  print('Product document found');
-                  productDetails = productDoc.data() as Map<String, dynamic>;
-                } else {
-                  print('Product document not found');
-                }
-              } catch (e) {
-                print('Error loading product details: $e');
-                productDetails = null;
-              }
-            }
-          } else {
-            print('Order product document not found');
-          }
-        } catch (e) {
-          print('Error loading order product: $e');
-        }
-      } else {
-        print('Missing required IDs for order product fetch');
-        print('UserID valid: ${userID != null && userID.isNotEmpty}');
-        print('OrderID valid: ${orderID != null && orderID.isNotEmpty}');
-        print('OrderProductID valid: ${orderProductID != null && orderProductID.isNotEmpty}');
-      }
-
-      // Only load customer details if userID is not empty
-      if (userID != null && userID.isNotEmpty) {
-        print('Loading customer details for userID: $userID');
-        try {
-          final customerDoc = await widget.firestore
-              .collection('customers')
-              .doc(userID)
-              .get();
-
-          if (customerDoc.exists) {
-            print('Customer document found');
-            customerDetails = customerDoc.data() as Map<String, dynamic>;
-          } else {
-            print('Customer document not found for userID: $userID');
-          }
-        } catch (e) {
-          print('Error loading customer: $e');
-        }
-      } else {
-        print('User ID is empty, skipping customer fetch');
-      }
-
-      print('=== Data loading completed ===');
-      print('Order loaded: ${order != null}');
-      print('Order product loaded: ${orderProduct != null}');
-      print('Product details loaded: ${productDetails != null}');
-      print('Customer details loaded: ${customerDetails != null}');
-
-      setState(() {
-        isLoading = false;
-      });
-
-      print('=== _loadReturnData COMPLETED ===');
-    } catch (e) {
-      print('=== ERROR in _loadReturnData: $e ===');
-      print('Stack trace: ${StackTrace.current}');
-      setState(() {
-        isLoading = false;
-      });
-    }
+    _controller.loadReturnData();
   }
 
   // Helper method to format dates
@@ -295,137 +161,95 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     }
   }
 
-  void _showDeleteConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Return Request'),
-          content: const Text(
-            'Are you sure you want to delete this return request? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
-              child: const Text('Delete'),
-              onPressed: () async {
-                Navigator.of(context).pop();
 
-                try {
-                  await widget.firestore
-                      .collection('returnRequests')
-                      .doc(widget.returnRequest.id)
-                      .delete();
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Return request deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to delete return request: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+  @override
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Row(
-        children: [
-          // Sidebar
-          AdminSidebar(
-            currentPage: currentPage,
-            onPageChanged: (String page) {
-              // Handle navigation based on selected page
-              switch (page) {
-                case 'dashboard':
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => AdminNavigator()),
-                        (route) => false,
-                  );
-                  break;
-                case 'products':
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => ProductManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'orders':
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => OrderManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'returns':
-                  Navigator.of(context).pop();
-                  break;
-                case 'customers':
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => CustomerManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'reports':
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Reports page not implemented yet'),
-                    ),
-                  );
-                  break;
-              }
-            },
-          ),
-          // Main Content
-          Expanded(
-            child: Column(
-              children: [
-                // Top Bar
-                const CustomTopBar(
-                  title: 'Returns',
-                  subtitle: 'Return Details',
-                ),
-                // Content Area
-                Expanded(
-                  child: isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                    padding: const EdgeInsets.all(12.0),
-                    child: _buildBody(),
-                  ),
-                ),
-              ],
+    return ChangeNotifierProvider.value(
+      value: _controller,
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        body: Row(
+          children: [
+            // Sidebar
+            AdminSidebar(
+              currentPage: currentPage,
+              onPageChanged: (String page) {
+                // Handle navigation based on selected page
+                switch (page) {
+                  case 'dashboard':
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => AdminNavigator()),
+                          (route) => false,
+                    );
+                    break;
+                  case 'products':
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => ProductManagementPage(),
+                      ),
+                    );
+                    break;
+                  case 'orders':
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => OrderManagementPage(),
+                      ),
+                    );
+                    break;
+                  case 'returns':
+                    Navigator.of(context).pop();
+                    break;
+                  case 'customers':
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => CustomerManagementPage(),
+                      ),
+                    );
+                    break;
+                  case 'reports':
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Reports page not implemented yet'),
+                      ),
+                    );
+                    break;
+                }
+              },
             ),
-          ),
-        ],
+            // Main Content
+            Expanded(
+              child: Column(
+                children: [
+                  // Top Bar
+                  const CustomTopBar(
+                    title: 'Returns',
+                    subtitle: 'Return Details',
+                  ),
+                  // Content Area
+                  Expanded(
+                    child: Consumer<AdminReturnDetailsController>(
+                      builder: (context, controller, child) {
+                        return controller.isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : SingleChildScrollView(
+                          padding: const EdgeInsets.all(12.0),
+                          child: _buildBody(controller),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AdminReturnDetailsController controller) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -443,9 +267,9 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildReturnSummaryCard(),
+                    _buildReturnSummaryCard(controller),
                     const SizedBox(height: 20),
-                    _buildReturnTimeline(),
+                    _buildReturnTimeline(controller),
                   ],
                 ),
               ),
@@ -457,11 +281,11 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    _buildOrderInfoCard(),
+                    _buildOrderInfoCard(controller),
                     const SizedBox(height: 16),
-                    _buildCustomerInfoCard(),
+                    _buildCustomerInfoCard(controller),
                     const SizedBox(height: 16),
-                    _buildPaymentInfoCard(),
+                    _buildPaymentInfoCard(controller),
                     const SizedBox(height: 16),
                     _buildReasonInfoCard(),
                     if (widget.returnRequest.returnImages.isNotEmpty) ...[
@@ -478,20 +302,12 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildReturnSummaryCard() {
-    print('Product Name: ${widget.returnRequest.productName}');
-    print('Raw Image URL: ${widget.returnRequest.productImageUrl}');
-
+  Widget _buildReturnSummaryCard(AdminReturnDetailsController controller) {
     final productName = widget.returnRequest.productName;
-    // Clean the URL - remove any potential whitespace or hidden characters
-    final imageUrl = widget.returnRequest.productImageUrl.trim().replaceAll('\n', '').replaceAll('\r', '');
-    print('Cleaned Image URL: $imageUrl');
-    print('Image URL Length: ${imageUrl.length}');
-    print('Image URL isEmpty: ${imageUrl.isEmpty}');
-
+    final imageUrl = controller.getCleanImageUrl();
     final quantity = widget.returnRequest.returnQuantity;
     final price = widget.returnRequest.returnPrice;
-    final totalPrice = price * quantity;
+    final totalPrice = controller.getTotalReturnPrice();
 
     return Container(
       decoration: BoxDecoration(
@@ -683,7 +499,6 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                               );
                             },
                             errorBuilder: (context, error, stackTrace) {
-                              print('Image loading error: $error');
                               // Fallback to a simple colored container
                               return Container(
                                 color: Colors.orange[100],
@@ -724,7 +539,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 Expanded(
                   flex: 3,
                   child: Text(
-                    '#${widget.returnRequest.orderID.length > 8 ? widget.returnRequest.orderID.substring(0, 8) : widget.returnRequest.orderID}',
+                    '#${controller.getShortOrderId()}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 14),
                   ),
@@ -855,8 +670,8 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildReturnTimeline() {
-    final timeline = _getReturnTimeline();
+  Widget _buildReturnTimeline(AdminReturnDetailsController controller) {
+    final timeline = controller.getReturnTimeline();
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -897,7 +712,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             final item = entry.value;
             return _buildTimelineItem(
               item['title']!,
-              item['date']!,
+              _formatDate(item['date'] as Timestamp),
               item['icon'] as IconData,
               item['color'] as Color,
               isCompleted: item['isCompleted'] as bool,
@@ -980,7 +795,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildOrderInfoCard() {
+  Widget _buildOrderInfoCard(AdminReturnDetailsController controller) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1010,27 +825,26 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Order Information',
+                'Customer Details',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Order ID', '#${widget.returnRequest.orderID.length > 8 ? widget.returnRequest.orderID.substring(0, 8) : widget.returnRequest.orderID}'),
-          const SizedBox(height: 8),
-          _buildInfoRow('Order Date', order != null
-              ? DateFormat('MMM dd, yyyy').format(order!.orderDate)
-              : 'N/A'),
-          const SizedBox(height: 8),
-          _buildInfoRow('Order Status', order != null
-              ? OrderStatusUtils.getStatusDisplayText(order!.orderStatus)
-              : 'N/A'),
+          _buildInfoRow('User ID', widget.returnRequest.userID),
+          if (controller.customerDetails != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('Name', controller.getCustomerName()),
+            const SizedBox(height: 8),
+            _buildInfoRow('Phone', controller.getCustomerPhone()),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCustomerInfoCard() {
+
+  Widget _buildCustomerInfoCard(AdminReturnDetailsController controller) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1079,7 +893,8 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildPaymentInfoCard() {
+
+  Widget _buildPaymentInfoCard(AdminReturnDetailsController controller) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1118,10 +933,10 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
           _buildInfoRow('Method', 'Credit Card'),
           const SizedBox(height: 8),
           _buildInfoRow('Return Amount',
-              'RM ${widget.returnRequest.returnPrice.toStringAsFixed(2)}'),
+              'RM ${controller.getTotalReturnPrice().toStringAsFixed(2)}'),
           const SizedBox(height: 8),
           _buildInfoRow('Refund Status',
-              currentStatus == 'completed' ? 'Refunded' : 'Pending'),
+              controller.isRefundCompleted() ? 'Refunded' : 'Pending'),
         ],
       ),
     );
@@ -1228,6 +1043,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
       ),
     );
   }
+
 
   Widget _buildImagesCard() {
     return Container(
@@ -1367,107 +1183,5 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         ),
       ],
     );
-  }
-
-  List<Map<String, dynamic>> _getReturnTimeline() {
-    final List<Map<String, dynamic>> timeline = [];
-
-    // Always show pending as the first step
-    timeline.add({
-      'title': 'Return Requested',
-      'date': widget.returnRequest.pendingDate != null
-          ? _formatDate(widget.returnRequest.pendingDate!)
-          : _formatDate(widget.returnRequest.returnDate),
-      'icon': Icons.refresh,
-      'color': Colors.blue,
-      'isCompleted': true,
-    });
-
-    // Add approved step if applicable
-    if (widget.returnRequest.approvedDate != null) {
-      timeline.add({
-        'title': 'Return Approved',
-        'date': _formatDate(widget.returnRequest.approvedDate!),
-        'icon': Icons.check_circle,
-        'color': Colors.green,
-        'isCompleted': true,
-      });
-    }
-
-    // Add rejected step if applicable
-    if (widget.returnRequest.rejectedDate != null) {
-      timeline.add({
-        'title': 'Return Rejected',
-        'date': _formatDate(widget.returnRequest.rejectedDate!),
-        'icon': Icons.cancel,
-        'color': Colors.red,
-        'isCompleted': true,
-      });
-    }
-
-    // Add pending inspection step if applicable
-    if (widget.returnRequest.pendinginspectionDate != null) {
-      timeline.add({
-        'title': 'Pending Inspection',
-        'date': _formatDate(widget.returnRequest.pendinginspectionDate!),
-        'icon': Icons.search,
-        'color': Colors.orange,
-        'isCompleted': true,
-      });
-    }
-
-    // Add completed inspection step if applicable
-    if (widget.returnRequest.completedinsepectionDate != null) {
-      timeline.add({
-        'title': 'Inspection Completed',
-        'date': _formatDate(widget.returnRequest.completedinsepectionDate!),
-        'icon': Icons.verified,
-        'color': Colors.teal,
-        'isCompleted': true,
-      });
-    }
-
-    // Add completed step if applicable
-    if (widget.returnRequest.completedDate != null) {
-      timeline.add({
-        'title': 'Return Completed',
-        'date': _formatDate(widget.returnRequest.completedDate!),
-        'icon': Icons.done_all,
-        'color': Colors.green,
-        'isCompleted': true,
-      });
-    }
-
-    // Add cancelled step if applicable
-    if (widget.returnRequest.cancelledDate != null) {
-      timeline.add({
-        'title': 'Return Cancelled',
-        'date': _formatDate(widget.returnRequest.cancelledDate!),
-        'icon': Icons.block,
-        'color': Colors.grey,
-        'isCompleted': true,
-      });
-    }
-
-    // Add future steps based on current status
-    if (currentStatus == 'pending') {
-      timeline.add({
-        'title': 'Awaiting Approval',
-        'date': 'Pending',
-        'icon': Icons.hourglass_empty,
-        'color': Colors.grey,
-        'isCompleted': false,
-      });
-    } else if (currentStatus == 'approved' && widget.returnRequest.completedDate == null) {
-      timeline.add({
-        'title': 'Processing Refund',
-        'date': 'In Progress',
-        'icon': Icons.payment,
-        'color': Colors.orange,
-        'isCompleted': false,
-      });
-    }
-
-    return timeline;
   }
 }
