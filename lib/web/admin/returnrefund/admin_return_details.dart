@@ -54,77 +54,142 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     currentStatus = widget.returnRequest.returnStatus == 'submitted'
         ? 'submitted'
         : widget.returnRequest.returnStatus;
+    print('=== initState called ===');
+    print('Return Request Data:');
+    print('- ID: ${widget.returnRequest.id}');
+    print('- OrderID: ${widget.returnRequest.orderID}');
+    print('- UserID: ${widget.returnRequest.userID}');
+    print('- ProductName: ${widget.returnRequest.productName}');
+
+    currentStatus = widget.returnRequest.returnStatus == 'submitted'
+        ? 'submitted'
+        : widget.returnRequest.returnStatus;
+    print('- Current Status: $currentStatus');
     _loadReturnData();
   }
 
   Future<void> _loadReturnData() async {
-    try {
-      // Only load order details if orderID is not empty
-      if (widget.returnRequest.orderID.isNotEmpty) {
-        final orderDoc = await widget.firestore
-            .collection('order')
-            .doc(widget.returnRequest.orderID)
-            .get();
+    print('=== _loadReturnData STARTED ===');
 
-        if (orderDoc.exists) {
-          order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+    try {
+      final orderID = widget.returnRequest.orderID;
+      final userID = widget.returnRequest.userID;
+      final orderProductID = widget.returnRequest.orderProductID;
+
+      print('OrderID: "$orderID"');
+      print('UserID: "$userID"');
+      print('OrderProductID: "$orderProductID"');
+      print('Return Request ID: "${widget.returnRequest.id}"');
+      print('Product Name: "${widget.returnRequest.productName}"');
+      print('Product Image URL: "${widget.returnRequest.productImageUrl}"');
+
+      // Only load order details if orderID is not empty
+      if (orderID != null && orderID.isNotEmpty) {
+        print('Loading order details for orderID: $orderID');
+        try {
+          final orderDoc = await widget.firestore
+              .collection('order')
+              .doc(orderID)
+              .get();
+
+          if (orderDoc.exists) {
+            print('Order document found');
+            order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+          } else {
+            print('Order document not found for ID: $orderID');
+          }
+        } catch (e) {
+          print('Error loading order: $e');
         }
       } else {
         print('Order ID is empty, skipping order fetch');
       }
 
       // Only load order product details if all required IDs are available
-      if (widget.returnRequest.userID.isNotEmpty &&
-          widget.returnRequest.orderID.isNotEmpty &&
-          widget.returnRequest.orderProductID.isNotEmpty) {
-        final orderProductDoc = await widget.getOrderProductDoc(
-          widget.returnRequest.userID,
-          widget.returnRequest.orderID,
-          widget.returnRequest.orderProductID,
-        );
+      if (userID != null && userID.isNotEmpty &&
+          orderID != null && orderID.isNotEmpty &&
+          orderProductID != null && orderProductID.isNotEmpty) {
 
-        if (orderProductDoc != null && orderProductDoc.exists) {
-          orderProduct = OrderProductModel.fromJson(
-              orderProductDoc.data() as Map<String, dynamic>
+        print('Loading order product details...');
+        try {
+          final orderProductDoc = await widget.getOrderProductDoc(
+            userID,
+            orderID,
+            orderProductID,
           );
 
-          // Load product details with null safety
-          if (orderProduct!.productID != null) {
-            try {
-              final productRef = orderProduct!.productID as DocumentReference;
-              final productDoc = await productRef.get();
-              if (productDoc.exists) {
-                productDetails = productDoc.data() as Map<String, dynamic>;
+          if (orderProductDoc != null && orderProductDoc.exists) {
+            print('Order product document found');
+            orderProduct = OrderProductModel.fromJson(
+                orderProductDoc.data() as Map<String, dynamic>
+            );
+
+            // Load product details with null safety
+            if (orderProduct!.productID != null) {
+              try {
+                print('Loading product details...');
+                final productRef = orderProduct!.productID as DocumentReference;
+                final productDoc = await productRef.get();
+                if (productDoc.exists) {
+                  print('Product document found');
+                  productDetails = productDoc.data() as Map<String, dynamic>;
+                } else {
+                  print('Product document not found');
+                }
+              } catch (e) {
+                print('Error loading product details: $e');
+                productDetails = null;
               }
-            } catch (e) {
-              print('Error loading product details: $e');
-              productDetails = null;
             }
+          } else {
+            print('Order product document not found');
           }
+        } catch (e) {
+          print('Error loading order product: $e');
         }
       } else {
         print('Missing required IDs for order product fetch');
+        print('UserID valid: ${userID != null && userID.isNotEmpty}');
+        print('OrderID valid: ${orderID != null && orderID.isNotEmpty}');
+        print('OrderProductID valid: ${orderProductID != null && orderProductID.isNotEmpty}');
       }
 
       // Only load customer details if userID is not empty
-      if (widget.returnRequest.userID.isNotEmpty) {
-        final customerDoc = await widget.firestore
-            .collection('customers')
-            .doc(widget.returnRequest.userID)
-            .get();
+      if (userID != null && userID.isNotEmpty) {
+        print('Loading customer details for userID: $userID');
+        try {
+          final customerDoc = await widget.firestore
+              .collection('customers')
+              .doc(userID)
+              .get();
 
-        if (customerDoc.exists) {
-          customerDetails = customerDoc.data() as Map<String, dynamic>;
+          if (customerDoc.exists) {
+            print('Customer document found');
+            customerDetails = customerDoc.data() as Map<String, dynamic>;
+          } else {
+            print('Customer document not found for userID: $userID');
+          }
+        } catch (e) {
+          print('Error loading customer: $e');
         }
       } else {
         print('User ID is empty, skipping customer fetch');
       }
 
+      print('=== Data loading completed ===');
+      print('Order loaded: ${order != null}');
+      print('Order product loaded: ${orderProduct != null}');
+      print('Product details loaded: ${productDetails != null}');
+      print('Customer details loaded: ${customerDetails != null}');
+
       setState(() {
         isLoading = false;
       });
+
+      print('=== _loadReturnData COMPLETED ===');
     } catch (e) {
-      print('Error loading return data: $e');
+      print('=== ERROR in _loadReturnData: $e ===');
+      print('Stack trace: ${StackTrace.current}');
       setState(() {
         isLoading = false;
       });
@@ -410,6 +475,9 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
   }
 
   Widget _buildReturnSummaryCard() {
+
+    print('Product Name: ${widget.returnRequest.productName}');
+    print('Image URL: ${widget.returnRequest.productImageUrl}');
     final productName = widget.returnRequest.productName;
     final imageUrl = widget.returnRequest.productImageUrl;
     final quantity = widget.returnRequest.returnQuantity;
@@ -970,7 +1038,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Email', widget.returnRequest.userID),
+          _buildInfoRow('User ID', widget.returnRequest.userID),
           if (customerDetails != null) ...[
             const SizedBox(height: 8),
             _buildInfoRow('Name',

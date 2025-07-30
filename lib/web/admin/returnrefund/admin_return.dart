@@ -162,53 +162,28 @@ class ReturnManagementView extends StatelessWidget {
                                       icon: const Icon(Icons.more_vert),
                                       onSelected: (value) async {
                                         if (value == 'view') {
-                                          // Convert the item map to ReturnRequestModel before navigation
-                                          // Note: Adjust field names based on your actual Map structure
-                                          final returnRequest = ReturnRequestModel(
-                                            id: item['id'] ?? '',
-                                            orderProductID: item['orderProductId'] ?? item['orderProductID'] ?? '',
-                                            orderID: item['orderId'] ?? item['orderID'] ?? '',
-                                            userID: item['userEmail'] ?? item['userID'] ?? '',
-                                            returnDate: item['date'] is Timestamp
-                                                ? item['date'] as Timestamp
-                                                : item['returnDate'] is Timestamp
-                                                ? item['returnDate'] as Timestamp
-                                                : Timestamp.now(),
-                                            returnImages: item['images'] != null
-                                                ? List<String>.from(item['images'])
-                                                : item['returnImages'] != null
-                                                ? List<String>.from(item['returnImages'])
-                                                : [],
-                                            returnReason: item['reason'] ?? item['returnReason'] ?? '',
-                                            returnStatus: item['status'] ?? item['returnStatus'] ?? 'pending',
-                                            returnComment: item['comment'] ?? item['returnComment'] ?? '',
-                                            rejectReason: item['rejectReason'],
-                                            returnPrice: item['returnPrice'] != null
-                                                ? (item['returnPrice'] as num).toDouble()
-                                                : 0.0,
-                                            returnQuantity: item['quantity'] ?? item['returnQuantity'] ?? 1,
-                                            productName: item['productName'] ?? 'Unknown Product',
-                                            productImageUrl: item['productImage'] ?? item['productImageUrl'] ?? '',
-                                            pendingDate: item['pendingDate'] as Timestamp?,
-                                            approvedDate: item['approvedDate'] as Timestamp?,
-                                            rejectedDate: item['rejectedDate'] as Timestamp?,
-                                            completedDate: item['completedDate'] as Timestamp?,
-                                            pendinginspectionDate: item['pendinginspectionDate'] as Timestamp?,
-                                            completedinsepectionDate: item['completedinsepectionDate'] as Timestamp?,
-                                            cancelledDate: item['cancelledDate'] as Timestamp?,
-                                          );
+                                          // ✅ FIXED: Use the original ReturnRequestModel instead of reconstructing
+                                          final returnRequest = item['returnRequest'] as ReturnRequestModel?;
 
-                                          // Navigate to the ReturnDetailsPage with ReturnRequestModel
+                                          // Add null safety check
+                                          if (returnRequest == null) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Error: Return request data not found')),
+                                            );
+                                            return;
+                                          }
+
+                                          // Navigate to the ReturnDetailsPage with the original ReturnRequestModel
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) => ReturnDetailsPage(
-                                                returnRequest: returnRequest,
+                                                returnRequest: returnRequest, // ← Now has correct data!
                                                 onUpdateReturnStatus: (returnId, newStatus) async {
                                                   try {
                                                     await controller.updateReturnStatus(
                                                         context,
-                                                        item['userEmail'] ?? item['userID'] ?? '',
+                                                        item['userEmail'] ?? '',
                                                         returnId,
                                                         newStatus
                                                     );

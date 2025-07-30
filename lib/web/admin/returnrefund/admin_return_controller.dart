@@ -81,13 +81,16 @@ class ReturnManagementController extends ChangeNotifier {
         return {
           'id': entry['id'],
           'userEmail': entry['userEmail'],
-          'returnId': entry['id'].substring(0, 8).toUpperCase(),
+          'returnRequest': returnRequest, // ← KEEP THE ORIGINAL MODEL!
+          'returnId': (entry['id'] as String? ?? '').length >= 8
+              ? (entry['id'] as String).substring(0, 8).toUpperCase()
+              : (entry['id'] as String? ?? '').toUpperCase(),
           'shortOrderId': orderId.length >= 6 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase(),
-          'orderProductId': returnRequest.orderProductID,
-          'date': returnRequest.returnDate.millisecondsSinceEpoch,
-          'returnPrice': returnRequest.returnPrice, // This is now directly available
-          'status': returnRequest.returnStatus,
-          'reason': returnRequest.returnReason,
+          'orderProductId': returnRequest.orderProductID ?? '',
+          'date': returnRequest.returnDate?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
+          'returnPrice': returnRequest.returnPrice ?? 0.0,
+          'status': returnRequest.returnStatus ?? 'unknown',
+          'reason': returnRequest.returnReason ?? 'No reason provided',
           'items': orderProductData['items'] ?? [],
         };
       }));

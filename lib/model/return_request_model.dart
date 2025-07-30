@@ -52,24 +52,33 @@ class ReturnRequestModel {
   });
 
   factory ReturnRequestModel.fromDocument(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>?;
+
+    // Handle case where document data is null
+    if (data == null) {
+      throw Exception('Document data is null for document: ${doc.id}');
+    }
 
     return ReturnRequestModel(
       id: doc.id,
-      orderProductID: data['orderProductID'] as String,
-      orderID: data['orderID'] as String,
-      userID: data['userID'] as String,
-      returnDate: data['returnDate'] as Timestamp,
-      returnImages: List<String>.from(data['returnImages'] ?? []),
-      returnReason: data['returnReason'] as String,
-      returnStatus: data['returnStatus'] as String,
-      returnComment: data['returnComment'] as String,
-      rejectReason: data['rejectReason'],
-      returnPrice: (data['returnPrice'] as num).toDouble(),
-      returnQuantity: data['returnQuantity'] as int,
-      productName: data['productName'] as String,
-      productImageUrl: data['productImageUrl'] as String,
-      pendingDate: data['pendingDate'] as Timestamp?, // ✅ nullable
+      orderProductID: data['orderProductID'] as String? ?? '',
+      orderID: data['orderID'] as String? ?? '',
+      userID: data['userID'] as String? ?? '',
+      returnDate: data['returnDate'] as Timestamp? ?? Timestamp.now(),
+      returnImages: data['returnImages'] != null
+          ? List<String>.from(data['returnImages'])
+          : [],
+      returnReason: data['returnReason'] as String? ?? '',
+      returnStatus: data['returnStatus'] as String? ?? 'unknown',
+      returnComment: data['returnComment'] as String? ?? '',
+      rejectReason: data['rejectReason'] as String?,
+      returnPrice: data['returnPrice'] != null
+          ? (data['returnPrice'] as num).toDouble()
+          : 0.0,
+      returnQuantity: data['returnQuantity'] as int? ?? 0,
+      productName: data['productName'] as String? ?? 'Unknown Product',
+      productImageUrl: data['productImageUrl'] as String? ?? '',
+      pendingDate: data['pendingDate'] as Timestamp?,
       approvedDate: data['approvedDate'] as Timestamp?,
       rejectedDate: data['rejectedDate'] as Timestamp?,
       completedDate: data['completedDate'] as Timestamp?,
@@ -78,7 +87,6 @@ class ReturnRequestModel {
       cancelledDate: data['cancelledDate'] as Timestamp?,
     );
   }
-
   Map<String, dynamic> toMap() {
     final map = {
       'orderProductID': orderProductID,
