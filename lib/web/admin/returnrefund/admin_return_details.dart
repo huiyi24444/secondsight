@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -84,25 +85,28 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
       print('Product Image URL: "${widget.returnRequest.productImageUrl}"');
 
       // Only load order details if orderID is not empty
-      if (orderID != null && orderID.isNotEmpty) {
-        print('Loading order details for orderID: $orderID');
+      if (orderID != null && orderID.isNotEmpty && userID != null && userID.isNotEmpty) {
+        print('Loading order details for orderID: $orderID, userID: $userID');
         try {
           final orderDoc = await widget.firestore
-              .collection('order')
-              .doc(orderID)
+              .collection('users')        // ← CORRECT PATH
+              .doc(userID)               // ← User document
+              .collection('order')       // ← User's orders subcollection
+              .doc(orderID)             // ← Specific order
               .get();
 
           if (orderDoc.exists) {
             print('Order document found');
             order = OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+            print('Order loaded - Date: ${order!.orderDate}, Status: ${order!.orderStatus}');
           } else {
-            print('Order document not found for ID: $orderID');
+            print('Order document not found for userID: $userID, orderID: $orderID');
           }
         } catch (e) {
           print('Error loading order: $e');
         }
       } else {
-        print('Order ID is empty, skipping order fetch');
+        print('Order ID or User ID is empty - OrderID: "$orderID", UserID: "$userID"');
       }
 
       // Only load order product details if all required IDs are available
@@ -475,11 +479,16 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
   }
 
   Widget _buildReturnSummaryCard() {
-
     print('Product Name: ${widget.returnRequest.productName}');
-    print('Image URL: ${widget.returnRequest.productImageUrl}');
+    print('Raw Image URL: ${widget.returnRequest.productImageUrl}');
+
     final productName = widget.returnRequest.productName;
-    final imageUrl = widget.returnRequest.productImageUrl;
+    // Clean the URL - remove any potential whitespace or hidden characters
+    final imageUrl = widget.returnRequest.productImageUrl.trim().replaceAll('\n', '').replaceAll('\r', '');
+    print('Cleaned Image URL: $imageUrl');
+    print('Image URL Length: ${imageUrl.length}');
+    print('Image URL isEmpty: ${imageUrl.isEmpty}');
+
     final quantity = widget.returnRequest.returnQuantity;
     final price = widget.returnRequest.returnPrice;
     final totalPrice = price * quantity;
@@ -657,24 +666,43 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.grey[300]!),
                         ),
-                        child: imageUrl.isNotEmpty
-                            ? ClipRRect(
+                        child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
+                          child: imageUrl.isNotEmpty
+                              ? Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder:
-                                (context, error, stackTrace) => Icon(
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              print('Image loading error: $error');
+                              // Fallback to a simple colored container
+                              return Container(
+                                color: Colors.orange[100],
+                                child: Icon(
+                                  Icons.shopping_bag,
+                                  color: Colors.orange[300],
+                                  size: 24,
+                                ),
+                              );
+                            },
+                          )
+                              : Container(
+                            color: Colors.grey[100],
+                            child: Icon(
                               Icons.image,
                               color: Colors.grey[400],
-                              size: 20,
+                              size: 24,
                             ),
                           ),
-                        )
-                            : Icon(
-                          Icons.image,
-                          color: Colors.grey[400],
-                          size: 20,
                         ),
                       ),
                       const SizedBox(width: 12),
