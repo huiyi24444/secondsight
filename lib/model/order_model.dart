@@ -101,6 +101,11 @@ class OrdersModel {
     };
   }
 
+  factory OrdersModel.fromDocument(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return OrdersModel.fromJson(data, doc.id);
+  }
+
   OrdersModel copyWith({
     String? id,
     String? customerId,
