@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/user_model.dart';
 import '../widget/topbar.dart';
 import 'admin_customer_addition.dart';
+import 'admin_customer_controller.dart';
 import 'admin_customer_details.dart';
 
 class CustomerManagementPage extends StatefulWidget {
@@ -16,7 +17,7 @@ class CustomerManagementPage extends StatefulWidget {
 class _CustomerManagementPageState extends State<CustomerManagementPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
-
+  late final CustomerManagementController _controller;
   List<CustomerModel> customers = [];
   List<CustomerModel> filteredCustomers = [];
   bool isLoading = true;
@@ -28,58 +29,14 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
   @override
   void initState() {
     super.initState();
+    _controller = CustomerManagementController(firestore: _firestore);
     _loadCustomers();
   }
 
   Future<void> _loadCustomers() async {
     setState(() => isLoading = true);
     try {
-      final customersSnapshot = await _firestore.collection('users').get();
-
-      Map<String, Map<String, dynamic>> customerOrderStats = {};
-
-      for (var customerDoc in customersSnapshot.docs) {
-        final customerId = customerDoc.id;
-        final orderCollection = _firestore.collection('users').doc(customerId).collection('Order');
-        final orderSnapshot = await orderCollection.get();
-
-        if (orderSnapshot.docs.isNotEmpty) {
-          for (var orderDoc in orderSnapshot.docs) {
-            final data = orderDoc.data();
-
-            if (!customerOrderStats.containsKey(customerId)) {
-              customerOrderStats[customerId] = {
-                'orderCount': 0,
-                'totalSpent': 0.0,
-                'lastOrderDate': 0,
-              };
-            }
-
-            customerOrderStats[customerId]!['orderCount']++;
-            customerOrderStats[customerId]!['totalSpent'] += data['total'] ?? 0.0;
-
-            final orderDate = data['date'] ?? 0;
-            if (orderDate > customerOrderStats[customerId]!['lastOrderDate']) {
-              customerOrderStats[customerId]!['lastOrderDate'] = orderDate;
-            }
-          }
-        }
-      }
-
-      List<CustomerModel> loadedCustomers = [];
-
-      for (var doc in customersSnapshot.docs) {
-        final data = doc.data();
-        final stats = customerOrderStats[doc.id] ?? {
-          'orderCount': 0,
-          'totalSpent': 0.0,
-          'lastOrderDate': 0,
-        };
-
-        final customer = CustomerModel.fromJson(data, doc.id);
-        loadedCustomers.add(customer);
-      }
-
+      final loadedCustomers = await _controller.loadCustomers();
       setState(() {
         customers = loadedCustomers;
         _filterCustomers();
@@ -91,47 +48,16 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
     }
   }
 
+
   void _filterCustomers() {
-    List<CustomerModel> filtered = customers;
-
-    // Filter by search
-    if (_searchController.text.isNotEmpty) {
-      final search = _searchController.text.toLowerCase();
-      filtered = filtered.where((customer) {
-        return customer.fullName.toLowerCase().contains(search) ||
-            customer.email.toLowerCase().contains(search) ||
-            customer.phoneNum.toString().contains(search);
-      }).toList();
-    }
-
-    // Filter by status
-    if (selectedFilter != 'All') {
-      filtered = filtered.where((customer) {
-        switch (selectedFilter) {
-          case 'Active':
-            return customer.status == 'active';
-          case 'Inactive':
-            return customer.status == 'inactive';
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
     setState(() {
-      filteredCustomers = filtered;
-      currentPage = 1;
+      filteredCustomers = selectedFilter == 'All'
+          ? customers
+          : customers.where((c) => c.isVerified == (selectedFilter == 'Verified')).toList();
     });
   }
 
-  void _showCustomerDetailsPage(CustomerModel customer) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CustomerDetailsPage(userId: customer.id),
-      ),
-    );
-  }
+
 
   void _showAddCustomerDialog() {
     showDialog(
@@ -307,7 +233,7 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: _showAddCustomerDialog,
+                onPressed: () => _controller.showAddCustomerDialog(context),
                 icon: const Icon(Icons.add, color: Colors.white),
                 label: const Text('Add Customer'),
                 style: ElevatedButton.styleFrom(
@@ -480,7 +406,7 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
 
   Widget _buildCustomerCard(CustomerModel customer) {
     return InkWell(
-      onTap: () => _showCustomerDetailsPage(customer),
+      onTap: () => _controller.showCustomerDetailsPage(context, customer),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -593,7 +519,7 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: ListTile(
-        onTap: () => _showCustomerDetailsPage(customer),
+        onTap: () => _controller.showCustomerDetailsPage(context, customer),
         contentPadding: const EdgeInsets.all(16),
         leading: Stack(
           children: [
