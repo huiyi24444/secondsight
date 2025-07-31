@@ -53,27 +53,12 @@ class AdminReportController {
     try {
       selectedDate ??= DateTime.now();
 
-      // Calculate date range based on filter type
-      DateTime startDate, endDate;
-
-      switch (filterType) {
-        case DateFilterType.day:
-          startDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-          endDate = startDate.add(const Duration(days: 1));
-          break;
-        case DateFilterType.month:
-          startDate = DateTime(selectedDate.year, selectedDate.month, 1);
-          endDate = DateTime(selectedDate.year, selectedDate.month + 1, 1);
-          break;
-        case DateFilterType.year:
-          startDate = DateTime(selectedDate.year, 1, 1);
-          endDate = DateTime(selectedDate.year + 1, 1, 1);
-          break;
-        case DateFilterType.all:
-          startDate = DateTime(2020, 1, 1); // Or your business start date
-          endDate = DateTime.now().add(const Duration(days: 1));
-          break;
-      }
+      // Use the same date range calculation logic from admin_dashboard_controller
+      final dateRanges = _calculateDateRanges(filterType, selectedDate);
+      final currentStart = dateRanges['currentStart']!;
+      final currentEnd = dateRanges['currentEnd']!;
+      final previousStart = dateRanges['previousStart']!;
+      final previousEnd = dateRanges['previousEnd']!;
 
       // ALWAYS fetch active orders for operational status
       final activeToShipQuery = await _firestore
@@ -89,46 +74,66 @@ class AdminReportController {
       int activeToShip = activeToShipQuery.docs.length;
       int activeToReceive = activeToReceiveQuery.docs.length;
 
-      // Fetch orders for selected period (for business metrics)
-      Query ordersQuery = _firestore.collectionGroup('order');
-
+      // Fetch CURRENT period orders
+      Query currentOrdersQuery = _firestore.collectionGroup('order');
       if (filterType != DateFilterType.all) {
-        ordersQuery = ordersQuery
-            .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-            .where('orderDate', isLessThan: Timestamp.fromDate(endDate));
+        currentOrdersQuery = currentOrdersQuery
+            .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(currentStart))
+            .where('orderDate', isLessThan: Timestamp.fromDate(currentEnd));
       }
 
-      final ordersSnapshot = await ordersQuery.get();
-      final List<OrdersModel> orders = ordersSnapshot.docs.map((doc) {
+      final currentOrdersSnapshot = await currentOrdersQuery.get();
+      final List<OrdersModel> orders = currentOrdersSnapshot.docs.map((doc) {
         final userId = doc.reference.parent.parent?.id ?? '';
         return OrdersModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).copyWith(customerId: userId);
       }).toList();
 
+      // Fetch PREVIOUS period orders (for comparison)
+      List<OrdersModel> previousOrders = [];
+      if (filterType != DateFilterType.all) {
+        final previousOrdersQuery = _firestore
+            .collectionGroup('order')
+            .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(previousStart))
+            .where('orderDate', isLessThan: Timestamp.fromDate(previousEnd));
+
+        final previousOrdersSnapshot = await previousOrdersQuery.get();
+        previousOrders = previousOrdersSnapshot.docs.map((doc) {
+          final userId = doc.reference.parent.parent?.id ?? '';
+          return OrdersModel.fromJson(doc.data() as Map<String, dynamic>, doc.id).copyWith(customerId: userId);
+        }).toList();
+      }
+
       // Calculate today's activity (always show today regardless of filter)
       final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
       final todayEnd = todayStart.add(const Duration(days: 1));
-
       final todayActivity = await _fetchTodayActivity(todayStart, todayEnd);
 
       // Calculate overdue orders
       final List<OrdersModel> allToShipOrders = activeToShipQuery.docs
           .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
           .toList();
-
       int overdue = _calculateOverdueOrders(allToShipOrders);
 
       // Fetch customers
       final customersSnapshot = await _firestore.collection('users').get();
       final totalCustomers = customersSnapshot.docs.length;
 
-      // Calculate revenue (only from completed orders in period)
-      double revenue = orders
+      // Calculate revenues for both periods
+      double currentRevenue = orders
+          .where((o) => o.orderStatus == 'completed')
+          .fold(0.0, (sum, o) => sum + o.totalAmount);
+
+      double previousRevenue = previousOrders
           .where((o) => o.orderStatus == 'completed')
           .fold(0.0, (sum, o) => sum + o.totalAmount);
 
       // Calculate period-specific status counts
       int periodCompleted = orders.where((o) => o.orderStatus == 'completed').length;
       int periodCancelled = orders.where((o) => o.orderStatus == 'cancelled').length;
+
+      // Calculate changes using the same logic
+      int orderChange = _calculatePercentageChange(orders.length, previousOrders.length);
+      int revenueChange = _calculatePercentageChange(currentRevenue, previousRevenue);
 
       // Calculate performance metrics
       final performanceMetrics = await _calculatePerformanceMetrics();
@@ -151,16 +156,9 @@ class AdminReportController {
           .where((order) => order.orderDate.isAfter(last24Hours))
           .length;
 
-      // Simple change calculations for display
-      int orderChange = 0;
-      int revenueChange = 0;
-
-      // You can implement proper comparison logic here if needed
-      // For now, keeping it simple
-
       return DashboardStats(
         // Business metrics (filtered by date)
-        totalRevenue: revenue.toInt(),
+        totalRevenue: currentRevenue.toInt(),
         allOrders: orders.length,
         completedOrders: periodCompleted,
         cancelledOrders: periodCancelled,
@@ -182,7 +180,7 @@ class AdminReportController {
         rawOrderDocs: recentOrdersSnapshot.docs,
         newOrdersCount: newOrdersCount,
 
-        // Changes
+        // Changes (now properly calculated)
         orderChange: orderChange,
         revenueChange: revenueChange,
 
@@ -196,6 +194,56 @@ class AdminReportController {
       print('Error fetching dashboard stats: $e');
       rethrow;
     }
+  }
+
+  Map<String, DateTime> _calculateDateRanges(DateFilterType filterType, DateTime selectedDate) {
+    DateTime currentStart, currentEnd, previousStart, previousEnd;
+
+    switch (filterType) {
+      case DateFilterType.day:
+      // Current day
+        currentStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+        currentEnd = currentStart.add(const Duration(days: 1));
+        // Previous day
+        previousStart = currentStart.subtract(const Duration(days: 1));
+        previousEnd = currentStart;
+        break;
+
+      case DateFilterType.month:
+      // Current month
+        currentStart = DateTime(selectedDate.year, selectedDate.month, 1);
+        currentEnd = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+        // Previous month
+        final prevMonth = selectedDate.month == 1 ? 12 : selectedDate.month - 1;
+        final prevYear = selectedDate.month == 1 ? selectedDate.year - 1 : selectedDate.year;
+        previousStart = DateTime(prevYear, prevMonth, 1);
+        previousEnd = currentStart;
+        break;
+
+      case DateFilterType.year:
+      // Current year
+        currentStart = DateTime(selectedDate.year, 1, 1);
+        currentEnd = DateTime(selectedDate.year + 1, 1, 1);
+        // Previous year
+        previousStart = DateTime(selectedDate.year - 1, 1, 1);
+        previousEnd = currentStart;
+        break;
+
+      case DateFilterType.all:
+      // All time - no comparison needed
+        currentStart = DateTime(2020, 1, 1); // Or your business start date
+        currentEnd = DateTime.now().add(const Duration(days: 1));
+        previousStart = currentStart;
+        previousEnd = currentStart;
+        break;
+    }
+
+    return {
+      'currentStart': currentStart,
+      'currentEnd': currentEnd,
+      'previousStart': previousStart,
+      'previousEnd': previousEnd,
+    };
   }
 
   Future<Map<String, int>> _fetchTodayActivity(DateTime startDate, DateTime endDate) async {
@@ -318,6 +366,19 @@ class AdminReportController {
     }
 
     return metrics;
+  }
+
+  int _calculatePercentageChange(num currentValue, num previousValue) {
+    if (previousValue == 0) {
+      // If previous value is 0, return 100% if current > 0, else 0%
+      return currentValue > 0 ? 100 : 0;
+    }
+
+    // Calculate percentage change
+    double change = ((currentValue - previousValue) / previousValue) * 100;
+
+    // Round to nearest integer
+    return change.round();
   }
 
   Future<List<OrdersModel>> fetchToReceiveOrders() async {

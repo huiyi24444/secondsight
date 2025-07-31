@@ -12,7 +12,17 @@ import 'admin_report_controller.dart';
 class MonthlySalesReport {
   final AdminReportController _controller = AdminReportController();
 
+  String _formatChange(int change) {
+    if (change == 0) return 'remained the same';
+    return change > 0
+        ? 'increased by $change%'
+        : 'decreased by ${change.abs()}%';
+  }
+
+
   Future<void> generateMonthlySalesReport(
+
+
       BuildContext context,
       DateTime selectedMonth,
       Function(bool) setIsGenerating,
@@ -28,7 +38,8 @@ class MonthlySalesReport {
 
       // Fetch category-wise sales data
       final categoryData = await _fetchCategorySales(selectedMonth);
-
+      print('Revenue Change: ${stats.revenueChange}');
+      print('Order Change: ${stats.orderChange}');
       final pdf = pw.Document();
 
       pdf.addPage(
@@ -40,7 +51,7 @@ class MonthlySalesReport {
               'MONTHLY SALES SUMMARY REPORT',
               DateFormat('MMMM yyyy').format(selectedMonth).toUpperCase(),
             ),
-            pw.SizedBox(height: 30),
+            pw.SizedBox(height: 20),
 
             // Executive Summary
             pw.Text(
@@ -60,7 +71,10 @@ class MonthlySalesReport {
                 'This report provides a comprehensive analysis of sales performance for ${DateFormat('MMMM yyyy').format(selectedMonth)}. '
                     'Total revenue generated was RM${stats.totalRevenue.toStringAsFixed(2)} from ${stats.allOrders} orders, '
                     'with an average order value of RM${stats.allOrders > 0 ? (stats.totalRevenue / stats.allOrders).toStringAsFixed(2) : "0.00"}. '
-                    '${stats.orderChange > 0 ? "Sales increased by ${stats.orderChange}% compared to the previous period." : ""}',
+                    'Revenue ${_formatChange(stats.revenueChange)}, '
+                    'Orders ${_formatChange(stats.orderChange)}, '
+                    'and Customer registrations ${_formatChange(stats.customerChange)} compared to the previous month.',
+
                 style: pw.TextStyle(fontSize: 11, height: 1.5),
               ),
             ),
@@ -85,34 +99,34 @@ class MonthlySalesReport {
                   children: [
                     _buildTableHeader('Metric'),
                     _buildTableHeader('Value'),
-                    _buildTableHeader('Change'),
-                    _buildTableHeader('Status'),
+                    _buildTableHeader('Comparison'),
                   ],
                 ),
                 _buildKPIRow(
                   'Total Revenue',
                   'RM${stats.totalRevenue.toStringAsFixed(2)}',
-                  '${stats.revenueChange > 0 ? "+" : ""}${stats.revenueChange}%',
+                  stats.revenueChange, // <-- pass int directly
                   stats.revenueChange >= 0,
                 ),
                 _buildKPIRow(
                   'Total Orders',
                   '${stats.allOrders}',
-                  '${stats.orderChange > 0 ? "+" : ""}${stats.orderChange}%',
+                  stats.orderChange, // <-- pass int directly
                   stats.orderChange >= 0,
                 ),
                 _buildKPIRow(
                   'Average Order Value',
                   'RM${stats.allOrders > 0 ? (stats.totalRevenue / stats.allOrders).toStringAsFixed(2) : "0.00"}',
-                  'N/A',
+                  null, // <-- no change value, show N/A
                   true,
                 ),
                 _buildKPIRow(
                   'Order Completion Rate',
                   '${stats.allOrders > 0 ? ((stats.completedOrders / stats.allOrders) * 100).toStringAsFixed(1) : "0"}%',
-                  'N/A',
+                  null, // <-- no change value, show N/A
                   stats.completedOrders > stats.cancelledOrders,
                 ),
+
               ],
             ),
 
@@ -189,13 +203,10 @@ class MonthlySalesReport {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatusBox('Completed', stats.completedOrders, stats.allOrders),
-                _buildStatusBox('Cancelled', stats.cancelledOrders, stats.allOrders),
-                _buildStatusBox(
-                  'In Progress',
-                  stats.allOrders - stats.completedOrders - stats.cancelledOrders,
-                  stats.allOrders,
-                ),
+                _buildStatusBox('Preparing', stats.to_ship_orders ?? 0, stats.allOrders ?? 1),
+                _buildStatusBox('In Transit', stats.to_receive_orders ?? 0, stats.allOrders ?? 1),
+                _buildStatusBox('Delivered', stats.completedOrders ?? 0, stats.allOrders ?? 1),
+                _buildStatusBox('Cancelled', stats.cancelledOrders ?? 0, stats.allOrders ?? 1),
               ],
             ),
 
@@ -252,6 +263,10 @@ class MonthlySalesReport {
               style: pw.TextStyle(fontSize: 12),
             ),
             pw.Text(
+              'Created By: HY Admin',
+              style: pw.TextStyle(fontSize: 11,  color: PdfColors.grey600),
+            ),
+            pw.Text(
               'Generated: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())}',
               style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
@@ -275,7 +290,7 @@ class MonthlySalesReport {
     );
   }
 
-  pw.TableRow _buildKPIRow(String metric, String value, String change, bool isPositive) {
+  pw.TableRow _buildKPIRow(String metric, String value, int? changeValue, bool isPositive) {
     return pw.TableRow(
       children: [
         pw.Container(
@@ -289,22 +304,14 @@ class MonthlySalesReport {
         pw.Container(
           padding: pw.EdgeInsets.all(8),
           child: pw.Text(
-            change,
+            changeValue == null
+                ? 'N/A'
+                : '${changeValue >= 0 ? '+' : ''}${changeValue}%',
             style: pw.TextStyle(
               fontSize: 11,
-              color: change == 'N/A'
+              color: changeValue == null
                   ? PdfColors.black
                   : (isPositive ? PdfColors.green : PdfColors.red),
-            ),
-          ),
-        ),
-        pw.Container(
-          padding: pw.EdgeInsets.all(8),
-          child: pw.Text(
-            isPositive ? '●' : '●',
-            style: pw.TextStyle(
-              fontSize: 11,
-              color: isPositive ? PdfColors.green : PdfColors.red,
             ),
           ),
         ),
