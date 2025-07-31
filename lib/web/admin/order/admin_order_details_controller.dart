@@ -4,6 +4,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/payment_cards_model.dart';
@@ -415,6 +416,28 @@ class OrderDetailsManagementController {
     }
   }
 
+  Future<CancellationModel?> getCancellationDetails(String cancelID) async {
+    try {
+      print('Fetching cancellation details for cancelID: $cancelID');
+
+      final doc = await FirebaseFirestore.instance
+          .collection('cancellation')
+          .doc(cancelID)
+          .get();
+
+      if (!doc.exists) {
+        debugPrint('Cancellation document not found for ID: $cancelID');
+        return null;
+      }
+
+      debugPrint('Cancellation document fetched successfully for ID: $cancelID');
+      return CancellationModel.fromDocument(doc);
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching cancellation details for ID: $cancelID -> $e');
+      debugPrint('Stack trace: $stackTrace');
+      return null;
+    }
+  }
 
 
 }

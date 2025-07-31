@@ -57,18 +57,6 @@ class _AdminChatViewState extends State<AdminChatView> {
       backgroundColor: Colors.grey[50],
       body: Row(
         children: [
-          // Add AdminSidebar here
-          AdminSidebar(
-            currentPage: 'chat', // Add 'chat' to your sidebar options
-            onPageChanged: (String page) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                    builder: (context) => AdminNavigator(initialPage: page)
-                ),
-                    (route) => false,
-              );
-            },
-          ),
           // Chat sidebar with conversations list
           Container(
             width: 350,

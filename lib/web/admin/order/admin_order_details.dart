@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import '../../../admin_main.dart';
+import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/shipment_model.dart';
@@ -50,6 +51,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   String currentPage = 'orders';
   String? customerFullName;
   late OrderDetailsManagementController _controller;
+  CancellationModel? cancelData;
 
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
@@ -66,6 +68,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     currentStatus = widget.order.orderStatus;
     _loadOrderData();
     fetchCustomerName();
+    _fetchCancellationData();
   }
 
   Future<void> _loadOrderData() async {
@@ -80,6 +83,14 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       paymentCard = data.paymentCard;
       isLoading = false;
     });
+  }
+  Future<void> _fetchCancellationData() async {
+    if (widget.order.cancelID != null) {
+      final data = await _controller.getCancellationDetails(widget.order.cancelID!);
+      setState(() {
+        cancelData = data;
+      });
+    }
   }
 
 
@@ -164,6 +175,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildCancelInfoCard(),
                     const SizedBox(height: 16),
                     _buildPaymentInfoCard(),
                     const SizedBox(height: 16),
@@ -1108,7 +1120,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(width: 8),
               const Text(
                 'Shipment Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -1261,6 +1273,64 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ),
     );
   }
+
+  Widget _buildCancelInfoCard() {
+    if (cancelData == null) {
+      return const SizedBox(); // Don't show if no cancellation data
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.cancel, color: Colors.red, size: 14),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Cancellation Details',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildInfoRow('Cancelled By', cancelData!.canceledBy),
+          const SizedBox(height: 8),
+          _buildInfoRow('Reason', cancelData!.cancelReason),
+          if (cancelData!.cancelNote != null && cancelData!.cancelNote!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('Note', cancelData!.cancelNote!),
+          ],
+          const SizedBox(height: 8),
+          _buildInfoRow('Date', _formatDate(cancelData!.cancelDate)),
+        ],
+      ),
+    );
+  }
+
+
+
+
 
   Widget _buildTimelineItem(
     String title,

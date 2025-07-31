@@ -32,6 +32,8 @@ class OrderManagementController extends ChangeNotifier {
   bool _showOverdueOnly = false;
   SortOption _currentSort = SortOption.dateNewest;
 
+
+
   // Getters
   List<OrdersModel> get orders => _orders;
   List<OrdersModel> get filteredOrders => _filteredOrders;
@@ -399,6 +401,77 @@ class OrderManagementController extends ChangeNotifier {
   String formatDate(DateTime date) {
     final formatter = DateFormat('d MMM yyyy | h:mm a');
     return formatter.format(date);
+  }
+
+  Future<void> updateOrderCancellation({
+    required String customerId,
+    required String orderId,
+    required String cancellationReason,
+    String? cancelNote,
+  }) async {
+    try {
+      // First, verify the order can be cancelled
+      final orderDoc = await _firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('order')
+          .doc(orderId)
+          .get();
+
+      if (!orderDoc.exists) {
+        throw Exception('Order not found');
+      }
+
+      final orderData = orderDoc.data() as Map<String, dynamic>;
+      final currentStatus = orderData['orderStatus']?.toString().toLowerCase();
+
+      if (currentStatus != 'to_ship') {
+        throw Exception('Only orders with "To Ship" status can be cancelled');
+      }
+
+      // Create cancellation document reference
+      final cancellationRef = _firestore
+          .collection('cancellation')
+          .doc();
+
+      // Prepare cancellation data
+      final cancellationData = {
+        'orderID': orderId,
+        'cancelReason': cancellationReason,
+        'cancelDate': FieldValue.serverTimestamp(),
+        'cancelNote': cancelNote,
+        'cancelledBy': 'admin', // Since this is from admin panel
+      };
+
+      // Use batch write for atomicity
+      final batch = _firestore.batch();
+
+      // Create cancellation document
+      batch.set(cancellationRef, cancellationData);
+
+      // Update order document
+      batch.update(
+        _firestore
+            .collection('users')
+            .doc(customerId)
+            .collection('order')
+            .doc(orderId),
+        {
+          'orderStatus': 'cancelled',
+          'cancelDate': FieldValue.serverTimestamp(),
+          'cancelID': cancellationRef.id,
+        },
+      );
+
+      // Commit batch
+      await batch.commit();
+
+      // Refresh the orders after cancellation
+      await loadOrders();
+
+    } catch (e) {
+      throw Exception('Failed to cancel order: $e');
+    }
   }
 
   @override

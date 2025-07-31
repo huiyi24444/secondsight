@@ -703,18 +703,37 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
       onSelected: (value) {
-        if (value == 'delete') {
-          _showDeleteConfirmation(order, controller);
+        if (value == 'cancel') {
+          _showCancelConfirmation(order, controller);
         } else {
           controller.updateOrderStatus(order, value);
         }
       },
-      itemBuilder: (BuildContext context) => [
-        const PopupMenuItem(
-          value: 'delete',
-          child: Text('Delete Order', style: TextStyle(color: Colors.red)),
-        ),
-      ],
+      itemBuilder: (BuildContext context) {
+        List<PopupMenuEntry<String>> items = [];
+
+        // Only show cancel option for 'to_ship' orders
+        if (order.orderStatus.toLowerCase() == 'to_ship') {
+          items.add(
+            const PopupMenuItem(
+              value: 'cancel',
+              child: Text('Cancel Order', style: TextStyle(color: Colors.orange)),
+            ),
+          );
+        }
+
+        // If no items to show, return a disabled item or empty list
+        if (items.isEmpty) {
+          items.add(
+            const PopupMenuItem(
+              enabled: false,
+              child: Text('No actions available', style: TextStyle(color: Colors.grey)),
+            ),
+          );
+        }
+
+        return items;
+      },
     );
   }
 
@@ -770,32 +789,197 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     );
   }
 
-  void _showDeleteConfirmation(OrdersModel order, OrderManagementController controller) {
-    showDialog(
+  void _showCancelConfirmation(OrdersModel order, OrderManagementController controller) async {
+    final noteController = TextEditingController();
+    final customReasonController = TextEditingController();
+
+    // Cancellation reason options
+    final List<String> cancellationReasons = [
+      'Out of Stock',
+      'Duplicate Order',
+      'Customer Request',
+      'Invalid Shipping Address',
+      'Others (Please specify)',
+    ];
+
+    String? selectedReason;
+    bool showCustomReason = false;
+
+    final bool? shouldCancel = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Order'),
-          content: Text('Are you sure you want to delete order #${order.shortOrderId}?'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Cancel Order'),
+          content: SizedBox(
+            width: 500,
+            height: 160,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (order.orderStatus == 'to_receive')
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.red[700], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'This order has already been shipped. Cancellation may require return shipping.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.red[900],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Cancellation Reason Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Cancellation Reason *',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedReason,
+                    items: cancellationReasons.map((reason) =>
+                        DropdownMenuItem(
+                          value: reason,
+                          child: Text(reason),
+                        ),
+                    ).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedReason = value;
+                        showCustomReason = value == 'Others (Please specify)';
+                        if (!showCustomReason) {
+                          customReasonController.clear();
+                        }
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a cancellation reason';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  // Custom reason field (only show when "Others" is selected)
+                  if (showCustomReason) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: customReasonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Please specify reason *',
+                        hintText: 'Enter custom cancellation reason',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                      autofocus: true,
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+
+                  // Additional Notes
+                  TextField(
+                    controller: noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Additional Notes (Optional)',
+                      hintText: 'Enter any additional notes',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Back'),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                controller.deleteOrder(order);
+              onPressed: () async {
+                // Validation
+                if (selectedReason == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please select a cancellation reason'),
+                    ),
+                  );
+                  return;
+                }
+
+                if (showCustomReason && customReasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please specify the custom cancellation reason'),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context, true);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Delete'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Cancel Order'),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
+
+    if (shouldCancel == true) {
+      try {
+        // Determine the final reason
+        String finalReason = selectedReason!;
+        if (showCustomReason && customReasonController.text.trim().isNotEmpty) {
+          finalReason = customReasonController.text.trim();
+        }
+
+        // Use your updated controller method
+        await controller.updateOrderCancellation(
+          customerId: order.customerId!,
+          orderId: order.id,
+          cancellationReason: finalReason,
+          cancelNote: noteController.text.trim().isNotEmpty
+              ? noteController.text.trim()
+              : null,
+        );
+
+        // Show success message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Order cancelled successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+      } catch (e) {
+        // Show error message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error cancelling order: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
