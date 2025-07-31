@@ -11,6 +11,7 @@ class OrdersModel {
   final String? shipmentID;
   final String payment;
   final String? cancelID;
+  final int totalProduct;
 
   // New status tracking fields
   final DateTime? confirmedDate;     // When order was confirmed
@@ -40,6 +41,7 @@ class OrdersModel {
     this.cancelDate,
     DateTime? lastStatusUpdate,
     this.lastUpdatedBy,
+    required this.totalProduct,
   }) : lastStatusUpdate = lastStatusUpdate ?? orderDate;
 
   factory OrdersModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -53,6 +55,7 @@ class OrdersModel {
       shipmentID: json['shipmentID'],
       payment: json['payment'] ?? 'Mastercard',
       cancelID: json['cancelID'],
+      totalProduct: json['totalProduct'] ?? 0,
       // Parse new date fields
       confirmedDate: json['confirmedDate'] != null
           ? (json['confirmedDate'] as Timestamp).toDate()
@@ -94,6 +97,7 @@ class OrdersModel {
       'cancelledDate': cancelDate != null ? Timestamp.fromDate(cancelDate!) : null,
       'lastStatusUpdate': Timestamp.fromDate(lastStatusUpdate),
       'lastUpdatedBy': lastUpdatedBy,
+      'totalProduct': totalProduct,
     };
   }
 
@@ -114,6 +118,7 @@ class OrdersModel {
     DateTime? cancelDate,
     DateTime? lastStatusUpdate,
     String? lastUpdatedBy,
+    int? totalProduct,
   }) {
     return OrdersModel(
       id: id ?? this.id,
@@ -132,6 +137,7 @@ class OrdersModel {
       cancelDate: cancelDate ?? this.cancelDate,
       lastStatusUpdate: lastStatusUpdate ?? this.lastStatusUpdate,
       lastUpdatedBy: lastUpdatedBy ?? this.lastUpdatedBy,
+      totalProduct: totalProduct ?? this.totalProduct,
     );
   }
 

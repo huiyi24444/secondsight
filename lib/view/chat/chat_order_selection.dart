@@ -242,6 +242,7 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                               orderStatus: 'general',
                               totalAmount: 0.0,
                               eligibilityForReturn: false,
+                              totalProduct: 0,
                             ));
                             _controller.startConversation();
                           },
@@ -273,6 +274,7 @@ class _ChatSupportViewState extends State<ChatSupportView> {
                               orderStatus: 'general',
                               totalAmount: 0.0,
                               eligibilityForReturn: false,
+                              totalProduct: 0,
                             ));
                             _controller.startConversation();
                           },
