@@ -1,5 +1,7 @@
 // FILE: model/customer_model.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CustomerModel {
   final String id; // Firestore document ID
   final String email;
@@ -8,6 +10,7 @@ class CustomerModel {
   final int phoneNum;
   final String profilePic;
   final String status;
+  final DateTime createdAt;
 
   CustomerModel({
     required this.id,
@@ -17,6 +20,7 @@ class CustomerModel {
     required this.phoneNum,
     required this.profilePic,
     required this.status,
+    required this.createdAt,
   });
 
   factory CustomerModel.fromJson(Map<String, dynamic> json, String docId) {
@@ -28,6 +32,7 @@ class CustomerModel {
       phoneNum: json['phoneNum'] ?? 0,
       profilePic: json['profilePic'] ?? '',
       status: json['status'] ?? 'active',
+      createdAt: (json['createdAt'] as Timestamp).toDate(),
     );
   }
 
@@ -39,6 +44,7 @@ class CustomerModel {
       'phoneNum': phoneNum,
       'profilePic': profilePic,
       'status': status,
+      'createdAt': createdAt
     };
   }
 
@@ -50,6 +56,7 @@ class CustomerModel {
       'phoneNum': phoneNum,
       'profilePic': profilePic,
       'status': status,
+      'createdAt': createdAt,
     };
   }
 

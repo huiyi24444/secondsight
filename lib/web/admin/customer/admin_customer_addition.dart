@@ -43,6 +43,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
         phoneNum: int.tryParse(_phoneController.text.trim()) ?? 0,
         profilePic: '',
         status: 'active', // Or any default you choose
+        createdAt: DateTime.now(),
       );
 
       await userRef.set(customer.toMap()..addAll({'createdAt': FieldValue.serverTimestamp()}));

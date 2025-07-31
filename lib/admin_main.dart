@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:secondsight/web/admin/chat/admin_chat_view.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
+import 'package:secondsight/web/admin/reports/admin_report.dart';
 import 'package:secondsight/web/admin/returnrefund/admin_return.dart';
 import 'package:secondsight/web/admin/widget/sidebar.dart';
 import 'firebase_options.dart';
@@ -70,6 +71,8 @@ class _AdminNavigatorState extends State<AdminNavigator> {
         return CustomerManagementPage();
       case 'chat':
         return AdminChatView();
+      case 'reports':
+        return AdminReportPage();
       default:
         return AdminDashboardPage();
     }
