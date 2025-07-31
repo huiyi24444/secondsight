@@ -158,99 +158,97 @@ class ReturnManagementView extends StatelessWidget {
                                     ),
                                   ),
                                   DataCell(
-                                    PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert),
-                                      onSelected: (value) async {
-                                        if (value == 'view') {
-                                          // ✅ FIXED: Use the original ReturnRequestModel instead of reconstructing
-                                          final returnRequest = item['returnRequest'] as ReturnRequestModel?;
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.visibility_outlined),
+                                          onPressed: () {
+                                            final returnRequest = item['returnRequest'] as ReturnRequestModel?;
 
-                                          // Add null safety check
-                                          if (returnRequest == null) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Error: Return request data not found')),
+                                            if (returnRequest == null) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Error: Return request data not found')),
+                                              );
+                                              return;
+                                            }
+
+                                            final currentIndex = controller.filteredReturns.indexWhere(
+                                                    (filteredItem) => filteredItem['id'] == item['id']
                                             );
-                                            return;
-                                          }
 
-                                          // Navigate to the ReturnDetailsPage with the original ReturnRequestModel
-                                          // REPLACE your existing Navigator.push code with this:
-
-// ✅ NEW: Find current index in filtered results
-                                          final currentIndex = controller.filteredReturns.indexWhere(
-                                                  (filteredItem) => filteredItem['id'] == item['id']
-                                          );
-
-// Navigate to the ReturnDetailsPage with the original ReturnRequestModel
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => ReturnDetailsPage(
-                                                returnRequest: returnRequest, // ← Now has correct data!
-                                                onUpdateReturnStatus: (returnId, newStatus) async {
-                                                  try {
-                                                    await controller.updateReturnStatus(
-                                                        context,
-                                                        item['userEmail'] ?? '',
-                                                        returnId,
-                                                        newStatus
-                                                    );
-                                                    return true;
-                                                  } catch (e) {
-                                                    return false;
-                                                  }
-                                                },
-                                                formatDate: (timestamp) {
-                                                  // Convert Timestamp to milliseconds for your controller
-                                                  return controller.formatDate(timestamp.millisecondsSinceEpoch);
-                                                },
-                                                formatStatus: controller.formatStatus,
-                                                firestore: FirebaseFirestore.instance,
-                                                getOrderProductDoc: controller.getOrderProductDoc,
-                                                // ✅ ADD THESE REQUIRED PARAMETERS
-                                                allReturns: controller.filteredReturns,
-                                                currentIndex: currentIndex,
-                                                selectedFilter: controller.selectedTab,
-                                              ),
-                                            ),
-                                          ).then((_) {
-                                            controller.loadReturns();
-                                          });
-                                        }
-                                        else if (value == 'delete') {
-                                          showDialog(
-                                            context: context,
-                                            builder: (_) => AlertDialog(
-                                              title: const Text('Delete Return'),
-                                              content: const Text('Are you sure you want to delete this return?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () async {
-                                                    Navigator.pop(context);
-                                                    await FirebaseFirestore.instance
-                                                        .collection('returnRequests')
-                                                        .doc(item['id'])
-                                                        .delete();
-                                                    controller.loadReturns();
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => ReturnDetailsPage(
+                                                  returnRequest: returnRequest,
+                                                  onUpdateReturnStatus: (returnId, newStatus) async {
+                                                    try {
+                                                      await controller.updateReturnStatus(
+                                                          context,
+                                                          item['userEmail'] ?? '',
+                                                          returnId,
+                                                          newStatus
+                                                      );
+                                                      return true;
+                                                    } catch (e) {
+                                                      return false;
+                                                    }
                                                   },
-                                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                                  child: const Text('Delete'),
+                                                  formatDate: (timestamp) {
+                                                    return controller.formatDate(timestamp.millisecondsSinceEpoch);
+                                                  },
+                                                  formatStatus: controller.formatStatus,
+                                                  firestore: FirebaseFirestore.instance,
+                                                  getOrderProductDoc: controller.getOrderProductDoc,
+                                                  allReturns: controller.filteredReturns,
+                                                  currentIndex: currentIndex,
+                                                  selectedFilter: controller.selectedTab,
                                                 ),
-                                              ],
-                                            ),
-                                          );
-                                        } else {
-                                          controller.updateReturnStatus(context, item['userEmail'], item['id'], value);
-                                        }
-                                      },
-                                      itemBuilder: (_) => const [
-                                        PopupMenuItem(value: 'view', child: Text('View Details')),
-                                        PopupMenuDivider(),
-                                        PopupMenuItem(value: 'delete', child: Text('Delete Return', style: TextStyle(color: Colors.red))),
+                                              ),
+                                            ).then((_) {
+                                              controller.loadReturns();
+                                            });
+                                          },
+                                          tooltip: 'View Details',
+                                        ),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(Icons.more_vert),
+                                          onSelected: (value) async {
+                                            if (value == 'delete') {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => AlertDialog(
+                                                  title: const Text('Delete Return'),
+                                                  content: const Text('Are you sure you want to delete this return?'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(context),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                    ElevatedButton(
+                                                      onPressed: () async {
+                                                        Navigator.pop(context);
+                                                        await FirebaseFirestore.instance
+                                                            .collection('returnRequests')
+                                                            .doc(item['id'])
+                                                            .delete();
+                                                        controller.loadReturns();
+                                                      },
+                                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                                      child: const Text('Delete'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            } else {
+                                              controller.updateReturnStatus(context, item['userEmail'], item['id'], value);
+                                            }
+                                          },
+                                          itemBuilder: (_) => const [
+                                            PopupMenuItem(value: 'delete', child: Text('Delete Return', style: TextStyle(color: Colors.red))),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                   ),

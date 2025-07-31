@@ -37,12 +37,24 @@ class AdminApp extends StatelessWidget {
 }
 
 class AdminNavigator extends StatefulWidget {
+  final String? initialPage;
+  const AdminNavigator({Key? key, this.initialPage}) : super(key: key);
+
   @override
   _AdminNavigatorState createState() => _AdminNavigatorState();
 }
 
 class _AdminNavigatorState extends State<AdminNavigator> {
   String currentPage = 'dashboard';
+
+  @override
+  void initState() {
+    super.initState();
+    // Set the initial page if provided
+    if (widget.initialPage != null) {
+      currentPage = widget.initialPage!;
+    }
+  }
 
   Widget _getPage() {
     switch (currentPage) {
@@ -56,6 +68,8 @@ class _AdminNavigatorState extends State<AdminNavigator> {
         return ReturnManagementPage();
       case 'customers':
         return CustomerManagementPage();
+      case 'chat':
+        return AdminChatView();
       default:
         return AdminDashboardPage();
     }

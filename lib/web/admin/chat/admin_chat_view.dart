@@ -1,11 +1,14 @@
+
 // admin_chat_view.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../../../admin_main.dart';
 import '../../../model/conversation_model.dart';
 import '../../../view/widgets/build_message.dart';
 import '../order/admin_order_details.dart';
+import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_chat_controller.dart';
 import 'create_conversation_dialog.dart';
@@ -50,19 +53,23 @@ class _AdminChatViewState extends State<AdminChatView> {
 
   @override
   Widget build(BuildContext context) {
-    // Use responsive layout for web
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: CustomTopBar(
-          title: 'Admin',
-          subtitle: 'Conversations',
-        ),
-      ),
       body: Row(
         children: [
-          // Sidebar with conversations list
+          // Add AdminSidebar here
+          AdminSidebar(
+            currentPage: 'chat', // Add 'chat' to your sidebar options
+            onPageChanged: (String page) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                    builder: (context) => AdminNavigator(initialPage: page)
+                ),
+                    (route) => false,
+              );
+            },
+          ),
+          // Chat sidebar with conversations list
           Container(
             width: 350,
             decoration: BoxDecoration(
@@ -73,7 +80,7 @@ class _AdminChatViewState extends State<AdminChatView> {
             ),
             child: Column(
               children: [
-                // Admin Header
+                // Admin Header (you can keep this or modify as needed)
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -182,7 +189,6 @@ class _AdminChatViewState extends State<AdminChatView> {
       ),
     );
   }
-
   Widget _buildFilterTab(String label, bool isActive) {
     return InkWell(
       onTap: () {
@@ -700,4 +706,5 @@ class _AdminChatViewState extends State<AdminChatView> {
       ),
     );
   }
+// Rest of your methods remain the same...
 }

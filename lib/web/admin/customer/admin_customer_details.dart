@@ -3,8 +3,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
+import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
 import '../../../model/user_model.dart';
+import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 
 class CustomerDetailsPage extends StatefulWidget {
@@ -21,6 +23,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   CustomerModel? customer;
   List<OrdersModel> customerOrders = [];
   bool isLoading = true;
+  String currentPage = 'customers';
 
   @override
   void initState() {
@@ -75,6 +78,18 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       backgroundColor: Colors.grey[100],
       body: Row(
         children: [
+          AdminSidebar(
+            currentPage: currentPage,
+            onPageChanged: (String page) {
+              // Always go back to AdminNavigator with the selected page
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                    builder: (context) => AdminNavigator(initialPage: page)
+                ),
+                    (route) => false,
+              );
+            },
+          ),
           Expanded(
             child: Column(
               children: [

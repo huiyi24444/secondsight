@@ -32,7 +32,7 @@ class AdminSidebar extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'Logo',
+                  'SecondSight',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -77,6 +77,12 @@ class AdminSidebar extends StatelessWidget {
             'Reports',
             'reports',
             currentPage == 'reports',
+          ),
+          _buildMenuItem(
+            Icons.chat,
+            'Chat Support',
+            'chat',
+            currentPage == 'chat',
           ),
         ],
       ),

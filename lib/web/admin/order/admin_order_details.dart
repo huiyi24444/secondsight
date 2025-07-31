@@ -103,52 +103,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           AdminSidebar(
             currentPage: currentPage,
             onPageChanged: (String page) {
-              // Handle navigation based on selected page
-              switch (page) {
-                case 'dashboard':
-                  // Navigate to dashboard - since we're in a sub-page, we go back to main
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => AdminNavigator()),
+              // Always go back to AdminNavigator with the selected page
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                    builder: (context) => AdminNavigator(initialPage: page)
+                ),
                     (route) => false,
-                  );
-                  break;
-                case 'products':
-                  // Already on products page, might want to go back to product list
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => ProductManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'orders':
-                  // Navigate to order management
-                  Navigator.pop(context);
-                  break;
-                case 'returns':
-                  // Navigate to return management
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => ReturnManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'customers':
-                  // Navigate to customer management
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => CustomerManagementPage(),
-                    ),
-                  );
-                  break;
-                case 'reports':
-                  // Navigate to reports - you'll need to create this page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Reports page not implemented yet'),
-                    ),
-                  );
-                  break;
-              }
+              );
             },
           ),
           // Main Content

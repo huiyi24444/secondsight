@@ -213,46 +213,13 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
              AdminSidebar(
                currentPage: currentPage,
                onPageChanged: (String page) {
-                 // Handle navigation based on selected page
-                 switch (page) {
-                   case 'dashboard':
-                     Navigator.of(context).pushAndRemoveUntil(
-                       MaterialPageRoute(builder: (context) => AdminNavigator()),
-                           (route) => false,
-                     );
-                     break;
-                   case 'products':
-                     Navigator.of(context).pushReplacement(
-                       MaterialPageRoute(
-                         builder: (context) => ProductManagementPage(),
-                       ),
-                     );
-                     break;
-                   case 'orders':
-                     Navigator.of(context).pushReplacement(
-                       MaterialPageRoute(
-                         builder: (context) => OrderManagementPage(),
-                       ),
-                     );
-                     break;
-                   case 'returns':
-                     Navigator.of(context).pop();
-                     break;
-                   case 'customers':
-                     Navigator.of(context).pushReplacement(
-                       MaterialPageRoute(
-                         builder: (context) => CustomerManagementPage(),
-                       ),
-                     );
-                     break;
-                   case 'reports':
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(
-                         content: Text('Reports page not implemented yet'),
-                       ),
-                     );
-                     break;
-                 }
+                 // Always go back to AdminNavigator with the selected page
+                 Navigator.of(context).pushAndRemoveUntil(
+                   MaterialPageRoute(
+                       builder: (context) => AdminNavigator(initialPage: page)
+                   ),
+                       (route) => false,
+                 );
                },
              ),
              // Main Content
