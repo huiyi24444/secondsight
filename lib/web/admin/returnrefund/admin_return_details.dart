@@ -18,6 +18,7 @@ import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_return_controller.dart';
 import 'admin_return_details_controller.dart';
+import 'admin_return_nav.dart';
 
 class ReturnDetailsPage extends StatefulWidget {
   final ReturnRequestModel returnRequest;
@@ -27,6 +28,10 @@ class ReturnDetailsPage extends StatefulWidget {
   final FirebaseFirestore firestore;
   final Future<DocumentSnapshot?> Function(String, String, String) getOrderProductDoc;
 
+  final List<Map<String, dynamic>> allReturns;
+  final int currentIndex;
+  final String? selectedFilter;
+
   const ReturnDetailsPage({
     Key? key,
     required this.returnRequest,
@@ -35,6 +40,10 @@ class ReturnDetailsPage extends StatefulWidget {
     required this.formatStatus,
     required this.firestore,
     required this.getOrderProductDoc,
+
+    required this.allReturns,
+    required this.currentIndex,
+    this.selectedFilter,
   }) : super(key: key);
 
   @override
@@ -46,6 +55,9 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
   bool isLoading = true;
   String currentPage = 'returns';
   late AdminReturnDetailsController _controller;
+
+  late ReturnNavigationService _navigationService;
+  late FocusNode _focusNode;
 
   OrdersModel? order;
   OrderProductModel? orderProduct;
@@ -63,7 +75,41 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         ? 'submitted'
         : widget.returnRequest.returnStatus;
 
-    _controller.loadReturnData();
+    _controller = AdminReturnDetailsController(
+      returnRequest: widget.returnRequest,
+      firestore: widget.firestore,
+      getOrderProductDoc: widget.getOrderProductDoc,
+    );
+
+    _navigationService = ReturnNavigationService(
+      allReturns: widget.allReturns,
+      currentIndex: widget.currentIndex,
+      selectedFilter: widget.selectedFilter,
+      context: context,
+      onUpdateReturnStatus: widget.onUpdateReturnStatus,
+      formatDate: widget.formatDate,
+      formatStatus: widget.formatStatus,
+      firestore: widget.firestore,
+      getOrderProductDoc: widget.getOrderProductDoc,
+    );
+
+    _focusNode = FocusNode();
+
+    // ✅ ADD: Call initialize() instead of loadReturnData()
+    _controller.initialize();
+
+    // Request focus after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    // ✅ ADD THIS
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   // Helper method to format dates
@@ -85,23 +131,17 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
 
   Widget _buildHeaderSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: ReturnStatusUtils.getReturnStatusColor(currentStatus)
-            .withOpacity(0.1),
-        border: Border.all(
-          color: ReturnStatusUtils.getReturnStatusColor(currentStatus),
-        ),
+        color: ReturnStatusUtils.getReturnStatusColor(currentStatus).withOpacity(0.1),
+        border: Border.all(color: ReturnStatusUtils.getReturnStatusColor(currentStatus)),
         borderRadius: BorderRadius.circular(6),
       ),
       child: DropdownButton<String>(
         value: currentStatus,
         underline: const SizedBox(),
         isDense: true,
-        items: ['pending', 'submitted', 'approved', 'rejected', 'completed', 'cancelled'] // Added 'submitted'
+        items: ['pending', 'submitted', 'approved', 'rejected', 'completed', 'cancelled', 'pending_inspection']
             .map((status) => DropdownMenuItem(
           value: status,
           child: Row(
@@ -116,18 +156,13 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                   shape: BoxShape.circle,
                 ),
               ),
-              Text(
-                widget.formatStatus(status),
-                style: const TextStyle(fontSize: 13),
-              ),
+              Text(widget.formatStatus(status), style: const TextStyle(fontSize: 13)),
             ],
           ),
-        ))
-            .toList(),
+        )).toList(),
         onChanged: _handleStatusChange,
       ),
     );
-
   }
 
   Future<void> _handleStatusChange(String? newStatus) async {
@@ -161,91 +196,99 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     }
   }
 
-
-  @override
-
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
       value: _controller,
-      child: Scaffold(
-        backgroundColor: Colors.grey[100],
-        body: Row(
-          children: [
-            // Sidebar
-            AdminSidebar(
-              currentPage: currentPage,
-              onPageChanged: (String page) {
-                // Handle navigation based on selected page
-                switch (page) {
-                  case 'dashboard':
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => AdminNavigator()),
-                          (route) => false,
-                    );
-                    break;
-                  case 'products':
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => ProductManagementPage(),
-                      ),
-                    );
-                    break;
-                  case 'orders':
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => OrderManagementPage(),
-                      ),
-                    );
-                    break;
-                  case 'returns':
-                    Navigator.of(context).pop();
-                    break;
-                  case 'customers':
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => CustomerManagementPage(),
-                      ),
-                    );
-                    break;
-                  case 'reports':
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Reports page not implemented yet'),
-                      ),
-                    );
-                    break;
-                }
-              },
-            ),
-            // Main Content
-            Expanded(
-              child: Column(
-                children: [
-                  // Top Bar
-                  const CustomTopBar(
-                    title: 'Returns',
-                    subtitle: 'Return Details',
-                  ),
-                  // Content Area
-                  Expanded(
-                    child: Consumer<AdminReturnDetailsController>(
-                      builder: (context, controller, child) {
-                        return controller.isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : SingleChildScrollView(
-                          padding: const EdgeInsets.all(12.0),
-                          child: _buildBody(controller),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+     child: Focus(
+       focusNode: _focusNode,
+       onKeyEvent: (node, event) => _navigationService.handleKeyEvent(event, currentStatus,_handleStatusChange)
+       ? KeyEventResult.handled
+           : KeyEventResult.ignored,
+       child: Scaffold(
+         backgroundColor: Colors.grey[100],
+         body: Row(
+           children: [
+             // Sidebar
+             AdminSidebar(
+               currentPage: currentPage,
+               onPageChanged: (String page) {
+                 // Handle navigation based on selected page
+                 switch (page) {
+                   case 'dashboard':
+                     Navigator.of(context).pushAndRemoveUntil(
+                       MaterialPageRoute(builder: (context) => AdminNavigator()),
+                           (route) => false,
+                     );
+                     break;
+                   case 'products':
+                     Navigator.of(context).pushReplacement(
+                       MaterialPageRoute(
+                         builder: (context) => ProductManagementPage(),
+                       ),
+                     );
+                     break;
+                   case 'orders':
+                     Navigator.of(context).pushReplacement(
+                       MaterialPageRoute(
+                         builder: (context) => OrderManagementPage(),
+                       ),
+                     );
+                     break;
+                   case 'returns':
+                     Navigator.of(context).pop();
+                     break;
+                   case 'customers':
+                     Navigator.of(context).pushReplacement(
+                       MaterialPageRoute(
+                         builder: (context) => CustomerManagementPage(),
+                       ),
+                     );
+                     break;
+                   case 'reports':
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(
+                         content: Text('Reports page not implemented yet'),
+                       ),
+                     );
+                     break;
+                 }
+               },
+             ),
+             // Main Content
+             Expanded(
+               child: Column(
+                 children: [
+                   // Top Bar
+                   const CustomTopBar(
+                     title: 'Returns',
+                     subtitle: 'Return Details',
+                   ),
+                   _navigationService.buildNavigationHeader(
+                       widget.returnRequest.id,
+                       currentStatus,
+                       _handleStatusChange
+                   ),
+                   // Content Area
+                   Expanded(
+                     child: Consumer<AdminReturnDetailsController>(
+                       builder: (context, controller, child) {
+                         return controller.isLoading
+                             ? const Center(child: CircularProgressIndicator())
+                             : SingleChildScrollView(
+                           padding: const EdgeInsets.all(12.0),
+                           child: _buildBody(controller),
+                         );
+                       },
+                     ),
+                   ),
+                 ],
+               ),
+             ),
+           ],
+         ),
+       ),
+     ),
     );
   }
 
@@ -825,18 +868,18 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Customer Details',
+                'Order Details',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('User ID', widget.returnRequest.userID),
+          _buildInfoRow('Order ID', widget.returnRequest.userID),
           if (controller.customerDetails != null) ...[
             const SizedBox(height: 8),
-            _buildInfoRow('Name', controller.getCustomerName()),
+            _buildInfoRow('Order Status', controller.getCustomerName()),
             const SizedBox(height: 8),
-            _buildInfoRow('Phone', controller.getCustomerPhone()),
+            _buildInfoRow('Order Date', controller.getCustomerPhone()),
           ],
         ],
       ),

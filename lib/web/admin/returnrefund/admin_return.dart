@@ -174,6 +174,14 @@ class ReturnManagementView extends StatelessWidget {
                                           }
 
                                           // Navigate to the ReturnDetailsPage with the original ReturnRequestModel
+                                          // REPLACE your existing Navigator.push code with this:
+
+// ✅ NEW: Find current index in filtered results
+                                          final currentIndex = controller.filteredReturns.indexWhere(
+                                                  (filteredItem) => filteredItem['id'] == item['id']
+                                          );
+
+// Navigate to the ReturnDetailsPage with the original ReturnRequestModel
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
@@ -199,6 +207,10 @@ class ReturnManagementView extends StatelessWidget {
                                                 formatStatus: controller.formatStatus,
                                                 firestore: FirebaseFirestore.instance,
                                                 getOrderProductDoc: controller.getOrderProductDoc,
+                                                // ✅ ADD THESE REQUIRED PARAMETERS
+                                                allReturns: controller.filteredReturns,
+                                                currentIndex: currentIndex,
+                                                selectedFilter: controller.selectedTab,
                                               ),
                                             ),
                                           ).then((_) {
