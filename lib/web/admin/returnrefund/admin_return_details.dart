@@ -1213,14 +1213,14 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             color: Colors.grey[600],
           ),
         ),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),

@@ -843,26 +843,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           const SizedBox(height: 12),
 
           // Return Eligibility
-          Row(
-            children: [
-              const Text(
-                'Return Eligibility: ',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.black,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                widget.order.eligibilityForReturn ? 'Yes' : 'No',
-                style: TextStyle(
-                  color: widget.order.eligibilityForReturn ? Colors.green : Colors.red,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+          // Return Eligibility - Enhanced display
+          _buildReturnEligibilityInfo(widget.order),
 
           // Check if there are return requests for this order
           StreamBuilder<QuerySnapshot>(
@@ -1171,37 +1153,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           const SizedBox(height: 8),
           if (shipment?.trackingNumber?.isNotEmpty ?? false) ...[
-            Text(
-              'Tracking: ${shipment!.trackingNumber!}',
-              style: const TextStyle(
-                fontSize: 15,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 4),
+            _buildInfoRow('Tracking', shipment!.trackingNumber!.toString()),
+            const SizedBox(height: 8),
           ],
           if (shipment?.shippedDate != null) ...[
-            Text(
-              'Shipped: ${_formatDate(shipment!.shippedDate!)}',
-              style: TextStyle(fontSize: 15, color: Colors.grey[600]),
-            ),
+            _buildInfoRow('Shipped', _formatDate(shipment!.shippedDate!)),
           ] else ...[
             Text(
               'Not yet shipped',
               style: TextStyle(fontSize: 15, color: Colors.orange[600]),
             ),
           ],
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           if (shipment?.fullName?.isNotEmpty ?? false) ...[
-            Text(
-              'To: ${shipment!.fullName!}',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            _buildInfoRow('Recipient', shipment!.fullName!),
           ],
         ],
       ),
@@ -1243,65 +1208,29 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               const SizedBox(width: 8),
               const Text(
                 'Address Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (shipment?.fullName?.isNotEmpty ?? false) ...[
-            Row(
-              children: [
-                const Icon(Icons.person, size: 16, color: Colors.grey),
-                const SizedBox(width: 6),
-                Text(
-                  '${shipment!.fullName!}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[800],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          if (shipment?.phoneNum != null) ...[
-            Row(
-              children: [
-                Icon(Icons.phone, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(
-                  '${shipment!.phoneNum}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
           if (shipment?.streetone?.isNotEmpty ?? false) ...[
-            Text(
-              '${shipment!.streetone}',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+            _buildInfoRow('Street 1', shipment!.streetone ?? ''),
             const SizedBox(height: 4),
           ],
           if (shipment?.streettwo?.isNotEmpty ?? false) ...[
-            Text(
-              '${shipment!.streettwo}',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
+            _buildInfoRow('Street 2', shipment!.streettwo?? ''),
             const SizedBox(height: 4),
           ],
           if ((shipment?.city?.isNotEmpty ?? false) ||
               (shipment?.state?.isNotEmpty ?? false) ||
               (shipment?.zipCode?.isNotEmpty ?? false)) ...[
-            Text(
-              '${shipment?.city ?? ""}${(shipment?.city?.isNotEmpty ?? false) && (shipment?.state?.isNotEmpty ?? false) ? ", " : ""}${shipment?.state ?? ""} ${shipment?.zipCode ?? ""}'
-                  .trim(),
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            _buildInfoRow(
+              'City/State/Zip',
+              '${shipment?.city ?? ""}${(shipment?.city?.isNotEmpty ?? false) && (shipment?.state?.isNotEmpty ?? false) ? ", " : ""}${shipment?.state ?? ""} ${shipment?.zipCode ?? ""}'.trim(),
             ),
+            const SizedBox(height: 4),
           ],
+
         ],
       ),
     );
@@ -1362,20 +1291,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            widget.customerNames[widget.order.customerId] ?? 'Unknown Customer',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'User ID: #${shortUserId(widget.order.customerId ?? "")}',
-            style: TextStyle(fontSize: 14, fontFamily: 'monospace'),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Full Name: ${customerFullName ?? "Not found"}',
-            style: TextStyle(fontSize: 14, fontFamily: 'monospace'),
-          ),
+          _buildInfoRow('Email', widget.customerNames[widget.order.customerId] ?? 'No Email Available'),
+          const SizedBox(height: 8),
+          _buildInfoRow('User ID', shortUserId(widget.order.customerId ?? "")),
+          const SizedBox(height: 8),
+          _buildInfoRow('Full Name', customerFullName ?? "Not found")
         ],
       ),
     );
@@ -1465,7 +1385,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  //already in controller ***************
+
 
   void _handleStatusChange(String? newStatus) async {
     if (newStatus != null && newStatus != currentStatus) {
@@ -1934,8 +1854,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
 
-  //already in controller ***************
-
   // Show transition error
   void _showTransitionError(String from, String to) {
     final errorMessage = _controller.getTransitionErrorMessage(from, to);
@@ -1955,5 +1873,153 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   String _formatDateTime(DateTime dateTime) {
     final formatter = DateFormat('dd MMM yyyy, HH:mm');
     return formatter.format(dateTime);
+  }
+
+  String getReturnEligibilityText(OrdersModel order) {
+    if (!order.eligibilityForReturn) {
+      return 'Not Eligible';
+    }
+
+    if (order.orderStatus.toLowerCase() != 'completed' &&
+        order.orderStatus.toLowerCase() != 'delivered') {
+      return 'Not Eligible';
+    }
+
+    if (order.completedDate != null) {
+      final daysSinceCompleted = DateTime.now().difference(order.completedDate!).inDays;
+      final daysRemaining = 5 - daysSinceCompleted;
+
+      if (daysRemaining <= 0) {
+        return 'Expired';
+      } else if (daysRemaining == 1) {
+        return 'Expires Today';
+      } else {
+        return '$daysRemaining days remaining';
+      }
+    }
+
+    return 'Yes';
+  }
+
+  Color getReturnEligibilityColor(OrdersModel order) {
+    if (!order.eligibilityForReturn) {
+      return Colors.grey;
+    }
+
+    if (order.orderStatus.toLowerCase() != 'completed' &&
+        order.orderStatus.toLowerCase() != 'delivered') {
+      return Colors.grey;
+    }
+
+    if (order.completedDate != null) {
+      final daysSinceCompleted = DateTime.now().difference(order.completedDate!).inDays;
+      final daysRemaining = 5 - daysSinceCompleted;
+
+      if (daysRemaining <= 0) {
+        return Colors.red;
+      } else if (daysRemaining <= 1) {
+        return Colors.orange;
+      } else if (daysRemaining <= 2) {
+        return Colors.amber;
+      } else {
+        return Colors.green;
+      }
+    }
+
+    return Colors.green;
+  }
+
+  bool isEligibleForReturn(OrdersModel order) {
+    // First check if order status allows returns
+    if (order.orderStatus.toLowerCase() != 'completed' &&
+        order.orderStatus.toLowerCase() != 'delivered') {
+      return false;
+    }
+
+    // Check if eligibilityForReturn is already false
+    if (!order.eligibilityForReturn) {
+      return false;
+    }
+
+    // Check if 5 days have passed since completion
+    if (order.completedDate != null) {
+      final daysSinceCompleted = DateTime.now().difference(order.completedDate!).inDays;
+      if (daysSinceCompleted > 5) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Widget _buildReturnEligibilityInfo(OrdersModel order) {
+    final eligibilityText = getReturnEligibilityText(order);
+    final eligibilityColor = getReturnEligibilityColor(order);
+    final isEligible = isEligibleForReturn(order);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Return Eligibility',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: eligibilityColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: eligibilityColor.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isEligible ? Icons.check_circle : Icons.cancel,
+                size: 14,
+                color: eligibilityColor,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                eligibilityText,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: eligibilityColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 }
