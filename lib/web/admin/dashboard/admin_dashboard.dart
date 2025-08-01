@@ -104,6 +104,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 30),
                   _buildOperationalStatus(),
                   const SizedBox(height: 30),
+                  _buildReturnOperationalStatus(),
+                  const SizedBox(height: 30),
                   _buildBottomSection(),
                 ],
               ),
@@ -298,12 +300,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: Colors.red,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Text(
                 'LIVE',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
@@ -343,6 +345,56 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               icon: Icons.cancel,
               color: Colors.red,
             ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReturnOperationalStatus() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Current Return Status',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'LIVE',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildStatusCard(
+              title: 'Pending Approval',
+              value: '${data!.activeToShipOrders}',
+              subtitle: 'Awaiting review',
+              icon: Icons.hourglass_top,
+              color: Colors.orange,
+              isUrgent: data!.activeToShipOrders > 20,
+            ),
+            const SizedBox(width: 16),
+            _buildStatusCard(
+              title: 'Pending Inspection',
+              value: '${data!.activeToReceiveOrders}',
+              subtitle: 'Checking return condition',
+              icon: Icons.search,
+              color: Colors.blue,
+            ),
+            const SizedBox(width: 16),
           ],
         ),
       ],

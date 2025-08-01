@@ -3,9 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/user_model.dart';
+import '../../../model/return_request_model.dart';
 
 class AdminDashboardController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
 
   Future<DashboardStats> fetchDashboardStats({
     DateFilterType filterType = DateFilterType.day,
@@ -35,6 +37,8 @@ class AdminDashboardController {
       int activeToShip = activeToShipQuery.docs.length;
       int activeToReceive = activeToReceiveQuery.docs.length;
 
+      // ADD IT HERE - Fetch return requests with pending statuses
+      final returnRequestsData = await _fetchPendingReturnRequests();
       // Fetch orders for CURRENT period
       Query currentOrdersQuery = _firestore.collectionGroup('order');
       if (filterType != DateFilterType.all) {
@@ -170,11 +174,14 @@ class AdminDashboardController {
         to_ship_orders: activeToShip,
         to_receive_orders: activeToReceive,
         todayOrders: todayActivity['created'] ?? 0,
+
       );
     } catch (e) {
       print('Error fetching dashboard stats: $e');
       rethrow;
     }
+
+
   }
 
   Map<String, DateTime> _calculateDateRanges(DateFilterType filterType, DateTime selectedDate) {
@@ -423,6 +430,35 @@ class AdminDashboardController {
         .map((doc) => OrderProductModel.fromJson(doc.data()))
         .toList();
   }
+
+  Future<ReturnRequestsData> _fetchPendingReturnRequests() async {
+    // Fetch return requests with pending_approval status
+    final pendingApprovalQuery = await _firestore
+        .collectionGroup('returnRequests')
+        .where('returnStatus', isEqualTo: 'pending_approval')
+        .get();
+
+    // Fetch return requests with pending_inspection status
+    final pendingInspectionQuery = await _firestore
+        .collectionGroup('returnRequests')
+        .where('returnStatus', isEqualTo: 'pending_inspection')
+        .get();
+
+    final pendingApprovalReturns = pendingApprovalQuery.docs
+        .map((doc) => ReturnRequestModel.fromDocument(doc))
+        .toList();
+
+    final pendingInspectionReturns = pendingInspectionQuery.docs
+        .map((doc) => ReturnRequestModel.fromDocument(doc))
+        .toList();
+
+    return ReturnRequestsData(
+      pendingApprovalCount: pendingApprovalReturns.length,
+      pendingInspectionCount: pendingInspectionReturns.length,
+      pendingApprovalReturns: pendingApprovalReturns,
+      pendingInspectionReturns: pendingInspectionReturns,
+    );
+  }
 }
 
 // DashboardStats class remains the same
@@ -442,6 +478,11 @@ class DashboardStats {
   final int orderChange;
   final int customerChange;
   final int newOrdersCount;
+
+  final int pendingApprovalReturns;
+  final int pendingInspectionReturns;
+  final int pendingReturnRequests;
+  final List<ReturnRequestModel> recentReturnRequests;
 
   // Simplified new fields
   final int activeToShipOrders;
@@ -465,10 +506,30 @@ class DashboardStats {
     required this.orderChange,
     required this.customerChange,
     required this.newOrdersCount,
+
+    this.pendingApprovalReturns = 0,
+    this.pendingInspectionReturns = 0,
+    this.pendingReturnRequests = 0,
+    this.recentReturnRequests = const [],
+
     this.activeToShipOrders = 0,
     this.activeToReceiveOrders = 0,
     this.statusActivity = const {},
     this.performanceMetrics = const {},
+  });
+}
+
+class ReturnRequestsData {
+  final int pendingApprovalCount;
+  final int pendingInspectionCount;
+  final List<ReturnRequestModel> pendingApprovalReturns;
+  final List<ReturnRequestModel> pendingInspectionReturns;
+
+  ReturnRequestsData({
+    required this.pendingApprovalCount,
+    required this.pendingInspectionCount,
+    required this.pendingApprovalReturns,
+    required this.pendingInspectionReturns,
   });
 }
 
