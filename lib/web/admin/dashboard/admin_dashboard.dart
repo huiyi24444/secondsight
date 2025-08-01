@@ -1,6 +1,7 @@
 // Simplified admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/web/admin/dashboard/revenue_trend_chart.dart' hide DateFilterType;
 import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
@@ -100,11 +101,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildBusinessMetrics(),
-                  const SizedBox(height: 30),
                   _buildOperationalStatus(),
                   const SizedBox(height: 30),
                   _buildReturnOperationalStatus(),
+                  const SizedBox(height: 30),
+                  _buildBusinessMetrics(),
+                  const SizedBox(height: 30),
+                  _buildRevenueChart(),
                   const SizedBox(height: 30),
                   _buildBottomSection(),
                 ],
@@ -787,66 +790,74 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Expanded(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(12), // Reduced from 20
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: isUrgent ? Border.all(color: color.withOpacity(0.3), width: 2) : null,
+          borderRadius: BorderRadius.circular(8), // Reduced from 10
+          border: isUrgent ? Border.all(color: color.withOpacity(0.3), width: 1.5) : null, // Reduced width
           boxShadow: [
             BoxShadow(
-              color: isUrgent ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 5,
+              color: isUrgent ? color.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
+              spreadRadius: 0, // Reduced from 1
+              blurRadius: 4, // Reduced from 5
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row( // Changed from Column to Row for horizontal layout
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+            Container(
+              padding: const EdgeInsets.all(10), // Slightly increased for better proportion
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 24), // Slightly larger icon
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Minimize vertical space
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 22, // Reduced from 28
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (isUrgent) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                if (isUrgent)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+                  const SizedBox(height: 2), // Reduced spacing
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 13, // Reduced from 14
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 11,
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 10, // Reduced from 11
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -877,6 +888,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ),
     );
   }
+
+  Widget _buildRevenueChart() {
+    return RevenueTrendChart(
+      filterType: _selectedFilter,
+      selectedDate: _selectedDate,
+    );
+  }
+
 
   // Helper methods
   String _getPeriodLabel() {

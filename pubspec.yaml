@@ -61,6 +61,7 @@ dependencies:
   month_picker_dialog: ^2.0.2
   gallery_saver: ^2.3.2
   device_info_plus: ^9.1.0
+  fl_chart: ^1.0.0
 
 
   camera: ^0.10.5
