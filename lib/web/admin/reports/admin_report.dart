@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:month_picker_dialog/month_picker_dialog.dart';
+import '../widget/topbar.dart';
 import 'monthly_sales_report.dart';
 import 'daily_sales_report.dart';
 import 'monthly_return_report.dart';
@@ -13,6 +15,7 @@ class _AdminReportPageState extends State<AdminReportPage> {
   DateTime selectedMonth = DateTime.now();
   DateTime selectedDate = DateTime.now();
   bool isGenerating = false;
+  String? selectedReportType;
 
   // Report instances
   final _monthlySalesReport = MonthlySalesReport();
@@ -23,196 +26,394 @@ class _AdminReportPageState extends State<AdminReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: Text('Report Generation'),
-        backgroundColor: Colors.teal,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Generate Reports',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Select and generate various business reports in PDF format',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-            SizedBox(height: 32),
-
-            _buildReportCard(
-              title: 'Monthly Sales Summary Report',
-              description: 'Comprehensive overview of monthly sales performance including total sales, orders, growth metrics, and category breakdown',
-              icon: Icons.analytics_outlined,
-              color: Colors.blue,
-              onGenerate: () => _generateMonthlySalesReport(),
-              dateSelector: _buildMonthSelector(),
-            ),
-
-            SizedBox(height: 16),
-
-            _buildReportCard(
-              title: 'Daily Sales Report',
-              description: 'Detailed breakdown of daily transactions including order details, customer information, and order status',
-              icon: Icons.receipt_long_outlined,
-              color: Colors.green,
-              onGenerate: () => _generateDailySalesReport(),
-              dateSelector: _buildDateSelector(),
-            ),
-
-            SizedBox(height: 16),
-
-            _buildReportCard(
-              title: 'Monthly Return Request Report',
-              description: 'Analysis of return requests including total returns, return rate, reasons for returns, and status breakdown',
-              icon: Icons.assignment_return_outlined,
-              color: Colors.orange,
-              onGenerate: () => _generateMonthlyReturnReport(),
-              dateSelector: _buildMonthSelector(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReportCard({
-    required String title,
-    required String description,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onGenerate,
-    required Widget dateSelector,
-  }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      body: Row(
+        children: [
+          // Main Content
+          Expanded(
+            child: Column(
               children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: color,
-                    size: 28,
-                  ),
+                const CustomTopBar(
+                  title: 'Report',
                 ),
-                SizedBox(width: 16),
+                // Header
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[800],
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                  child: Container(
+                    margin: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 5,
                       ),
                     ],
                   ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 20),
+                          SingleChildScrollView(
+                            padding: EdgeInsets.all(32),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Report Type Selection
+                                Container(
+                                  padding: EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.grey[200]!,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Select Report Type',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF2C3E50),
+                                        ),
+                                      ),
+                                      SizedBox(height: 20),
+
+                                      // Report Options
+                                      _buildReportOption(
+                                        id: 'monthly_sales',
+                                        title: 'Monthly Sales Summary',
+                                        subtitle: 'Comprehensive overview of monthly sales performance',
+                                        icon: Icons.trending_up_outlined,
+                                        color: Color(0xFF3498DB),
+                                      ),
+
+                                      _buildReportOption(
+                                        id: 'daily_sales',
+                                        title: 'Daily Sales Report',
+                                        subtitle: 'Detailed breakdown of daily transactions',
+                                        icon: Icons.receipt_outlined,
+                                        color: Color(0xFF27AE60),
+                                      ),
+
+                                      _buildReportOption(
+                                        id: 'monthly_returns',
+                                        title: 'Monthly Return Request Report',
+                                        subtitle: 'Analysis of return requests and reasons',
+                                        icon: Icons.assignment_return_outlined,
+                                        color: Color(0xFFE67E22),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                SizedBox(height: 24),
+
+                                // Report Configuration
+                                if (selectedReportType != null)
+                                  Container(
+                                    padding: EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.grey[200]!,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Report Configuration',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF2C3E50),
+                                          ),
+                                        ),
+                                        SizedBox(height: 20),
+
+                                        // Date Selection
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    selectedReportType == 'daily_sales'
+                                                        ? 'Select Date'
+                                                        : 'Select Month',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  InkWell(
+                                                    onTap: () => selectedReportType == 'daily_sales'
+                                                        ? _selectDate(context)
+                                                        : _selectMonth(context),
+                                                    child: Container(
+                                                      padding: EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 12,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        border: Border.all(
+                                                          color: Colors.grey[300]!,
+                                                        ),
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            selectedReportType == 'daily_sales'
+                                                                ? DateFormat('dd MMMM yyyy').format(selectedDate)
+                                                                : DateFormat('MMMM yyyy').format(selectedMonth),
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              color: Color(0xFF2C3E50),
+                                                            ),
+                                                          ),
+                                                          Icon(
+                                                            Icons.calendar_today_outlined,
+                                                            size: 20,
+                                                            color: Colors.grey[600],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(width: 24),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Format',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  Container(
+                                                    padding: EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 12,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: Colors.grey[300]!,
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      color: Colors.grey[50],
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.picture_as_pdf,
+                                                          size: 20,
+                                                          color: Colors.red[700],
+                                                        ),
+                                                        SizedBox(width: 8),
+                                                        Text(
+                                                          'PDF Document',
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            color: Color(0xFF2C3E50),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        SizedBox(height: 32),
+
+                                        // Generate Button
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  selectedReportType = null;
+                                                });
+                                              },
+                                              child: Text(
+                                                'Cancel',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              style: TextButton.styleFrom(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 24,
+                                                  vertical: 12,
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 16),
+                                            ElevatedButton.icon(
+                                              onPressed: isGenerating ? null : _generateReport,
+                                              icon: isGenerating
+                                                  ? SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                                  : Icon(Icons.download_outlined),
+                                              label: Text(
+                                                isGenerating ? 'Generating...' : 'Generate Report',
+                                                style: TextStyle(fontSize: 16),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Color(0xFF3498DB),
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 24,
+                                                  vertical: 12,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ),
+                ),
+
               ],
             ),
-            SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                dateSelector,
-                ElevatedButton.icon(
-                  onPressed: isGenerating ? null : onGenerate,
-                  icon: isGenerating
-                      ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                      : Icon(Icons.picture_as_pdf),
-                  label: Text('Generate PDF'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMonthSelector() {
-    return Row(
-      children: [
-        Text('Month: ', style: TextStyle(fontWeight: FontWeight.w500)),
-        TextButton.icon(
-          onPressed: () => _selectMonth(context),
-          icon: Icon(Icons.calendar_today, size: 18),
-          label: Text(DateFormat('MMMM yyyy').format(selectedMonth)),
-        ),
-      ],
-    );
-  }
+  Widget _buildReportOption({
+    required String id,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
+    final isSelected = selectedReportType == id;
 
-  Widget _buildDateSelector() {
-    return Row(
-      children: [
-        Text('Date: ', style: TextStyle(fontWeight: FontWeight.w500)),
-        TextButton.icon(
-          onPressed: () => _selectDate(context),
-          icon: Icon(Icons.calendar_today, size: 18),
-          label: Text(DateFormat('dd MMM yyyy').format(selectedDate)),
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            selectedReportType = id;
+          });
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected ? color : Colors.grey[300]!,
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color: isSelected ? color.withOpacity(0.05) : Colors.white,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Radio<String>(
+                value: id,
+                groupValue: selectedReportType,
+                onChanged: (value) {
+                  setState(() {
+                    selectedReportType = value;
+                  });
+                },
+                activeColor: color,
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
   Future<void> _selectMonth(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showMonthPicker(
       context: context,
       initialDate: selectedMonth,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      initialDatePickerMode: DatePickerMode.year,
     );
+
     if (picked != null && picked != selectedMonth) {
       setState(() {
         selectedMonth = DateTime(picked.year, picked.month);
@@ -234,7 +435,20 @@ class _AdminReportPageState extends State<AdminReportPage> {
     }
   }
 
-  // Report generation methods that delegate to separate classes
+  Future<void> _generateReport() async {
+    switch (selectedReportType) {
+      case 'monthly_sales':
+        await _generateMonthlySalesReport();
+        break;
+      case 'daily_sales':
+        await _generateDailySalesReport();
+        break;
+      case 'monthly_returns':
+        await _generateMonthlyReturnReport();
+        break;
+    }
+  }
+
   Future<void> _generateMonthlySalesReport() async {
     await _monthlySalesReport.generateMonthlySalesReport(
       context,

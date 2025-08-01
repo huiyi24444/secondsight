@@ -578,8 +578,7 @@ class OfflineRecommendationService {
 
   /// Save recommendations to Firestore for persistence
   Future<void> _saveRecommendationsToFirestore(String userId, List<PersonalizedRecommendation> recommendations) async {
-
-    debugPrint("Saving ${recommendations.length} recommendations to Firestore");
+    debugPrint("[DEBUG] Starting to save ${recommendations.length} recommendations for user $userId...");
 
     try {
       final userRef = _firestore.collection('users').doc(userId);
@@ -587,27 +586,31 @@ class OfflineRecommendationService {
 
       // Clear old recommendations
       final oldRecs = await recommendationsRef.get();
-      final batch = _firestore.batch();
+      debugPrint("[DEBUG] Found ${oldRecs.docs.length} old recommendations. Clearing them...");
 
+      final batch = _firestore.batch();
       for (var doc in oldRecs.docs) {
+        debugPrint("[DEBUG] Deleting old recommendation: ${doc.id}");
         batch.delete(doc.reference);
       }
 
       // Save metadata
       final metaRef = recommendationsRef.doc('_metadata');
-      batch.set(metaRef, {
+      final metaData = {
         'generatedAt': FieldValue.serverTimestamp(),
         'totalRecommendations': recommendations.length,
         'basedOnViews': _cachedUserPreferences?.viewedProducts.length ?? 0,
         'basedOnPurchases': _cachedUserPreferences?.purchasedProducts.length ?? 0,
         'version': '3.0-offline',
-      });
+      };
+      batch.set(metaRef, metaData);
+      debugPrint("[DEBUG] Metadata to be saved: $metaData");
 
       // Save individual recommendations
       for (int i = 0; i < recommendations.length; i++) {
         final rec = recommendations[i];
         final recRef = recommendationsRef.doc('rec_${i.toString().padLeft(3, '0')}');
-        batch.set(recRef, {
+        final recData = {
           'productId': rec.productId,
           'productName': rec.productName,
           'productPrice': rec.productPrice,
@@ -618,13 +621,16 @@ class OfflineRecommendationService {
           'tags': rec.tags,
           'category': rec.category,
           'generatedAt': FieldValue.serverTimestamp(),
-        });
+        };
+        batch.set(recRef, recData);
+        debugPrint("[DEBUG] Queued rec_${i.toString().padLeft(3, '0')} => $recData");
       }
 
       await batch.commit();
-      debugPrint('Saved ${recommendations.length} offline recommendations for user $userId');
-    } catch (e) {
-      debugPrint('Error saving recommendations to Firestore: $e');
+      debugPrint("[DEBUG] Successfully saved ${recommendations.length} recommendations for user $userId");
+    } catch (e, stack) {
+      debugPrint("[ERROR] Failed to save recommendations for user $userId: $e");
+      debugPrint("[ERROR] Stack trace: $stack");
     }
   }
 

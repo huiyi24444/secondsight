@@ -65,10 +65,10 @@ class DailySalesReport {
                   'Average Order',
                   'RM${orders.isNotEmpty ? (orders.fold(0.0, (sum, order) => sum + order.totalAmount) / orders.length).toStringAsFixed(2) : "0.00"}',
                 ),
-                _buildDailySummaryBox(
-                  'Completion Rate',
-                  '${orders.isNotEmpty ? ((orders.where((o) => o.orderStatus == 'completed').length / orders.length) * 100).toStringAsFixed(0) : "0"}%',
-                ),
+                //_buildDailySummaryBox(
+                //                   'Completion Rate',
+                //                   '${orders.isNotEmpty ? ((orders.where((o) => o.orderStatus == 'completed').length / orders.length) * 100).toStringAsFixed(0) : "0"}%',
+                //                 ),
               ],
             ),
 
