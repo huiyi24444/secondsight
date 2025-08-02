@@ -14,6 +14,7 @@ import '../customer/admin_customer.dart';
 import '../order/admin_order.dart';
 import '../product/admin_product.dart';
 
+import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_return_controller.dart';
@@ -198,6 +199,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
     return ChangeNotifierProvider.value(
       value: _controller,
      child: Focus(
@@ -209,6 +211,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
          backgroundColor: Colors.grey[100],
          body: Row(
            children: [
+
              // Sidebar
              AdminSidebar(
                currentPage: currentPage,
@@ -220,7 +223,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                    ),
                        (route) => false,
                  );
-               },
+               }, adminPermissions: adminProvider.permissions,
              ),
              // Main Content
              Expanded(

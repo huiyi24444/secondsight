@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class AdminSidebar extends StatelessWidget {
   final String currentPage;
   final Function(String) onPageChanged;
+  final List<String> adminPermissions;
 
   const AdminSidebar({
     Key? key,
     required this.currentPage,
     required this.onPageChanged,
+    required this.adminPermissions,
   }) : super(key: key);
 
   @override
@@ -42,12 +44,9 @@ class AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
-          _buildMenuItem(
-            Icons.dashboard,
-            'Dashboard',
-            'dashboard',
-            currentPage == 'dashboard',
-          ),
+          if (adminPermissions.contains('view_dashboard'))
+            _buildMenuItem(Icons.dashboard, 'Dashboard', 'dashboard', currentPage == 'dashboard'),
+
           _buildMenuItem(
             Icons.shopping_cart,
             'Product Management',

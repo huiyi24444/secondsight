@@ -1,10 +1,12 @@
 // Simplified admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/web/admin/dashboard/revenue_trend_chart.dart' hide DateFilterType;
 import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../services/admin_auth_provider.dart';
 import '../widget/blinkingdot.dart';
 import '../widget/topbar.dart';
 import 'admin_dashboard_controller.dart';
@@ -59,6 +61,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
+
     if (loading) {
       return Scaffold(
         backgroundColor: Colors.grey[100],
@@ -94,6 +98,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       body: Column(
         children: [
           const CustomTopBar(title: 'Dashboard'),
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: () async {
+              await adminProvider.signOut();
+              Navigator.of(context).pushReplacementNamed('/admin');
+            },
+          ),
           _buildSimplifiedDateFilterBar(),
           Expanded(
             child: SingleChildScrollView(

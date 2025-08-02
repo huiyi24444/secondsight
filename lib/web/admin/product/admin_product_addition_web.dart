@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/web/admin/product/admin_product_addition_controller.dart';
 import 'dart:html' as html;
 
@@ -9,6 +10,7 @@ import '../../../model/category_model.dart';
 import '../customer/admin_customer.dart';
 import '../order/admin_order.dart';
 import '../returnrefund/admin_return.dart';
+import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'measurements_widget.dart';
@@ -41,6 +43,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: Row(
@@ -87,7 +90,7 @@ class _ProductAdditionPageState extends State<ProductAdditionPage> {
                   );
                   break;
               }
-            },
+            }, adminPermissions: adminProvider.permissions,
           ),
           // Main Content
           Expanded(

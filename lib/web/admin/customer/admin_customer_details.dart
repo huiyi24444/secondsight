@@ -2,10 +2,12 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
 import '../../../model/user_model.dart';
+import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 
@@ -62,6 +64,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
     if (isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -89,6 +93,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                     (route) => false,
               );
             },
+            adminPermissions: adminProvider.permissions,
           ),
           Expanded(
             child: Column(

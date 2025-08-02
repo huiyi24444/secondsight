@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import '../../../admin_main.dart';
@@ -16,6 +17,7 @@ import '../../../view/widgets/return_status_utils.dart';
 import '../../../view/widgets/user_utils.dart';
 import '../customer/admin_customer.dart';
 import '../returnrefund/admin_return.dart';
+import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
 import 'admin_order.dart';
@@ -106,6 +108,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: Row(
@@ -122,6 +125,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     (route) => false,
               );
             },
+            adminPermissions: adminProvider.permissions,
           ),
           // Main Content
           Expanded(
