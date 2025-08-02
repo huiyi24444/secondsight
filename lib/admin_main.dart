@@ -5,6 +5,7 @@ import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/services/auth_wrapper.dart';
 import 'package:secondsight/web/admin/chat/admin_chat_view.dart';
 import 'package:secondsight/web/admin/login/admin_login_view.dart';
+import 'package:secondsight/web/admin/login/admin_management_view.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import 'package:secondsight/web/admin/reports/admin_report.dart';
 import 'package:secondsight/web/admin/returnrefund/admin_return.dart';
@@ -98,6 +99,8 @@ class _AdminNavigatorState extends State<AdminNavigator> {
         return AdminChatView();
       case 'reports':
         return AdminReportPage();
+      case 'admins':
+        return AdminManagementPage();
       default:
         return AdminDashboardPage();
     }

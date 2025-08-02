@@ -83,6 +83,7 @@ class AdminSidebar extends StatelessWidget {
             'chat',
             currentPage == 'chat',
           ),
+          _buildMenuItem(Icons.admin_panel_settings, 'Admins', 'admins', currentPage == 'admins')
         ],
       ),
     );

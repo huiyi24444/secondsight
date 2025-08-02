@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:secondsight/web/admin/login/temp_verification_button.dart';
 import '../services/admin_auth_provider.dart';
 
 class AdminLoginView extends StatefulWidget {
@@ -117,10 +116,6 @@ class _AdminLoginViewState extends State<AdminLoginView> {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              child: const TemporaryVerificationButton(),
             ),
           ],
         ),
