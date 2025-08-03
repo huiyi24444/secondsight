@@ -81,9 +81,14 @@ class _AdminAuthWrapperState extends State<AdminAuthWrapper> {
         }
 
         // 2. Not Authenticated or Not Admin
+        if (!authState.isAuthenticated) {
+          return const AdminLoginView();
+        }
+
         if (!authState.isVerified) {
           return const EmailVerificationScreen();
         }
+
 
         if (!authState.isAdmin) {
           print('[AuthWrapper] Authenticated but Not Admin. Redirecting to AdminLoginView.');

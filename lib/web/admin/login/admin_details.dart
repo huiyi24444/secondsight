@@ -5,19 +5,21 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../admin_main.dart';
 import '../../../model/admin_log_model.dart';
+import '../../../model/admin_model.dart';
 import '../services/admin_auth_provider.dart';
 import '../services/permissions_manager.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
+import 'admin_details_controller.dart';
 
 class AdminDetailsPage extends StatefulWidget {
-  final Map<String, dynamic> admin;
   final String adminId;
+  final Map<String, dynamic>? initialAdminData; // Made optional since we'll fetch from controller
 
   const AdminDetailsPage({
     Key? key,
-    required this.admin,
     required this.adminId,
+    this.initialAdminData,
   }) : super(key: key);
 
   @override
@@ -26,256 +28,326 @@ class AdminDetailsPage extends StatefulWidget {
 
 class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<AdminLogModel> _activityLogs = [];
-  bool _isLoadingLogs = true;
-  String _selectedLogFilter = 'All';
   final ScrollController _scrollController = ScrollController();
   String currentPage = 'admins';
+  late AdminDetailsController _controller;
+
+  AdminActivityLog? _selectedLog;
+  bool _showDetailsPanel = false;
+  double _detailsPanelWidth = 400.0;
+  final double _minPanelWidth = 300.0;
+  final double _maxPanelWidth = 600.0;
+
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadActivityLogs();
+    _controller = AdminDetailsController();
+    _loadData();
+    _controller.loadActivityLogs(widget.adminId);
   }
 
-  Future<void> _loadActivityLogs() async {
-    try {
-      setState(() => _isLoadingLogs = true);
-
-      // Load logs from subcollection
-      final logsSnapshot = await FirebaseFirestore.instance
-          .collection('admins')
-          .doc(widget.adminId)
-          .collection('activity_logs')
-          .orderBy('timestamp', descending: true)
-          .limit(100)
-          .get();
-
-      final logs = logsSnapshot.docs
-          .map((doc) => AdminLogModel.fromDocument(doc))
-          .toList();
-
-      setState(() {
-        _activityLogs = logs;
-        _isLoadingLogs = false;
-      });
-    } catch (e) {
-      print('Error loading activity logs: $e');
-      setState(() => _isLoadingLogs = false);
-    }
+  Future<void> _loadData() async {
+    await _controller.fetchAdminById(widget.adminId);
   }
 
-  List<AdminLogModel> get filteredLogs {
-    if (_selectedLogFilter == 'All') return _activityLogs;
 
-    return _activityLogs.where((log) {
-      switch (_selectedLogFilter) {
-        case 'Account':
-          return log.action.contains('login') ||
-              log.action.contains('logout') ||
-              log.action.contains('password');
-        case 'Data Changes':
-          return log.action.contains('create') ||
-              log.action.contains('update') ||
-              log.action.contains('delete');
-        case 'Settings':
-          return log.action.contains('settings') ||
-              log.action.contains('permission');
-        default:
-          return true;
-      }
-    }).toList();
-  }
 
   @override
   Widget build(BuildContext context) {
     final adminProvider = Provider.of<AdminAuthProvider>(context);
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Row(
-        children: [
-          // Sidebar - Fixed width on the left
-          AdminSidebar(
-            onPageChanged: (String page) {
-              // Always go back to AdminNavigator with the selected page
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                    builder: (context) => AdminNavigator(initialPage: page)
-                ),
-                    (route) => false,
-              );
-            },
-            currentPage: 'admins',
-            adminPermissions: adminProvider.permissions,
-          ),
 
-          // Main content area - Takes remaining space
-          Expanded(
-            child: Column(
-              children: [
-                const CustomTopBar(
-                  title: 'Admin',
-                  subtitle: 'Admin Details',
-                ),
-                // Admin Header Info
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Row(
+    return ChangeNotifierProvider<AdminDetailsController>.value(
+      value: _controller,
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        body: Consumer<AdminDetailsController>(
+          builder: (context, controller, child) {
+            // Handle loading state
+            if (controller.isLoading) {
+              return Row(
+                children: [
+                  AdminSidebar(
+                    onPageChanged: (String page) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                            builder: (context) => AdminNavigator(initialPage: page)
+                        ),
+                            (route) => false,
+                      );
+                    },
+                    currentPage: 'admins',
+                    adminPermissions: adminProvider.permissions,
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Handle error state
+            if (controller.error != null) {
+              return Row(
+                children: [
+                  AdminSidebar(
+                    onPageChanged: (String page) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                            builder: (context) => AdminNavigator(initialPage: page)
+                        ),
+                            (route) => false,
+                      );
+                    },
+                    currentPage: 'admins',
+                    adminPermissions: adminProvider.permissions,
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundColor: const Color(0xFF7C3AED).withOpacity(0.1),
-                            child: Text(
-                              widget.admin['name'][0].toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 36,
-                                color: Color(0xFF7C3AED),
-                                fontWeight: FontWeight.bold,
-                              ),
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.red[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            controller.error!,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.red[600],
                             ),
                           ),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => _loadData(),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Handle case where admin data is not available
+            if (!controller.hasData) {
+              return Row(
+                children: [
+                  AdminSidebar(
+                    onPageChanged: (String page) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                            builder: (context) => AdminNavigator(initialPage: page)
+                        ),
+                            (route) => false,
+                      );
+                    },
+                    currentPage: 'admins',
+                    adminPermissions: adminProvider.permissions,
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text('Admin not found'),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Main content when data is available
+            final admin = controller.admin!;
+            return Row(
+              children: [
+                // Sidebar - Fixed width on the left
+                AdminSidebar(
+                  onPageChanged: (String page) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                          builder: (context) => AdminNavigator(initialPage: page)
+                      ),
+                          (route) => false,
+                    );
+                  },
+                  currentPage: 'admins',
+                  adminPermissions: adminProvider.permissions,
+                ),
+
+                // Main content area - Takes remaining space
+                Expanded(
+                  child: Column(
+                    children: [
+                      const CustomTopBar(
+                        title: 'Admin',
+                        subtitle: 'Admin Details',
+                      ),
+                      // Admin Header Info
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      widget.admin['name'],
-                                      style: const TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: const Color(0xFF7C3AED).withOpacity(0.1),
+                                  child: Text(
+                                    admin.name[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 36,
+                                      color: Color(0xFF7C3AED),
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _getRoleColor(widget.admin['role']).withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        _formatRole(widget.admin['role']),
-                                        style: TextStyle(
-                                          color: _getRoleColor(widget.admin['role']),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  widget.admin['email'],
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.access_time,
-                                      size: 16,
-                                      color: Colors.grey[500],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Last active: ${widget.admin['lastActive']}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: widget.admin['isActive']
-                                            ? Colors.green.withOpacity(0.1)
-                                            : Colors.red.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          Container(
-                                            width: 6,
-                                            height: 6,
-                                            decoration: BoxDecoration(
-                                              color: widget.admin['isActive'] ? Colors.green : Colors.red,
-                                              shape: BoxShape.circle,
+                                          Text(
+                                            admin.name,
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            widget.admin['isActive'] ? 'Active' : 'Inactive',
-                                            style: TextStyle(
-                                              color: widget.admin['isActive'] ? Colors.green : Colors.red,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
+                                          const SizedBox(width: 12),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: _controller.getRoleColor(admin.role).withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              _controller.formatRole(admin.role),
+                                              style: TextStyle(
+                                                color: _controller.getRoleColor(admin.role),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        admin.email,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.access_time,
+                                            size: 16,
+                                            color: Colors.grey[500],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Last active: ${_controller.formatDateTime(admin.lastLogout)}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: admin.isEnabled
+                                                  ? Colors.green.withOpacity(0.1)
+                                                  : Colors.red.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 6,
+                                                  height: 6,
+                                                  decoration: BoxDecoration(
+                                                    color: admin.isEnabled ? Colors.green : Colors.red,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  admin.isEnabled ? 'Active' : 'Inactive',
+                                                  style: TextStyle(
+                                                    color: admin.isEnabled ? Colors.green : Colors.red,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+
+                      // Tab Bar
+                      Container(
+                        color: Colors.white,
+                        child: TabBar(
+                          controller: _tabController,
+                          labelColor: const Color(0xFF7C3AED),
+                          unselectedLabelColor: Colors.grey[600],
+                          indicatorColor: const Color(0xFF7C3AED),
+                          tabs: const [
+                            Tab(text: 'Overview'),
+                            Tab(text: 'Permissions'),
+                            Tab(text: 'Activity Log'),
+                          ],
+                        ),
+                      ),
+
+                      // Tab Content
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            // Overview Tab
+                            _buildOverviewTab(admin),
+                            // Permissions Tab
+                            _buildPermissionsTab(admin),
+                            // Activity Log Tab
+                            _buildActivityLogTab(),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // Tab Bar
-                Container(
-                  color: Colors.white,
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: const Color(0xFF7C3AED),
-                    unselectedLabelColor: Colors.grey[600],
-                    indicatorColor: const Color(0xFF7C3AED),
-                    tabs: const [
-                      Tab(text: 'Overview'),
-                      Tab(text: 'Permissions'),
-                      Tab(text: 'Activity Log'),
-                    ],
-                  ),
-                ),
-
-                // Tab Content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // Overview Tab
-                      _buildOverviewTab(),
-                      // Permissions Tab
-                      _buildPermissionsTab(),
-                      // Activity Log Tab
-                      _buildActivityLogTab(),
-                    ],
-                  ),
-                ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildOverviewTab() {
+  Widget _buildOverviewTab(AdminModel admin) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -287,7 +359,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Admin ID',
-                  '#${widget.adminId}',
+                  '#${admin.id}',
                   Icons.fingerprint,
                   Colors.blue,
                 ),
@@ -296,7 +368,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Created Date',
-                  '3 months ago',
+                  admin.createdAt.toString(),
                   Icons.calendar_today,
                   Colors.orange,
                 ),
@@ -305,7 +377,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Total Actions',
-                  '${_activityLogs.length}',
+                  '${_controller.activityLogs?.length ?? 0}',
                   Icons.analytics,
                   Colors.green,
                 ),
@@ -339,11 +411,11 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildDetailRow('Email', widget.admin['email'], Icons.email),
+                _buildDetailRow('Email', admin.email, Icons.email),
                 const Divider(height: 24),
-                _buildDetailRow('Phone', widget.admin['phone'] ?? 'Not provided', Icons.phone),
+                _buildDetailRow('Phone','Not provided', Icons.phone), // admin.phone ??
                 const Divider(height: 24),
-                _buildDetailRow('Department', widget.admin['department'] ?? 'Not assigned', Icons.business),
+                _buildDetailRow('Department', 'Not assigned', Icons.business),  //admin.department ??
               ],
             ),
           ),
@@ -374,7 +446,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildActivitySummaryItem('Last Login', widget.admin['lastActive'], Icons.login),
+                _buildActivitySummaryItem('Last Login', _controller.formatDateTime(admin.lastLogin), Icons.login),
                 const SizedBox(height: 12),
                 _buildActivitySummaryItem('Total Logins This Month', '45', Icons.timeline),
                 const SizedBox(height: 12),
@@ -387,8 +459,8 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
     );
   }
 
-  Widget _buildPermissionsTab() {
-    final rolePermissions = _getRolePermissions(widget.admin['role']);
+  Widget _buildPermissionsTab(AdminModel admin) {
+    final rolePermissions = _controller.getRolePermissions(admin.role);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -423,7 +495,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Based on ${_formatRole(widget.admin['role'])} role',
+                      'Based on ${_controller.formatRole(admin.role)} role',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],
@@ -451,6 +523,8 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
     );
   }
 
+
+// Updated _buildActivityLogTab method
   Widget _buildActivityLogTab() {
     return Column(
       children: [
@@ -471,28 +545,27 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                 'Data Changes',
                 'Settings',
               ].map((filter) {
-                final isActive = _selectedLogFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: FilterChip(
                     label: Text(filter),
-                    selected: isActive,
+                      selected: _controller.selectedLogFilter == filter,
                     onSelected: (selected) {
-                      setState(() {
-                        _selectedLogFilter = filter;
-                      });
+                      _controller.selectedLogFilter = filter;
                     },
                     selectedColor: const Color(0xFF7C3AED).withOpacity(0.2),
                     checkmarkColor: const Color(0xFF7C3AED),
                     labelStyle: TextStyle(
-                      color: isActive ? const Color(0xFF7C3AED) : Colors.grey[700],
+                      color: _controller.selectedLogFilter == filter
+                          ? const Color(0xFF7C3AED)
+                          : Colors.grey[700], // Also update this condition
                     ),
                   ),
                 );
               }).toList(),
               const Spacer(),
               TextButton.icon(
-                onPressed: _loadActivityLogs,
+                onPressed: () => _controller.loadActivityLogs(widget.adminId),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Refresh'),
               ),
@@ -500,48 +573,95 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
           ),
         ),
 
-        // Activity Log List
+        // Activity Log List with Details Panel
         Expanded(
-          child: _isLoadingLogs
-              ? const Center(child: CircularProgressIndicator())
-              : filteredLogs.isEmpty
-              ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'No activity logs found',
-                  style: TextStyle(color: Colors.grey[600]),
+          child: Row(
+            children: [
+              // Main log list
+              Expanded(
+                flex: _showDetailsPanel ? 6 : 10,
+                child: _controller.isLoadingLogs
+                    ? const Center(child: CircularProgressIndicator())
+                    : _controller.filteredLogs.isEmpty
+                    ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history, size: 64, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No activity logs found',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                )
+                    : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(20),
+                  itemCount: _controller.filteredLogs.length,
+                  itemBuilder: (context, index) {
+                    final log = _controller.filteredLogs[index];
+                    return _buildLogItemWithSelection(log);
+                  },
                 ),
-              ],
-            ),
-          )
-              : ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(20),
-            itemCount: filteredLogs.length,
-            itemBuilder: (context, index) {
-              final log = filteredLogs[index];
-              return _buildLogItem(log);
-            },
+              ),
+
+              // Resizable divider
+              if (_showDetailsPanel)
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        _detailsPanelWidth = (_detailsPanelWidth - details.delta.dx)
+                            .clamp(_minPanelWidth, _maxPanelWidth);
+                      });
+                    },
+                    child: Container(
+                      width: 8,
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: Container(
+                          width: 2,
+                          height: 30,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Details Panel
+              if (_showDetailsPanel)
+                Container(
+                  width: _detailsPanelWidth,
+                  color: Colors.white,
+                  child: _buildDetailsPanel(),
+                ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLogItem(AdminLogModel log) {
-    final icon = _getLogIcon(log.action);
-    final color = _getLogColor(log.action);
+
+// Updated log item with selection capability
+  Widget _buildLogItemWithSelection(AdminActivityLog log) {
+    final icon = _controller.getLogIcon(log.action);
+    final color = _controller.getLogColor(log.action);
+    final isSelected = _selectedLog?.id == log.id;
+    final hasDetails = log.details != null && log.details!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
+        border: isSelected
+            ? Border.all(color: const Color(0xFF7C3AED), width: 2)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -550,65 +670,271 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  log.action,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
+      child: InkWell(
+        onTap: hasDetails ? () => _selectLog(log) : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                if (log.details != null && log.details!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      log.action,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (hasDetails) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: Colors.grey[500],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${log.details!.length} detail${log.details!.length > 1 ? 's' : ''} available',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7C3AED).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Selected',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF7C3AED),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   Text(
-                    _formatLogDetails(log.details!),
+                    DateFormat('MMM d, y').format(log.timestamp),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    DateFormat('h:mm a').format(log.timestamp),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
                   ),
                 ],
+              ),
+              if (hasDetails) ...[
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: isSelected ? const Color(0xFF7C3AED) : Colors.grey[400],
+                ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+// Method to select a log and show details panel
+  void _selectLog(AdminActivityLog log) {
+    setState(() {
+      _selectedLog = log;
+      _showDetailsPanel = true;
+    });
+  }
+
+// Details panel widget
+  Widget _buildDetailsPanel() {
+    if (_selectedLog == null) return const SizedBox();
+
+    final log = _selectedLog!;
+    final icon = _controller.getLogIcon(log.action);
+    final color = _controller.getLogColor(log.action);
+
+    return Column(
+      children: [
+        // Panel Header
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.05),
+            border: Border(
+              bottom: BorderSide(color: Colors.grey[200]!),
             ),
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Activity Details',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _showDetailsPanel = false;
+                        _selectedLog = null;
+                      });
+                    },
+                    icon: const Icon(Icons.close),
+                    iconSize: 20,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Text(
-                DateFormat('MMM d, y').format(log.timestamp),
+                log.action,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                DateFormat('EEEE, MMM d, y • h:mm:ss a').format(log.timestamp),
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
                 ),
               ),
-              Text(
-                DateFormat('h:mm a').format(log.timestamp),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
-              ),
             ],
           ),
-        ],
-      ),
+        ),
+
+        // Panel Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (log.details != null && log.details!.isNotEmpty) ...[
+                  Text(
+                    'Details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ...log.details!.entries.map((entry) => Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: SelectableText(
+                            entry.value?.toString() ?? 'N/A',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ] else ...[
+                  Center(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 40),
+                        Icon(
+                          Icons.info_outline,
+                          size: 48,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No additional details available',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -738,110 +1064,6 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
     );
   }
 
-  IconData _getLogIcon(String action) {
-    if (action.contains('login')) return Icons.login;
-    if (action.contains('logout')) return Icons.logout;
-    if (action.contains('create')) return Icons.add_circle;
-    if (action.contains('update')) return Icons.edit;
-    if (action.contains('delete')) return Icons.delete;
-    if (action.contains('view')) return Icons.visibility;
-    if (action.contains('settings')) return Icons.settings;
-    if (action.contains('permission')) return Icons.security;
-    return Icons.circle;
-  }
-
-  Color _getLogColor(String action) {
-    if (action.contains('login') || action.contains('logout')) return Colors.blue;
-    if (action.contains('create')) return Colors.green;
-    if (action.contains('update')) return Colors.orange;
-    if (action.contains('delete')) return Colors.red;
-    if (action.contains('settings') || action.contains('permission')) return Colors.purple;
-    return Colors.grey;
-  }
-
-  String _formatLogDetails(Map<String, dynamic> details) {
-    final List<String> parts = [];
-    details.forEach((key, value) {
-      if (value != null) {
-        parts.add('$key: $value');
-      }
-    });
-    return parts.join(', ');
-  }
-
-  String _formatRole(String role) {
-    switch (role) {
-      case 'super_admin':
-        return 'Super Admin';
-      case 'admin':
-        return 'Admin';
-      case 'manager':
-        return 'Manager';
-      case 'support':
-        return 'Support';
-      case 'viewer':
-        return 'Viewer';
-      default:
-        return role;
-    }
-  }
-
-  Color _getRoleColor(String role) {
-    switch (role) {
-      case 'super_admin':
-        return Colors.purple;
-      case 'admin':
-        return Colors.blue;
-      case 'manager':
-        return Colors.orange;
-      case 'support':
-        return Colors.green;
-      case 'viewer':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  List<String> _getRolePermissions(String role) {
-    // This should come from your actual permissions system
-    switch (role) {
-      case 'super_admin':
-        return [
-          'Full system access',
-          'Manage all admins',
-          'View all data',
-          'Modify system settings',
-          'Access audit logs',
-        ];
-      case 'admin':
-        return [
-          'Manage users',
-          'View reports',
-          'Modify content',
-          'Access analytics',
-        ];
-      case 'manager':
-        return [
-          'View reports',
-          'Manage team',
-          'Approve requests',
-        ];
-      case 'support':
-        return [
-          'View user data',
-          'Handle support tickets',
-          'Basic modifications',
-        ];
-      case 'viewer':
-        return [
-          'View data only',
-          'Generate reports',
-        ];
-      default:
-        return [];
-    }
-  }
 
   void _showEditDialog() {
     // Implement edit dialog
@@ -852,7 +1074,14 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset Password'),
-        content: Text('Send password reset email to ${widget.admin['email']}?'),
+        content: Consumer<AdminDetailsController>(
+          builder: (context, controller, child) {
+            if (controller.hasData) {
+              return Text('Send password reset email to ${controller.admin!.email}?');
+            }
+            return const Text('Loading admin data...');
+          },
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -876,24 +1105,28 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
   }
 
   void _toggleAdminStatus() {
-    setState(() {
-      widget.admin['isActive'] = !widget.admin['isActive'];
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.admin['isActive']
-              ? 'Admin activated successfully'
-              : 'Admin deactivated successfully',
+    // This would need to be implemented in the controller
+    // For now, showing a placeholder implementation
+    final controller = _controller;
+    if (controller.hasData) {
+      final currentStatus = controller.admin!.isEnabled;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            !currentStatus
+                ? 'Admin would be activated (implement in controller)'
+                : 'Admin would be deactivated (implement in controller)',
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _scrollController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 }

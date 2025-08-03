@@ -6,8 +6,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:html' as html;
 
 import '../../../model/category_model.dart';
+import '../login/activity_logger_mixin.dart';
 
-class ProductAdditionController {
+class ProductAdditionController extends ChangeNotifier with ActivityLoggerMixin{
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
 
@@ -202,6 +203,19 @@ class ProductAdditionController {
         'updatedAt':  FieldValue.serverTimestamp(),
       };
 
+      final docRef = await firestore.collection('products').add(productData);
+
+      // Log the creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'product',
+        targetId: docRef.id,
+        targetName: productData['productName']?.toString() ?? 'Unknown',
+        changes: productData,
+      );
+
+      notifyListeners();
+
       if (virtualTryOnData != null) {
         productData['virtualTryOn'] = virtualTryOnData;
       }
@@ -217,6 +231,16 @@ class ProductAdditionController {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding product: \$e')),
       );
+
+      await logCrud(
+        operation: 'create',
+        targetType: 'product',
+        targetId: 'failed_creation',
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+
     } finally {
       isLoading = false;
       onUpdate();

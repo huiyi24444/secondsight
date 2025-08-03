@@ -318,7 +318,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => AdminDetailsPage(admin: admin, adminId: 'id'),
+                                builder: (context) => AdminDetailsPage(adminId: admin['id']),
                               ),
                             );
                           },

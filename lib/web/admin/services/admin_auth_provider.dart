@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../model/admin_log_model.dart';
+import '../../../model/admin_model.dart';
+import '../login/admin_session_service.dart';
+
 class AdminAuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -45,13 +49,15 @@ class AdminAuthProvider with ChangeNotifier {
     });
   }
 
+
+
   // Clear error message
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  // Check if the current user is an admin
+  //check if user is an admin
   Future<void> _checkAdminStatus() async {
     if (_user == null) {
       _isAdmin = false;
@@ -61,7 +67,6 @@ class AdminAuthProvider with ChangeNotifier {
     }
 
     try {
-      // Check in the admins collection
       final adminDoc = await _firestore
           .collection('admins')
           .doc(_user!.uid)
@@ -70,9 +75,23 @@ class AdminAuthProvider with ChangeNotifier {
       if (adminDoc.exists) {
         _isAdmin = true;
         _adminData = adminDoc.data();
-
-        // NEW: Check Firestore verification status
         _isFirestoreVerified = _adminData?['isVerified'] ?? false;
+
+        // SET UP ADMIN SESSION for logging
+        AdminSessionService.instance.setCurrentAdmin(
+          AdminModel(
+            id: _user!.uid,
+            email: _adminData?['email'] ?? _user!.email ?? '',
+            name: _adminData?['name'] ?? _user!.displayName ?? '',
+            role: _adminData?['role'] ?? 'viewer',
+            isAdmin: _adminData?['isAdmin'] ?? false,
+            isVerified: _adminData?['isVerified'] ?? false,
+            isEnabled: _adminData?['isEnabled'] ?? true,
+            permissions: List<String>.from(_adminData?['permissions'] ?? []),
+            createdAt: (_adminData?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          ),
+        );
+
 
         // Update last login timestamp
         await _firestore
@@ -185,6 +204,16 @@ class AdminAuthProvider with ChangeNotifier {
       await _checkAdminStatus();
 
       if (!_isAdmin) {
+        // LOG FAILED LOGIN - Not an admin
+        await AdminActivityLogger.logLogin(
+          adminId: _user?.uid ?? 'unknown',
+          adminEmail: email,
+          adminName: 'Non-admin user',
+          adminRole: 'none',
+          isSuccessful: false,
+          errorMessage: 'Access denied - not an admin',
+        );
+
         // If not an admin, sign out immediately
         await _auth.signOut();
         _user = null;
@@ -193,6 +222,16 @@ class AdminAuthProvider with ChangeNotifier {
         notifyListeners();
         return false;
       }
+
+      // LOG SUCCESSFUL LOGIN
+      await AdminActivityLogger.logLogin(
+        adminId: _user!.uid,
+        adminEmail: _adminData?['email'] ?? email,
+        adminName: _adminData?['name'] ?? _user!.displayName ?? 'Unknown',
+        adminRole: _adminData?['role'] ?? 'viewer',
+        isSuccessful: true,
+      );
+
 
       // Sync verification status
       await syncVerificationStatus();
@@ -214,6 +253,7 @@ class AdminAuthProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+
     } on FirebaseAuthException catch (e) {
       _isLoading = false;
 
@@ -236,11 +276,32 @@ class AdminAuthProvider with ChangeNotifier {
         default:
           _errorMessage = 'Login failed. Please try again.';
       }
+
+      await AdminActivityLogger.logLogin(
+        adminId: 'unknown',
+        adminEmail: email,
+        adminName: 'Unknown',
+        adminRole: 'unknown',
+        isSuccessful: false,
+        errorMessage: _errorMessage,
+      );
+
       notifyListeners();
       return false;
     } catch (e) {
       _isLoading = false;
       _errorMessage = 'An unexpected error occurred: ${e.toString()}';
+
+    // LOG FAILED LOGIN - Unexpected error
+    await AdminActivityLogger.logLogin(
+    adminId: 'unknown',
+    adminEmail: email,
+    adminName: 'Unknown',
+    adminRole: 'unknown',
+    isSuccessful: false,
+    errorMessage: _errorMessage,
+    );
+
       notifyListeners();
       return false;
     }
@@ -252,8 +313,19 @@ class AdminAuthProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // Update last logout timestamp
-      if (_user != null && _isAdmin) {
+      // LOG LOGOUT before clearing session
+      if (_user != null && _isAdmin && _adminData != null) {
+        await AdminActivityLogger.log(
+          adminId: _user!.uid,
+          adminEmail: _adminData?['email'] ?? _user!.email ?? '',
+          adminName: _adminData?['name'] ?? _user!.displayName ?? '',
+          adminRole: _adminData?['role'] ?? 'viewer',
+          action: 'logout',
+          actionType: 'auth',
+          targetType: 'session',
+        );
+
+        // Update last logout timestamp
         await _firestore
             .collection('admins')
             .doc(_user!.uid)
@@ -263,6 +335,10 @@ class AdminAuthProvider with ChangeNotifier {
       }
 
       await _auth.signOut();
+
+      // Clear admin session
+      AdminSessionService.instance.clearSession();
+
       _user = null;
       _isAdmin = false;
       _adminData = null;
@@ -286,13 +362,19 @@ class AdminAuthProvider with ChangeNotifier {
     try {
       if (_user == null || !_isAdmin) return false;
 
+      // Store old values for logging
+      final oldName = _adminData?['name'] ?? _user!.displayName;
+      final changes = <String, dynamic>{};
+
       // Update Firebase Auth profile
-      if (displayName != null) {
+      if (displayName != null && displayName != oldName) {
         await _user!.updateDisplayName(displayName);
+        changes['name'] = {'old': oldName, 'new': displayName};
       }
 
       if (photoURL != null) {
         await _user!.updatePhotoURL(photoURL);
+        changes['photoURL'] = {'old': _adminData?['photoURL'], 'new': photoURL};
       }
 
       // Update Firestore admin document
@@ -308,6 +390,7 @@ class AdminAuthProvider with ChangeNotifier {
 
       if (additionalData != null) {
         updateData.addAll(additionalData);
+        changes['additionalData'] = additionalData;
       }
 
       if (updateData.isNotEmpty) {
@@ -317,6 +400,19 @@ class AdminAuthProvider with ChangeNotifier {
             .collection('admins')
             .doc(_user!.uid)
             .update(updateData);
+
+        // LOG PROFILE UPDATE
+        await AdminActivityLogger.log(
+          adminId: _user!.uid,
+          adminEmail: _adminData?['email'] ?? _user!.email ?? '',
+          adminName: _adminData?['name'] ?? _user!.displayName ?? '',
+          adminRole: _adminData?['role'] ?? 'viewer',
+          action: 'update_profile',
+          actionType: 'settings',
+          targetType: 'admin_profile',
+          targetId: _user!.uid,
+          details: changes,
+        );
       }
 
       await _user!.reload();
@@ -327,12 +423,28 @@ class AdminAuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Failed to update profile: ${e.toString()}';
+
+      // LOG FAILED PROFILE UPDATE
+      await AdminActivityLogger.log(
+        adminId: _user?.uid ?? 'unknown',
+        adminEmail: _adminData?['email'] ?? _user?.email ?? '',
+        adminName: _adminData?['name'] ?? _user?.displayName ?? '',
+        adminRole: _adminData?['role'] ?? 'viewer',
+        action: 'update_profile',
+        actionType: 'settings',
+        targetType: 'admin_profile',
+        targetId: _user?.uid,
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+
       notifyListeners();
       return false;
     }
   }
 
-  // Change admin password
+
+  // MODIFIED changePassword method with logging
   Future<bool> changePassword(String currentPassword, String newPassword) async {
     try {
       if (_user == null || _user!.email == null) return false;
@@ -360,9 +472,22 @@ class AdminAuthProvider with ChangeNotifier {
         'passwordChangedAt': FieldValue.serverTimestamp(),
       });
 
+      // LOG PASSWORD CHANGE
+      await AdminActivityLogger.log(
+        adminId: _user!.uid,
+        adminEmail: _adminData?['email'] ?? _user!.email ?? '',
+        adminName: _adminData?['name'] ?? _user!.displayName ?? '',
+        adminRole: _adminData?['role'] ?? 'viewer',
+        action: 'password_changed',
+        actionType: 'auth',
+        targetType: 'account_security',
+        targetId: _user!.uid,
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;
+
     } on FirebaseAuthException catch (e) {
       _isLoading = false;
 
@@ -379,6 +504,21 @@ class AdminAuthProvider with ChangeNotifier {
         default:
           _errorMessage = 'Failed to change password. Please try again.';
       }
+
+      // LOG FAILED PASSWORD CHANGE
+      await AdminActivityLogger.log(
+        adminId: _user!.uid,
+        adminEmail: _adminData?['email'] ?? _user!.email ?? '',
+        adminName: _adminData?['name'] ?? _user!.displayName ?? '',
+        adminRole: _adminData?['role'] ?? 'viewer',
+        action: 'password_change_failed',
+        actionType: 'auth',
+        targetType: 'account_security',
+        targetId: _user!.uid,
+        isSuccessful: false,
+        errorMessage: _errorMessage,
+      );
+
       notifyListeners();
       return false;
     } catch (e) {
@@ -389,7 +529,8 @@ class AdminAuthProvider with ChangeNotifier {
     }
   }
 
-  // Send password reset email
+
+  // MODIFIED resetPassword method with logging
   Future<bool> resetPassword(String email) async {
     try {
       _isLoading = true;
@@ -410,11 +551,27 @@ class AdminAuthProvider with ChangeNotifier {
         return false;
       }
 
+      final adminDoc = querySnapshot.docs.first;
+      final adminData = adminDoc.data();
+
       await _auth.sendPasswordResetEmail(email: email);
+
+      // LOG PASSWORD RESET REQUEST
+      await AdminActivityLogger.log(
+        adminId: adminDoc.id,
+        adminEmail: email,
+        adminName: adminData['name'] ?? 'Unknown',
+        adminRole: adminData['role'] ?? 'viewer',
+        action: 'password_reset_requested',
+        actionType: 'auth',
+        targetType: 'account_security',
+        targetId: adminDoc.id,
+      );
 
       _isLoading = false;
       notifyListeners();
       return true;
+
     } on FirebaseAuthException catch (e) {
       _isLoading = false;
 
@@ -437,6 +594,7 @@ class AdminAuthProvider with ChangeNotifier {
       return false;
     }
   }
+
 
   // Get admin permissions
   List<String> get permissions {
