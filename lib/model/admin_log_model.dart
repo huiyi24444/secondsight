@@ -22,8 +22,8 @@ class AdminLogModel {
       id: doc.id,
       action: data['action'] ?? '',
       timestamp: (data['timestamp'] as Timestamp).toDate(),
-      details: data['details'] != null ? Map<String, dynamic>.from(data['details']) : null,
-      adminId: data['adminId'], // Only needed if used in global logs
+      details: data['details'] != null ? Map<String, dynamic>.from(data['details']) : null, //stored in array in firebase document
+      adminId: data['adminId'],
     );
   }
 
