@@ -176,43 +176,25 @@ class AdminDetailsController extends ChangeNotifier {
     }
   }
 
-  List<String> getRolePermissions(String role) {
-    // This should come from your actual permissions system
-    switch (role) {
-      case 'super_admin':
-        return [
-          'Full system access',
-          'Manage all admins',
-          'View all data',
-          'Modify system settings',
-          'Access audit logs',
-        ];
-      case 'admin':
-        return [
-          'Manage users',
-          'View reports',
-          'Modify content',
-          'Access analytics',
-        ];
-      case 'manager':
-        return [
-          'View reports',
-          'Manage team',
-          'Approve requests',
-        ];
-      case 'support':
-        return [
-          'View user data',
-          'Handle support tickets',
-          'Basic modifications',
-        ];
-      case 'viewer':
-        return [
-          'View data only',
-          'Generate reports',
-        ];
-      default:
+  Future<List<String>> getRolePermissions(String adminId) async {
+    try {
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(adminId)
+          .get();
+
+      if (adminDoc.exists) {
+        final data = adminDoc.data();
+        final permissions = List<String>.from(data?['permissions'] ?? []);
+        debugPrint('Fetched permissions for admin $adminId: $permissions');
+        return permissions;
+      } else {
+        debugPrint('Admin document not found for ID: $adminId');
         return [];
+      }
+    } catch (e) {
+      debugPrint('Error fetching permissions for admin $adminId: $e');
+      return [];
     }
   }
 

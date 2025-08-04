@@ -279,7 +279,6 @@ class PermissionExampleScreen extends StatelessWidget {
             // Multiple permissions (require all)
             PermissionGuard(
               requiredPermissions: [
-                AdminPermissions.viewFinancials,
                 AdminPermissions.exportReports,
               ],
               requireAll: true,

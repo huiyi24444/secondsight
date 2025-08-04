@@ -46,7 +46,7 @@ class AdminApp extends StatelessWidget {
         '/admin/login': (context) => AdminLoginView(),
         '/conversations': (context) => AdminAuthWrapper(
           authenticatedWidget: PermissionGuard(
-            requiredPermissions: [AdminPermissions.viewSupport],
+            requiredPermissions: [AdminPermissions.viewConversations],
             child: const AdminChatView(),
             fallback: NoPermissionWidget(feature: 'Customer Support'), // ✅ FIXED HERE
           ),

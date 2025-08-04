@@ -460,68 +460,80 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
   }
 
   Widget _buildPermissionsTab(AdminModel admin) {
-    final rolePermissions = _controller.getRolePermissions(admin.role);
+    return FutureBuilder<List<String>>(
+      future: _controller.getRolePermissions(admin.id), // Use admin.id instead of role
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error loading permissions: ${snapshot.error}'));
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 5,
+        final rolePermissions = snapshot.data ?? [];
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Current Permissions',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Current Permissions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Based on ${_controller.formatRole(admin.role)} role',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Based on ${_controller.formatRole(admin.role)} role',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // Edit permissions
+                      },
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Edit Permissions'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
                       ),
                     ),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Edit permissions
-                  },
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Edit Permissions'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                  ),
-                ),
+                const SizedBox(height: 24),
+                ...rolePermissions.map((permission) => _buildPermissionItem(permission)),
               ],
             ),
-            const SizedBox(height: 24),
-            ...rolePermissions.map((permission) => _buildPermissionItem(permission)),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
+
 
 
 // Updated _buildActivityLogTab method

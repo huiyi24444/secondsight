@@ -7,7 +7,6 @@ class AdminPermissions {
   static const String viewUsers = 'view_users';
   static const String createUsers = 'create_users';
   static const String editUsers = 'edit_users';
-  static const String deleteUsers = 'delete_users';
 
   // Product Management
   static const String viewProducts = 'view_products';
@@ -19,16 +18,14 @@ class AdminPermissions {
   static const String viewOrders = 'view_orders';
   static const String processOrders = 'process_orders';
   static const String cancelOrders = 'cancel_orders';
-  static const String refundOrders = 'refund_orders';
+  //static const String refundOrders = 'refund_orders';
 
   // Category Management
   static const String viewCategories = 'view_categories';
   static const String manageCategories = 'manage_categories';
 
   // Customer Support
-  static const String viewSupport = 'view_support';
-  static const String respondSupport = 'respond_support';
-  static const String closeSupport = 'close_support';
+  static const String viewConversations = 'view_conversations';
 
   // Analytics & Reports
   static const String viewAnalytics = 'view_analytics';
@@ -38,21 +35,20 @@ class AdminPermissions {
   static const String viewAdmins = 'view_admins';
   static const String createAdmins = 'create_admins';
   static const String editAdmins = 'edit_admins';
-  static const String deleteAdmins = 'delete_admins';
   static const String managePermissions = 'manage_permissions';
 
   // System Settings
-  static const String viewSettings = 'view_settings';
-  static const String editSettings = 'edit_settings';
+  //static const String viewSettings = 'view_settings';
+  //static const String editSettings = 'edit_settings';
 
   // Financial
-  static const String viewFinancials = 'view_financials';
-  static const String processPayments = 'process_payments';
+  //static const String viewFinancials = 'view_financials';
+  //static const String processPayments = 'process_payments';
 
   // Marketing
-  static const String viewMarketing = 'view_marketing';
-  static const String managePromotions = 'manage_promotions';
-  static const String sendNotifications = 'send_notifications';
+  //static const String viewMarketing = 'view_marketing';
+  //static const String managePromotions = 'manage_promotions';
+  //static const String sendNotifications = 'send_notifications';
 }
 
 /// Defines admin roles and their default permissions
@@ -66,7 +62,6 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.createUsers,
         AdminPermissions.editUsers,
-        AdminPermissions.deleteUsers,
         AdminPermissions.viewProducts,
         AdminPermissions.createProducts,
         AdminPermissions.editProducts,
@@ -74,26 +69,15 @@ class AdminRoles {
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
         AdminPermissions.cancelOrders,
-        AdminPermissions.refundOrders,
         AdminPermissions.viewCategories,
         AdminPermissions.manageCategories,
-        AdminPermissions.viewSupport,
-        AdminPermissions.respondSupport,
-        AdminPermissions.closeSupport,
+        AdminPermissions.viewConversations,
         AdminPermissions.viewAnalytics,
         AdminPermissions.exportReports,
         AdminPermissions.viewAdmins,
         AdminPermissions.createAdmins,
         AdminPermissions.editAdmins,
-        AdminPermissions.deleteAdmins,
         AdminPermissions.managePermissions,
-        AdminPermissions.viewSettings,
-        AdminPermissions.editSettings,
-        AdminPermissions.viewFinancials,
-        AdminPermissions.processPayments,
-        AdminPermissions.viewMarketing,
-        AdminPermissions.managePromotions,
-        AdminPermissions.sendNotifications,
       ],
     ),
     'admin': AdminRole(
@@ -109,18 +93,10 @@ class AdminRoles {
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
         AdminPermissions.cancelOrders,
-        AdminPermissions.refundOrders,
         AdminPermissions.viewCategories,
         AdminPermissions.manageCategories,
-        AdminPermissions.viewSupport,
-        AdminPermissions.respondSupport,
-        AdminPermissions.closeSupport,
         AdminPermissions.viewAnalytics,
         AdminPermissions.exportReports,
-        AdminPermissions.viewSettings,
-        AdminPermissions.viewFinancials,
-        AdminPermissions.viewMarketing,
-        AdminPermissions.managePromotions,
       ],
     ),
     'manager': AdminRole(
@@ -134,10 +110,7 @@ class AdminRoles {
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
         AdminPermissions.viewCategories,
-        AdminPermissions.viewSupport,
-        AdminPermissions.respondSupport,
         AdminPermissions.viewAnalytics,
-        AdminPermissions.viewMarketing,
       ],
     ),
     'support': AdminRole(
@@ -147,8 +120,6 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.viewProducts,
         AdminPermissions.viewOrders,
-        AdminPermissions.viewSupport,
-        AdminPermissions.respondSupport,
       ],
     ),
     'viewer': AdminRole(
@@ -159,7 +130,6 @@ class AdminRoles {
         AdminPermissions.viewProducts,
         AdminPermissions.viewOrders,
         AdminPermissions.viewCategories,
-        AdminPermissions.viewSupport,
         AdminPermissions.viewAnalytics,
       ],
     ),
@@ -188,7 +158,6 @@ class PermissionGroups {
         AdminPermissions.viewUsers,
         AdminPermissions.createUsers,
         AdminPermissions.editUsers,
-        AdminPermissions.deleteUsers,
       ],
     ),
     'products': PermissionGroup(
@@ -208,16 +177,12 @@ class PermissionGroups {
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
         AdminPermissions.cancelOrders,
-        AdminPermissions.refundOrders,
       ],
     ),
     'support': PermissionGroup(
       name: 'Customer Support',
       icon: Icons.support_agent,
       permissions: [
-        AdminPermissions.viewSupport,
-        AdminPermissions.respondSupport,
-        AdminPermissions.closeSupport,
       ],
     ),
     'analytics': PermissionGroup(
@@ -235,7 +200,6 @@ class PermissionGroups {
         AdminPermissions.viewAdmins,
         AdminPermissions.createAdmins,
         AdminPermissions.editAdmins,
-        AdminPermissions.deleteAdmins,
         AdminPermissions.managePermissions,
       ],
     ),
@@ -243,25 +207,18 @@ class PermissionGroups {
       name: 'System Settings',
       icon: Icons.settings,
       permissions: [
-        AdminPermissions.viewSettings,
-        AdminPermissions.editSettings,
       ],
     ),
     'financial': PermissionGroup(
       name: 'Financial',
       icon: Icons.attach_money,
       permissions: [
-        AdminPermissions.viewFinancials,
-        AdminPermissions.processPayments,
       ],
     ),
     'marketing': PermissionGroup(
       name: 'Marketing',
       icon: Icons.campaign,
       permissions: [
-        AdminPermissions.viewMarketing,
-        AdminPermissions.managePromotions,
-        AdminPermissions.sendNotifications,
       ],
     ),
   };
@@ -288,7 +245,6 @@ class PermissionHelper {
       AdminPermissions.viewUsers: 'View Users',
       AdminPermissions.createUsers: 'Create Users',
       AdminPermissions.editUsers: 'Edit Users',
-      AdminPermissions.deleteUsers: 'Delete Users',
 
       // Products
       AdminPermissions.viewProducts: 'View Products',
@@ -300,16 +256,10 @@ class PermissionHelper {
       AdminPermissions.viewOrders: 'View Orders',
       AdminPermissions.processOrders: 'Process Orders',
       AdminPermissions.cancelOrders: 'Cancel Orders',
-      AdminPermissions.refundOrders: 'Process Refunds',
 
       // Categories
       AdminPermissions.viewCategories: 'View Categories',
       AdminPermissions.manageCategories: 'Manage Categories',
-
-      // Support
-      AdminPermissions.viewSupport: 'View Support Tickets',
-      AdminPermissions.respondSupport: 'Respond to Support',
-      AdminPermissions.closeSupport: 'Close Support Tickets',
 
       // Analytics
       AdminPermissions.viewAnalytics: 'View Analytics',
@@ -319,21 +269,7 @@ class PermissionHelper {
       AdminPermissions.viewAdmins: 'View Admins',
       AdminPermissions.createAdmins: 'Create Admins',
       AdminPermissions.editAdmins: 'Edit Admins',
-      AdminPermissions.deleteAdmins: 'Delete Admins',
       AdminPermissions.managePermissions: 'Manage Permissions',
-
-      // Settings
-      AdminPermissions.viewSettings: 'View Settings',
-      AdminPermissions.editSettings: 'Edit Settings',
-
-      // Financial
-      AdminPermissions.viewFinancials: 'View Financials',
-      AdminPermissions.processPayments: 'Process Payments',
-
-      // Marketing
-      AdminPermissions.viewMarketing: 'View Marketing',
-      AdminPermissions.managePromotions: 'Manage Promotions',
-      AdminPermissions.sendNotifications: 'Send Notifications',
     };
 
     return permissionNames[permission] ?? permission;
@@ -345,7 +281,6 @@ class PermissionHelper {
       AdminPermissions.viewUsers: 'View user profiles and account information',
       AdminPermissions.createUsers: 'Create new user accounts',
       AdminPermissions.editUsers: 'Modify user information and settings',
-      AdminPermissions.deleteUsers: 'Remove user accounts from the system',
 
       AdminPermissions.viewProducts: 'View product listings and details',
       AdminPermissions.createProducts: 'Add new products to the catalog',
@@ -355,10 +290,8 @@ class PermissionHelper {
       AdminPermissions.viewOrders: 'View customer orders and order details',
       AdminPermissions.processOrders: 'Update order status and process shipments',
       AdminPermissions.cancelOrders: 'Cancel pending or processing orders',
-      AdminPermissions.refundOrders: 'Issue refunds for completed orders',
 
       AdminPermissions.managePermissions: 'Assign and modify admin permissions',
-      AdminPermissions.sendNotifications: 'Send push notifications to users',
       // Add more descriptions as needed
     };
 
