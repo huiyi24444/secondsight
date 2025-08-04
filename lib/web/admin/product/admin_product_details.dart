@@ -602,10 +602,11 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                       ),
 
                       // Section: Virtual Try-On
+                      // Section: Virtual Try-On
                       _buildSectionHeader('Virtual Try-On'),
                       const SizedBox(height: 10),
 
-                      // Only show the Try-On Row if _tryOnEnabled is true
+// Only show the Try-On Row if _tryOnEnabled is true
                       if (_tryOnEnabled)
                         Row(
                           children: [
@@ -615,30 +616,137 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _buildLabel('Try-On Image'),
-                                  Row(
-                                    children: [
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: TextFormField(
-                                              controller: _tryOnDataController,
-                                              readOnly: true,
-                                              decoration: InputDecoration(labelText: 'Try-On Image URL'),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey.shade300),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: _tryOnDataController.text.isNotEmpty
+                                        ? Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            _tryOnDataController.text,
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            fit: BoxFit.contain,
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null) return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                      loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.error_outline,
+                                                        size: 40,
+                                                        color: Colors.red.shade400),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      'Failed to load image',
+                                                      style: TextStyle(color: Colors.red.shade600),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        // Remove image button
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: IconButton(
+                                              icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _tryOnDataController.clear();
+                                                });
+                                              },
                                             ),
                                           ),
-                                          const SizedBox(width: 10),
+                                        ),
+                                      ],
+                                    )
+                                        : Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                          style: BorderStyle.solid
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.checkroom,
+                                              size: 50,
+                                              color: Colors.grey.shade400),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'No try-on image uploaded',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
                                           ElevatedButton.icon(
                                             onPressed: _uploadTryOnImage,
                                             icon: const Icon(Icons.upload),
-                                            label: const Text('Upload'),
+                                            label: const Text('Upload Image'),
                                           ),
                                         ],
                                       ),
-
-
-                                    ],
+                                    ),
                                   ),
+                                  const SizedBox(height: 12),
+                                  // Status indicator (no URL shown)
+                                  if (_tryOnDataController.text.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.green.shade200),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Try-on image uploaded successfully',
+                                            style: TextStyle(
+                                              color: Colors.green.shade700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          TextButton(
+                                            onPressed: _uploadTryOnImage,
+                                            child: const Text('Replace'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -650,7 +758,7 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
                                   _buildLabel('Try-On Type'),
                                   DropdownButtonFormField<String>(
                                     value: _tryOnType,
-                                    decoration: _buildInputDecoration('Select type'),
+                                    decoration: _buildInputDecoration('Select clothing type'),
                                     items: _tryOnTypes.map((type) {
                                       return DropdownMenuItem(
                                         value: type,

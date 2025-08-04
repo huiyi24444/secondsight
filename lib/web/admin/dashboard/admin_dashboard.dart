@@ -98,13 +98,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       body: Column(
         children: [
           const CustomTopBar(title: 'Dashboard'),
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () async {
-              await adminProvider.signOut();
-              Navigator.of(context).pushReplacementNamed('/admin');
-            },
-          ),
+
           _buildSimplifiedDateFilterBar(),
           Expanded(
             child: SingleChildScrollView(

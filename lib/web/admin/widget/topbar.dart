@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/admin_auth_provider.dart';
 class CustomTopBar extends StatefulWidget {
   final String title;
   final String? subtitle;
@@ -18,6 +21,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
 
   @override
   Widget build(BuildContext context) {
+    final adminProvider = Provider.of<AdminAuthProvider>(context);
     return Container(
       height: 60,
       color: Colors.white,
@@ -68,26 +72,19 @@ class _CustomTopBarState extends State<CustomTopBar> {
 
           const Spacer(),
           const SizedBox(width: 10),
-          InkWell(
-            onTap: () {
-              Navigator.pushNamed(context, '/conversations'); // Adjust route name if needed
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Icon(Icons.message_outlined),
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-
-          const Icon(Icons.notifications_outlined),
-          const SizedBox(width: 10),
           CircleAvatar(
             radius: 20,
             backgroundColor: Colors.grey[300],
             child: const Icon(Icons.person, color: Colors.grey),
+          ),
+          const SizedBox(height: 10),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await adminProvider.signOut();
+              Navigator.of(context).pushReplacementNamed('/admin');
+            },
+            tooltip: 'Logout',
           ),
         ],
       ),

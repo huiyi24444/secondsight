@@ -290,18 +290,27 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                           IconButton(
                                             icon: const Icon(Icons.edit, size: 18),
                                             onPressed: () {
+                                              debugPrint('Edit icon pressed for product: ${product.id}');
+
                                               showDialog(
                                                 context: context,
-                                                builder: (context) => ProductEditDialog(
-                                                  product: product,
-                                                  onUpdate: () {
-                                                    // Reload products after successful update
-                                                    controller.loadProducts(() => setState(() {}));
-                                                  },
-                                                ),
+                                                builder: (context) {
+                                                  debugPrint('Opening ProductEditDialog for product: ${product.id}');
+                                                  return ProductEditDialog(
+                                                    product: product,
+                                                    onUpdate: () {
+                                                      debugPrint('Product updated, reloading product list...');
+                                                      controller.loadProducts(() {
+                                                        debugPrint('Products reloaded, calling setState...');
+                                                        setState(() {});
+                                                      });
+                                                    },
+                                                  );
+                                                },
                                               );
                                             },
                                           ),
+
                                           IconButton(
                                             icon: const Icon(Icons.delete, size: 18, color: Colors.red),
                                             onPressed: () {
