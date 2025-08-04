@@ -20,6 +20,12 @@ class AdminPermissions {
   static const String cancelOrders = 'cancel_orders';
   //static const String refundOrders = 'refund_orders';
 
+  static const String viewReturns = 'view_returns';
+  static const String createReturns = 'create_returns';
+  static const String editReturns = 'edit_returns';
+  static const String cancelReturns = 'delete_returns';
+
+
   // Category Management
   static const String viewCategories = 'view_categories';
   static const String manageCategories = 'manage_categories';

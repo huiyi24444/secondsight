@@ -90,17 +90,41 @@ class _AdminNavigatorState extends State<AdminNavigator> {
           fallback: _buildNoPermissionPage('Product Management'),
         );
       case 'orders':
-        return OrderManagementPage();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.viewOrders],
+          child: OrderManagementPage(),
+          fallback: _buildNoPermissionPage('Order Management'),
+        );
       case 'returns':
-        return ReturnManagementPage();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.viewReturns],
+          child: ReturnManagementPage(),
+          fallback: _buildNoPermissionPage('Return Management'),
+        );
       case 'customers':
-        return CustomerManagementPage();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.viewUsers],
+          child: CustomerManagementPage(),
+          fallback: _buildNoPermissionPage('Customer Management'),
+        );
       case 'chat':
-        return AdminChatView();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.viewConversations],
+          child: AdminChatView(),
+          fallback: _buildNoPermissionPage('Customer Support'),
+        );
       case 'reports':
-        return AdminReportPage();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.exportReports],
+          child: AdminReportPage(),
+          fallback: _buildNoPermissionPage('Generate Reports'),
+        );
       case 'admins':
-        return AdminManagementPage();
+        return PermissionGuard(
+          requiredPermissions: [AdminPermissions.viewAdmins],
+          child: AdminManagementPage(),
+          fallback: _buildNoPermissionPage('Admins Management'),
+        );
       default:
         return AdminDashboardPage();
     }
