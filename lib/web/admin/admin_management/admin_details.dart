@@ -237,6 +237,24 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                                               ),
                                             ),
                                           ),
+                                          if (admin.isVerified) ...[
+                                            const SizedBox(width: 8),
+                                            Tooltip(
+                                              message: 'Verified Admin',
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue.withOpacity(0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.verified,
+                                                  size: 16,
+                                                  color: Colors.blue,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                       const SizedBox(height: 8),
@@ -295,6 +313,35 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                                               ],
                                             ),
                                           ),
+                                          if (!admin.isVerified) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.warning,
+                                                    size: 12,
+                                                    color: Colors.orange[700],
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'Unverified',
+                                                    style: TextStyle(
+                                                      color: Colors.orange[700],
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ],
@@ -359,7 +406,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Admin ID',
-                  '#${admin.id}',
+                  '#${admin.id.substring(0, 8)}...',
                   Icons.fingerprint,
                   Colors.blue,
                 ),
@@ -368,7 +415,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Created Date',
-                  admin.createdAt.toString(),
+                  DateFormat('MMM d, y').format(admin.createdAt),
                   Icons.calendar_today,
                   Colors.orange,
                 ),
@@ -376,10 +423,16 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               const SizedBox(width: 16),
               Expanded(
                 child: _buildInfoCard(
-                  'Total Actions',
-                  '${_controller.activityLogs?.length ?? 0}',
-                  Icons.analytics,
-                  Colors.green,
+                  'Verification Status',
+                  admin.isVerified
+                      ? 'Verified'
+                      : 'Pending',
+                  admin.isVerified
+                      ? Icons.verified_user
+                      : Icons.pending,
+                  admin.isVerified
+                      ? Colors.green
+                      : Colors.amber,
                 ),
               ),
             ],
@@ -460,20 +513,14 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
   }
 
   Widget _buildPermissionsTab(AdminModel admin) {
-    return FutureBuilder<List<String>>(
-      future: _controller.getRolePermissions(admin.id), // Use admin.id instead of role
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error loading permissions: ${snapshot.error}'));
-        }
+    final groupedPermissions = _controller.getGroupedPermissions();
 
-        final rolePermissions = snapshot.data ?? [];
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Container(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Header Card
+          Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -486,51 +533,219 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Current Permissions',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Based on ${_controller.formatRole(admin.role)} role',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Role-Based Permissions',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // Edit permissions
-                      },
-                      icon: const Icon(Icons.edit, size: 16),
-                      label: const Text('Edit Permissions'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Permissions inherited from ${_controller.formatRole(admin.role)} role',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                ...rolePermissions.map((permission) => _buildPermissionItem(permission)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _controller.getRoleColor(admin.role).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _controller.getRoleColor(admin.role).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.shield,
+                        size: 16,
+                        color: _controller.getRoleColor(admin.role),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _controller.formatRole(admin.role),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _controller.getRoleColor(admin.role),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        );
-      },
+          const SizedBox(height: 20),
+
+          // Permission Groups
+          if (groupedPermissions.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 48,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No permissions assigned',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...groupedPermissions.entries.map((entry) {
+              final groupKey = entry.key;
+              final permissions = entry.value;
+              final group = PermissionGroups.groups[groupKey];
+
+              if (group == null) return const SizedBox.shrink();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    dividerColor: Colors.transparent,
+                  ),
+                  child: ExpansionTile(
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        group.icon,
+                        color: const Color(0xFF7C3AED),
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      group.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${permissions.length} permission${permissions.length != 1 ? 's' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    initiallyExpanded: false,
+                    children: permissions.map((permission) =>
+                        _buildPermissionItem(permission)
+                    ).toList(),
+                  ),
+                ),
+              );
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionItem(String permission) {
+    final permissionName = PermissionHelper.getPermissionName(permission);
+    final permissionDescription = PermissionHelper.getPermissionDescription(permission);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.check,
+              color: Colors.green,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  permissionName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (permissionDescription.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    permissionDescription,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1046,33 +1261,6 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPermissionItem(String permission) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle,
-            color: Colors.green,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              permission,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

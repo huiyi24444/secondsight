@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/admin_log_model.dart';
 import '../../../model/admin_model.dart';
+import '../services/permissions_manager.dart';
 
 class AdminDetailsController extends ChangeNotifier {
   AdminModel? _admin;
@@ -26,6 +27,7 @@ class AdminDetailsController extends ChangeNotifier {
     _selectedLogFilter = filter;
     notifyListeners();
   }
+
   List<AdminActivityLog> get filteredLogs {
     if (_selectedLogFilter == 'All') return _activityLogs;
 
@@ -47,10 +49,6 @@ class AdminDetailsController extends ChangeNotifier {
       }
     }).toList();
   }
-
-
-
-
 
   Future<void> loadActivityLogs(String adminId) async {
     _isLoadingLogs = true;
@@ -81,9 +79,6 @@ class AdminDetailsController extends ChangeNotifier {
     notifyListeners();
   }
 
-
-
-
   Future<void> fetchAdminById(String adminId) async {
     _isLoading = true;
     _error = null;
@@ -97,6 +92,9 @@ class AdminDetailsController extends ChangeNotifier {
 
       if (doc.exists && doc.data() != null) {
         _admin = AdminModel.fromDocument(doc);
+
+        // Update the admin's permissions array to match the role permissions
+        await syncAdminPermissionsWithRole(adminId);
       } else {
         _error = 'Admin not found';
       }
@@ -109,7 +107,52 @@ class AdminDetailsController extends ChangeNotifier {
     }
   }
 
+  // Sync the admin document's permissions array with their role permissions
+  Future<void> syncAdminPermissionsWithRole(String adminId) async {
+    if (_admin == null) return;
 
+    try {
+      final rolePermissions = PermissionHelper.getPermissionsForRole(_admin!.role);
+
+      // Update the admin document with the correct permissions
+      await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(adminId)
+          .update({
+        'permissions': rolePermissions,
+      });
+
+      debugPrint('Synced permissions for admin $adminId with role ${_admin!.role}');
+    } catch (e) {
+      debugPrint('Error syncing permissions: $e');
+    }
+  }
+
+  // Get permissions from role definition
+  List<String> getRolePermissions() {
+    if (_admin == null) return [];
+    return PermissionHelper.getPermissionsForRole(_admin!.role);
+  }
+
+  // Get permissions grouped by PermissionGroups
+  Map<String, List<String>> getGroupedPermissions() {
+    if (_admin == null) return {};
+
+    final rolePermissions = getRolePermissions();
+    final groupedPermissions = <String, List<String>>{};
+
+    PermissionGroups.groups.forEach((key, group) {
+      final groupPermissions = group.permissions
+          .where((permission) => rolePermissions.contains(permission))
+          .toList();
+
+      if (groupPermissions.isNotEmpty) {
+        groupedPermissions[key] = groupPermissions;
+      }
+    });
+
+    return groupedPermissions;
+  }
 
   IconData getLogIcon(String action) {
     if (action.contains('login')) return Icons.login;
@@ -176,28 +219,6 @@ class AdminDetailsController extends ChangeNotifier {
     }
   }
 
-  Future<List<String>> getRolePermissions(String adminId) async {
-    try {
-      final adminDoc = await FirebaseFirestore.instance
-          .collection('admins')
-          .doc(adminId)
-          .get();
-
-      if (adminDoc.exists) {
-        final data = adminDoc.data();
-        final permissions = List<String>.from(data?['permissions'] ?? []);
-        debugPrint('Fetched permissions for admin $adminId: $permissions');
-        return permissions;
-      } else {
-        debugPrint('Admin document not found for ID: $adminId');
-        return [];
-      }
-    } catch (e) {
-      debugPrint('Error fetching permissions for admin $adminId: $e');
-      return [];
-    }
-  }
-
   // Helper method to format DateTime
   String formatDateTime(DateTime? dateTime) {
     if (dateTime == null) return 'Never';
@@ -214,5 +235,4 @@ class AdminDetailsController extends ChangeNotifier {
       return 'Just now';
     }
   }
-
 }

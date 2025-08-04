@@ -7,6 +7,7 @@ import '../services/permissions_guard.dart';
 import '../services/permissions_manager.dart';
 import '../services/admin_auth_provider.dart';
 import '../widget/topbar.dart';
+import 'admin_addition.dart';
 import 'admin_details.dart';
 import 'admin_management_controller.dart';
 
@@ -90,6 +91,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                                   onPressed: () => _showCreateAdminDialog(context),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF7C3AED),
+                                    foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 12,

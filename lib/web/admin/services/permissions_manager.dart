@@ -91,14 +91,13 @@ class AdminRoles {
       description: 'General administrative access',
       permissions: [
         AdminPermissions.viewUsers,
+        AdminPermissions.createUsers,
         AdminPermissions.editUsers,
         AdminPermissions.viewProducts,
         AdminPermissions.createProducts,
         AdminPermissions.editProducts,
-        AdminPermissions.deleteProducts,
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
-        AdminPermissions.cancelOrders,
         AdminPermissions.viewCategories,
         AdminPermissions.manageCategories,
         AdminPermissions.viewAnalytics,
@@ -111,7 +110,6 @@ class AdminRoles {
       permissions: [
         AdminPermissions.viewUsers,
         AdminPermissions.viewProducts,
-        AdminPermissions.createProducts,
         AdminPermissions.editProducts,
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
@@ -126,6 +124,8 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.viewProducts,
         AdminPermissions.viewOrders,
+        AdminPermissions.cancelOrders,
+        AdminPermissions.viewConversations,
       ],
     ),
     'viewer': AdminRole(

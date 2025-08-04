@@ -5,7 +5,7 @@ import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/services/auth_wrapper.dart';
 import 'package:secondsight/web/admin/chat/admin_chat_view.dart';
 import 'package:secondsight/web/admin/login/admin_login_view.dart';
-import 'package:secondsight/web/admin/login/admin_management_view.dart';
+import 'package:secondsight/web/admin/admin_management/admin_management_view.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import 'package:secondsight/web/admin/reports/admin_report.dart';
 import 'package:secondsight/web/admin/returnrefund/admin_return.dart';
@@ -178,6 +178,7 @@ class _AdminNavigatorState extends State<AdminNavigator> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
               child: const Text('Go to Dashboard'),
@@ -269,9 +270,11 @@ class NoPermissionWidget extends StatelessWidget {
                 onPressed: onBackToDashboard,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 ),
-                child: const Text('Go to Dashboard'),
+                child: const Text('Go to Dashboard',style: TextStyle(color: Colors.white),),
+
               ),
             ],
           ],
