@@ -5,6 +5,8 @@ import 'package:secondsight/view/widgets/string_extensions.dart';
 
 import '../../../model/product_model.dart';
 import '../../../view/widgets/string_extensions.dart';
+import '../services/permissions_guard.dart';
+import '../services/permissions_manager.dart';
 import '../widget/topbar.dart';
 import 'admin_product_addition.dart';
 import 'admin_product_controller.dart';
@@ -287,8 +289,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     DataCell(
                                       Row(
                                         children: [
-                                          IconButton(
+                                          PermissionIconButton(
                                             icon: const Icon(Icons.edit, size: 18),
+                                            requiredPermissions: [AdminPermissions.editProducts],
                                             onPressed: () {
                                               debugPrint('Edit icon pressed for product: ${product.id}');
 
@@ -309,6 +312,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                                 },
                                               );
                                             },
+                                            tooltip: 'Edit Product',
+                                            disabledTooltip: 'You need edit permission',
                                           ),
 
                                           IconButton(
