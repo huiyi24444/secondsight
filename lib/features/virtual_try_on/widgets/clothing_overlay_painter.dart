@@ -39,12 +39,16 @@ class ClothingOverlayPainter extends CustomPainter {
   final ui.Image? clothingImage;
   final Size cameraSize;
   final String clothingType; // Add this field
+  final bool showDebugInfo; // Add this
+  final bool showSkeleton;
 
   ClothingOverlayPainter({
     required this.pose,
     required this.clothingImage,
     required this.cameraSize,
     this.clothingType = 'upper', // Default to upper
+    this.showDebugInfo = true, // Default true for live view
+    this.showSkeleton = true,
   });
 
   Offset transformLandmarkForDisplay(double x, double y, Size size) {
@@ -131,7 +135,9 @@ class ClothingOverlayPainter extends CustomPainter {
     );
     canvas.restore();
 
-    _drawDebugInfo(canvas, size, shoulderWidth, finalScale, shoulderAngle);
+    if (showDebugInfo) {
+      _drawDebugInfo(canvas, size, shoulderWidth, finalScale, shoulderAngle);
+    }
   }
 
   // New method for lower body clothing (pants, skirts)
@@ -263,39 +269,41 @@ class ClothingOverlayPainter extends CustomPainter {
     }
 
     // Red dots for landmarks
-    final dotPaint = Paint()..color = Colors.red;
-    for (var entry in pose!.landmarks.entries) {
-      final landmarkName = entry.key;
-      final point = entry.value;
+    if(showSkeleton){
+      final dotPaint = Paint()..color = Colors.red;
+      for (var entry in pose!.landmarks.entries) {
+        final landmarkName = entry.key;
+        final point = entry.value;
 
-      // Skip drawing red dots for face landmarks
-      if (faceLandmarks.contains(landmarkName)) {
-        continue; // Skip this landmark
+        // Skip drawing red dots for face landmarks
+        if (faceLandmarks.contains(landmarkName)) {
+          continue; // Skip this landmark
+        }
+
+        final rotated = transformLandmarkForDisplay(point.x, point.y, size);
+
+        if (_isInBounds(rotated.dx, rotated.dy, size)) {
+          canvas.drawCircle(rotated, 5, dotPaint);
+        }
       }
 
-      final rotated = transformLandmarkForDisplay(point.x, point.y, size);
+      // Green skeleton lines
+      final linePaint = Paint()
+        ..color = Colors.green
+        ..strokeWidth = 3;
 
-      if (_isInBounds(rotated.dx, rotated.dy, size)) {
-        canvas.drawCircle(rotated, 5, dotPaint);
-      }
-    }
+      for (var pair in jointConnections) {
+        final pointA = pose!.landmarks[pair[0]];
+        final pointB = pose!.landmarks[pair[1]];
 
-    // Green skeleton lines
-    final linePaint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 3;
+        if (pointA != null && pointB != null) {
+          final offsetA = transformLandmarkForDisplay(pointA.x, pointA.y, size);
+          final offsetB = transformLandmarkForDisplay(pointB.x, pointB.y, size);
 
-    for (var pair in jointConnections) {
-      final pointA = pose!.landmarks[pair[0]];
-      final pointB = pose!.landmarks[pair[1]];
-
-      if (pointA != null && pointB != null) {
-        final offsetA = transformLandmarkForDisplay(pointA.x, pointA.y, size);
-        final offsetB = transformLandmarkForDisplay(pointB.x, pointB.y, size);
-
-        if (_isInBounds(offsetA.dx, offsetA.dy, size) &&
-            _isInBounds(offsetB.dx, offsetB.dy, size)) {
-          canvas.drawLine(offsetA, offsetB, linePaint);
+          if (_isInBounds(offsetA.dx, offsetA.dy, size) &&
+              _isInBounds(offsetB.dx, offsetB.dy, size)) {
+            canvas.drawLine(offsetA, offsetB, linePaint);
+          }
         }
       }
     }

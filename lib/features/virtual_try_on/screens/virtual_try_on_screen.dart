@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../../model/product_model.dart';
 import '../widgets/virtual_try_on_view.dart';
 
@@ -194,16 +195,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     // Show loading screen
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.white),
+              CircularProgressIndicator(color: Colors.black),
               SizedBox(height: 16),
               Text(
                 'Initializing...',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.black),
               ),
             ],
           ),
@@ -214,14 +215,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     // Show error screen
     if (_errorMessage.isNotEmpty) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.black,
+          backgroundColor: Colors.white,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () => Navigator.pop(context),
           ),
-          title: Text('Virtual Try-On', style: TextStyle(color: Colors.white)),
+          title: Text('Virtual Try-On', style: TextStyle(color: Colors.black)),
         ),
         body: Center(
           child: Padding(
@@ -232,12 +233,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
                 Icon(
                   Icons.error_outline,
                   size: 64,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
                 SizedBox(height: 16),
                 Text(
                   _errorMessage,
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: Colors.black, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 24),
@@ -260,24 +261,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     // Show product not found
     if (_product == null) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.black,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text('Virtual Try-On', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.white,
+          leading: CustomBackButton(),
+          title: Text('Virtual Try-On', style: TextStyle(color: Colors.black)),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.white),
+              Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.black),
               SizedBox(height: 16),
               Text(
                 'Product not found',
-                style: TextStyle(color: Colors.white, fontSize: 18),
+                style: TextStyle(color: Colors.black, fontSize: 18),
               ),
               SizedBox(height: 24),
               ElevatedButton(
@@ -294,24 +292,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     final tryOnImageUrl = _product!.tryOnImageUrl;
     if (tryOnImageUrl == null) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.black,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text('Virtual Try-On', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.white,
+          leading: CustomBackButton(),
+          title: Text('Virtual Try-On', style: TextStyle(color: Colors.black)),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.image_not_supported, size: 64, color: Colors.white),
+              Icon(Icons.image_not_supported, size: 64, color: Colors.black),
               SizedBox(height: 16),
               Text(
                 'No image available for virtual try-on',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: Colors.black, fontSize: 16),
               ),
               SizedBox(height: 24),
               ElevatedButton(
@@ -327,16 +322,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     // Show camera not initialized
     if (!_isCameraInitialized || _cameraController == null) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.white),
+              CircularProgressIndicator(color: Colors.black),
               SizedBox(height: 16),
               Text(
                 'Initializing camera...',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.black),
               ),
             ],
           ),
@@ -346,20 +341,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
 
     // Main virtual try-on screen
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: Colors.white,
+        leading: CustomBackButton(),
         title: Text(
           'Try On: ${_product!.name}',
           style: TextStyle(color: Colors.white),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.info_outline, color: Colors.white),
+            icon: Icon(Icons.info_outline, color: Colors.black),
             onPressed: _showProductInfo,
           ),
         ],
@@ -372,28 +364,6 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
             cameraSize: _cameraController!.value.previewSize!,
             cameraController: _cameraController!,
             clothingType: _product?.tryOnType ?? 'upper',
-          ),
-          // Bottom label with product name
-          Positioned(
-            bottom: 24,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                _product!.name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
           ),
         ],
       ),

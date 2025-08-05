@@ -59,9 +59,11 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.2
   month_picker_dialog: ^2.0.2
-
+  gal: ^2.3.0
   device_info_plus: ^9.1.0
   fl_chart: ^1.0.0
+  share_plus: ^7.2.2
+
 
 
   camera: ^0.10.5

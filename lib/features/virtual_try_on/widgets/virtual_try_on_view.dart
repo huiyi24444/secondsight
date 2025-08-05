@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:camera/camera.dart';
+import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 //import 'package:gallery_saver/gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 import 'dart:async';
+import '../../../view/widgets/custom_back_button.dart';
 import '../models/pose_landmarks.dart';
 import '../services/pose_detection_service.dart';
 import 'clothing_overlay_painter.dart';
@@ -46,6 +49,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   bool _isLoadingImage = true;
   bool _isCapturing = false;
   int _frameCount = 0;
+  List<File> _recentImages = [];
   String? _lastCapturedImagePath;
 
   // Add these for proper cleanup
@@ -57,6 +61,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   void initState() {
     super.initState();
     _initializeVirtualTryOn();
+    _loadRecentImages();
   }
 
   Future<void> _initializeVirtualTryOn() async {
@@ -71,6 +76,28 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
     // Start image stream with delay to ensure everything is ready
     await Future.delayed(Duration(milliseconds: 1000)); // Increased delay
     await _startImageStream();
+  }
+
+  // Load recent images from app's directory
+  Future<void> _loadRecentImages() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tryOnDir = Directory('${tempDir.path}/tryon_images');
+
+      if (await tryOnDir.exists()) {
+        final files = tryOnDir.listSync()
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.png'))
+            .toList()
+          ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+
+        setState(() {
+          _recentImages = files.take(10).toList(); // Keep last 10 images
+        });
+      }
+    } catch (e) {
+      print('Error loading recent images: $e');
+    }
   }
 
   void _setupPoseDetection() {
@@ -332,57 +359,13 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
     }
   }
 
-  Future<bool> _requestStoragePermission() async {
-    if (!Platform.isAndroid) return true;
-
-    final androidInfo = await DeviceInfoPlugin().androidInfo;
-
-    // Android 13+ (API 33+) uses new photo permissions
-    if (androidInfo.version.sdkInt >= 33) {
-      final photos = await Permission.photos.request();
-      return photos.isGranted;
-    } else {
-      // Android 12 and below uses storage permissions
-      final storage = await Permission.storage.request();
-
-      if (!storage.isGranted && storage.isPermanentlyDenied) {
-        // Show dialog to open settings
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Permission Required'),
-              content: Text('Please enable storage access in settings to save photos.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    openAppSettings();
-                  },
-                  child: Text('Open Settings'),
-                ),
-              ],
-            ),
-          );
-        }
-        return false;
-      }
-
-      return storage.isGranted;
-    }
-  }
-
+// Replace the _captureWithOverlay method with this:
   Future<void> _captureWithOverlay() async {
     try {
       print('[OVERLAY] Starting capture with overlay...');
 
       // Stop image stream temporarily to take photo
       print('[OVERLAY] Stopping image stream...');
-      // Stop image stream temporarily to take photo
       await _stopImageStream();
 
       // Take the photo from camera
@@ -414,6 +397,8 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
           clothingImage: _clothingImage,
           cameraSize: Size(cameraImage.width.toDouble(), cameraImage.height.toDouble()),
           clothingType: widget.clothingType,
+          showDebugInfo: false, // Don't show debug in captured image
+          showSkeleton: false,
         );
         painter.paint(canvas, Size(cameraImage.width.toDouble(), cameraImage.height.toDouble()));
       }
@@ -432,13 +417,38 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
       final tempDir = await getTemporaryDirectory();
       print('[OVERLAY] Temp directory: ${tempDir.path}');
 
+      final tryOnDir = Directory('${tempDir.path}/tryon_images');
+      if (!await tryOnDir.exists()) {
+        await tryOnDir.create(recursive: true);
+      }
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final tempPath = '${tempDir.path}/tryon_$timestamp.png';
+      final tempPath = '${tryOnDir.path}/tryon_$timestamp.png';
       print('[OVERLAY] Temp file path: $tempPath');
 
       final tempFile = File(tempPath);
       await tempFile.writeAsBytes(buffer);
+
+      // Save to gallery using gal
+      print('[OVERLAY] Saving to gallery using gal...');
+      await Gal.putImage(
+        tempPath,
+        album: 'SecondSight', // Optional: create a specific album
+      );
+
+      print('[OVERLAY] Successfully saved to gallery');
+      _lastCapturedImagePath = tempPath;
+
+      if (mounted) {
+        setState(() {
+          _recentImages.insert(0, tempFile);
+          // Keep only the last 10 images
+          if (_recentImages.length > 10) {
+            _recentImages.removeLast();
+          }
+        });
+      }
+
       // Restart image stream
       await _startImageStream();
 
@@ -450,11 +460,61 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
     }
   }
 
+  Future<bool> _requestStoragePermission() async {
+    // Check if we have access to save to gallery
+    final hasAccess = await Gal.hasAccess();
+
+    if (!hasAccess) {
+      // Request access
+      final granted = await Gal.requestAccess();
+      if (!granted) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Permission Required'),
+              content: Text('Please enable photo library access in settings to save photos.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Gal.open(); // Opens the app settings
+                  },
+                  child: Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   Future<ui.Image> _convertImageToUiImage(img.Image image) async {
     final bytes = img.encodePng(image);
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;
+  }
+
+  void _viewGallery() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TryOnGalleryScreen(
+          recentImages: _recentImages,
+          onImageDeleted: () {
+            _loadRecentImages(); // Reload images after deletion
+          },
+        ),
+      ),
+    );
   }
 
   void _viewCapturedImage() {
@@ -464,8 +524,9 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(
+            leading: CustomBackButton(),
             title: Text('Captured Photo'),
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.white,
             actions: [
               IconButton(
                 icon: Icon(Icons.share),
@@ -475,7 +536,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
               ),
             ],
           ),
-          backgroundColor: Colors.black,
+          backgroundColor: Colors.white,
           body: Center(
             child: Image.file(
               File(_lastCapturedImagePath!),
@@ -573,7 +634,38 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Gallery button (placeholder)
+                // Gallery button
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: _viewGallery,
+                      icon: Icon(Icons.photo_library_outlined),
+                      iconSize: 30,
+                      color: Colors.white,
+                    ),
+                    if (_recentImages.isNotEmpty)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${_recentImages.length}',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
                 // Capture button
                 GestureDetector(
                   onTap: _isCapturing ? null : _capturePhoto,
@@ -625,6 +717,184 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+// Gallery Screen to view recent try-on photos
+class TryOnGalleryScreen extends StatefulWidget {
+  final List<File> recentImages;
+  final VoidCallback onImageDeleted;
+
+  const TryOnGalleryScreen({
+    Key? key,
+    required this.recentImages,
+    required this.onImageDeleted,
+  }) : super(key: key);
+
+  @override
+  _TryOnGalleryScreenState createState() => _TryOnGalleryScreenState();
+}
+
+class _TryOnGalleryScreenState extends State<TryOnGalleryScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: const CustomBackButton(),
+        backgroundColor: Colors.white,
+        title: Text('Recent Try-Ons', style: TextStyle(color: Colors.black)),
+      ),
+      body: widget.recentImages.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.photo_library_outlined,
+              size: 64,
+              color: Colors.white54,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No photos yet',
+              style: TextStyle(color: Colors.white54, fontSize: 18),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Take some try-on photos!',
+              style: TextStyle(color: Colors.white38, fontSize: 14),
+            ),
+          ],
+        ),
+      )
+          : GridView.builder(
+        padding: EdgeInsets.all(8),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: widget.recentImages.length,
+        itemBuilder: (context, index) {
+          final image = widget.recentImages[index];
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FullScreenImageView(
+                    imageFile: image,
+                    onDelete: () {
+                      widget.onImageDeleted();
+                      Navigator.pop(context);
+                    },
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                image: DecorationImage(
+                  image: FileImage(image),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// Full screen image viewer
+class FullScreenImageView extends StatelessWidget {
+  final File imageFile;
+  final VoidCallback onDelete;
+
+  const FullScreenImageView({
+    Key? key,
+    required this.imageFile,
+    required this.onDelete,
+  }) : super(key: key);
+
+  Future<void> _shareImage() async {
+    try {
+      // Use share_plus to share the image
+      await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: 'Check out my virtual try-on!',
+      );
+    } catch (e) {
+      print('Error sharing image: $e');
+    }
+  }
+
+  void _deleteImage(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Photo'),
+        content: Text('Are you sure you want to delete this photo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await imageFile.delete();
+                Navigator.pop(context); // Close dialog
+                onDelete(); // Call callback
+              } catch (e) {
+                print('Error deleting image: $e');
+              }
+            },
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: Icon(Icons.close, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.share, color: Colors.black),
+            onPressed: _shareImage,
+          ),
+          IconButton(
+            icon: Icon(Icons.delete_outline, color: Colors.black),
+            onPressed: () => _deleteImage(context),
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          panEnabled: true,
+          boundaryMargin: EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.file(
+            imageFile,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
     );
   }
 }
