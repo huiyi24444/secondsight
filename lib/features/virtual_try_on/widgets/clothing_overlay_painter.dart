@@ -19,6 +19,21 @@ const List<List<String>> jointConnections = [
   ['right_knee', 'right_ankle'],
 ];
 
+const Set<String> faceLandmarks = {
+  'landmark_0',  // nose
+  'landmark_1',  // left_eye_inner
+  'landmark_2',  // left_eye
+  'landmark_3',  // left_eye_outer
+  'landmark_4',  // right_eye_inner
+  'landmark_5',  // right_eye
+  'landmark_6',  // right_eye_outer
+  'landmark_7',  // left_ear
+  'landmark_8',  // right_ear
+  'landmark_9',  // mouth_left
+  'landmark_10', // mouth_right
+};
+
+
 class ClothingOverlayPainter extends CustomPainter {
   final PoseLandmarks? pose;
   final ui.Image? clothingImage;
@@ -238,7 +253,7 @@ class ClothingOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Rect.fromLTWH(10, 10, 100, 100), Paint()..color = Colors.red);
+    //canvas.drawRect(Rect.fromLTWH(10, 10, 100, 100), Paint()..color = Colors.purple);
 
     if (pose == null) return;
 
@@ -250,7 +265,14 @@ class ClothingOverlayPainter extends CustomPainter {
     // Red dots for landmarks
     final dotPaint = Paint()..color = Colors.red;
     for (var entry in pose!.landmarks.entries) {
+      final landmarkName = entry.key;
       final point = entry.value;
+
+      // Skip drawing red dots for face landmarks
+      if (faceLandmarks.contains(landmarkName)) {
+        continue; // Skip this landmark
+      }
+
       final rotated = transformLandmarkForDisplay(point.x, point.y, size);
 
       if (_isInBounds(rotated.dx, rotated.dy, size)) {

@@ -59,7 +59,7 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.2
   month_picker_dialog: ^2.0.2
-  gallery_saver: ^2.3.2
+
   device_info_plus: ^9.1.0
   fl_chart: ^1.0.0
 

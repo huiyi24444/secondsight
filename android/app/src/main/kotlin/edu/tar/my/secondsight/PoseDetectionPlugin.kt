@@ -181,6 +181,20 @@ class PoseDetectionPlugin(
 
     private fun getLandmarkName(index: Int): String {
         return when (index) {
+
+            // Face landmarks (0-10)
+            0 -> "landmark_0"   // nose
+            1 -> "landmark_1"   // left_eye_inner
+            2 -> "landmark_2"   // left_eye
+            3 -> "landmark_3"   // left_eye_outer
+            4 -> "landmark_4"   // right_eye_inner
+            5 -> "landmark_5"   // right_eye
+            6 -> "landmark_6"   // right_eye_outer
+            7 -> "landmark_7"   // left_ear
+            8 -> "landmark_8"   // right_ear
+            9 -> "landmark_9"   // mouth_left
+            10 -> "landmark_10" // mouth_right
+
             11 -> "left_shoulder"
             12 -> "right_shoulder"
             13 -> "left_elbow"

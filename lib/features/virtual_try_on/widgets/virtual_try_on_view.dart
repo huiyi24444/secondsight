@@ -8,7 +8,7 @@ import 'package:camera/camera.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
-import 'package:gallery_saver/gallery_saver.dart';
+//import 'package:gallery_saver/gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:async';
@@ -438,32 +438,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
       print('[OVERLAY] Temp file path: $tempPath');
 
       final tempFile = File(tempPath);
-      print('[OVERLAY] Writing bytes to temp file...');
       await tempFile.writeAsBytes(buffer);
-      print('[OVERLAY] Temp file size: ${tempFile.lengthSync()} bytes');
-      print('[OVERLAY] Temp file exists: ${tempFile.existsSync()}');
-
-      print('[OVERLAY] Calling GallerySaver.saveImage...');
-      // Save to gallery
-      final success = await GallerySaver.saveImage(
-        tempPath,
-        albumName: 'SecondSight', // Creates an album for your app
-      );
-      print('[OVERLAY] GallerySaver result: $success');
-      if (success == true) {
-        _lastCapturedImagePath = tempPath;
-        print('[OVERLAY] Photo saved to gallery successfully');
-      } else {
-        throw Exception('GallerySaver returned false or null');
-      }
-
-      // Clean up temp file after a delay (let gallery saver finish)
-      Future.delayed(Duration(seconds: 2), () {
-        if (tempFile.existsSync()) {
-          tempFile.deleteSync();
-        }
-      });
-
       // Restart image stream
       await _startImageStream();
 
