@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../model/cancel_model.dart';
+import '../../model/payment_cards_model.dart';
 import '../../model/shipment_model.dart';
 
 class OrderDetailsController extends ChangeNotifier {
@@ -138,9 +139,6 @@ class OrderDetailsController extends ChangeNotifier {
 
     return remainingDays > 0 ? remainingDays : 0;
   }
-
-
-
 
 
   /// Create OrdersModel from document data
@@ -383,7 +381,7 @@ class OrderDetailsController extends ChangeNotifier {
                   cancelNote: noteController.text.trim().isEmpty
                       ? null
                       : noteController.text.trim(),
-                  cancelledBy: userId,
+                  cancelledBy: "Customer",
                 );
 
                 // Close loading dialog
@@ -601,5 +599,27 @@ class OrderDetailsController extends ChangeNotifier {
     return query.docs.map((doc) => doc['orderProductID'] as String).toSet();
   }
 
+  Future<PaymentCard?> fetchPaymentCard(String paymentCardId) async {
+    try {
+      print("Fetching payment card with ID: $paymentCardId for user: $userId");
 
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)  // Add user ID here
+          .collection('paymentCards')  // Access as subcollection
+          .doc(paymentCardId)
+          .get();
+
+      if (doc.exists) {
+        print("Payment card document FOUND: ${doc.data()}");
+        return PaymentCard.fromDocument(doc);
+      } else {
+        print("Payment card document NOT found for ID: $paymentCardId under user: $userId");
+        return null;
+      }
+    } catch (e) {
+      print("Error fetching payment card: $e");
+      return null;
+    }
+  }
 }

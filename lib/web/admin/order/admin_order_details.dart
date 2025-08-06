@@ -1318,7 +1318,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ],
           ),
           const SizedBox(height: 8),
-          _buildInfoRow('Cancelled By', cancelData!.canceledBy),
+          _buildInfoRow('Cancelled By', cancelData!.cancelledBy),
           const SizedBox(height: 8),
           _buildInfoRow('Reason', cancelData!.cancelReason),
           if (cancelData!.cancelNote != null && cancelData!.cancelNote!.isNotEmpty) ...[

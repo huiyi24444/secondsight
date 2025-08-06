@@ -316,6 +316,7 @@ class _CheckoutViewState extends State<CheckoutView> {
         'eligibilityForReturn': true,
         'shipmentID': shipmentId,
         'payment': result.transactionId ?? 'unknown',
+        'paymentCard': selectedPaymentCard?.id,
       });
 
       // 👇 Create shipment using the new ShipmentModel (with DateTime? shippedDate)

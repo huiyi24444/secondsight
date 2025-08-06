@@ -10,7 +10,7 @@ class CancellationModel {
   final String cancelReason;
   final DateTime cancelDate;
   final String? cancelNote;
-  final String canceledBy;
+  final String cancelledBy;
 
   CancellationModel({
     required this.id,
@@ -18,7 +18,7 @@ class CancellationModel {
     required this.cancelReason,
     required this.cancelDate,
     this.cancelNote,
-    required this.canceledBy,
+    required this.cancelledBy,
   });
 
   // Factory constructor to create from Firestore document
@@ -30,7 +30,7 @@ class CancellationModel {
       cancelReason: data['cancelReason'] ?? '',
       cancelDate: (data['cancelDate'] as Timestamp).toDate(),
       cancelNote: data['cancelNote'],
-      canceledBy: data['canceledBy'] ?? '',
+      cancelledBy: data['cancelledBy'] ?? '',
     );
   }
 
@@ -42,7 +42,7 @@ class CancellationModel {
       cancelReason: data['cancelReason'] ?? '',
       cancelDate: (data['cancelDate'] as Timestamp).toDate(),
       cancelNote: data['cancelNote'],
-      canceledBy: data['canceledBy'] ?? '',
+      cancelledBy: data['cancelledBy'] ?? '',
     );
   }
 
@@ -53,7 +53,7 @@ class CancellationModel {
       'cancelReason': cancelReason,
       'cancelDate': Timestamp.fromDate(cancelDate),
       'cancelNote': cancelNote,
-      'canceledBy': canceledBy,
+      'cancelledBy': cancelledBy,
     };
   }
 
@@ -64,7 +64,7 @@ class CancellationModel {
     String? cancelReason,
     DateTime? cancelDate,
     String? cancelNote,
-    String? canceledBy,
+    String? cancelledBy,
   }) {
     return CancellationModel(
       id: id ?? this.id,
@@ -72,7 +72,7 @@ class CancellationModel {
       cancelReason: cancelReason ?? this.cancelReason,
       cancelDate: cancelDate ?? this.cancelDate,
       cancelNote: cancelNote ?? this.cancelNote,
-      canceledBy: canceledBy ?? this.canceledBy,
+      cancelledBy: cancelledBy ?? this.cancelledBy,
     );
   }
 }

@@ -17,8 +17,8 @@ class CancellationDetailsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
         borderRadius: BorderRadius.circular(12),
@@ -101,7 +101,7 @@ class CancellationDetailsWidget extends StatelessWidget {
           _buildDetailRow(
             icon: Icons.person_outline,
             label: 'Cancelled By',
-            value: _getCancelledByText(cancellation.canceledBy),
+            value: cancellation.cancelledBy,
             iconColor: Colors.grey.shade600,
           ),
 
@@ -223,11 +223,5 @@ class CancellationDetailsWidget extends StatelessWidget {
     } else {
       return '${DateFormat('EEEE').format(date)}, ${DateFormat('MMM d, yyyy').format(date)} at ${DateFormat('h:mm a').format(date)}';
     }
-  }
-
-  String _getCancelledByText(String canceledBy) {
-    // You can customize this based on your user identification logic
-    // For now, just showing "You" if it's the current user, or "Customer" otherwise
-    return 'Customer';
   }
 }

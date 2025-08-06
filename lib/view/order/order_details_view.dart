@@ -1,11 +1,13 @@
 // order_details_view.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../controller/order/order_details_controller.dart';
 import '../../model/cancel_model.dart';
 import '../../model/order_model.dart';
 import '../../model/order_product_model.dart';
+import '../../model/payment_cards_model.dart';
 import '../../model/shipment_model.dart';
 import '../returnRefund/return_request_view.dart';
 import '../widgets/custom_back_button.dart';
@@ -891,6 +893,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                     ),
                   ],
                 ),
+
+
               ],
             ),
 
@@ -935,7 +939,27 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
             ),
             const SizedBox(height: 16),
             _buildShippingAddressSection(shipment),
+            const SizedBox(height: 16),
+            if (order.paymentCard != null) ...[
+              FutureBuilder<PaymentCard?>(
+                future: _controller.fetchPaymentCard(order.paymentCard!),
+                builder: (context, paymentCardSnapshot) {
+                  if (paymentCardSnapshot.connectionState == ConnectionState.waiting) {
+                    return Container(
+                      padding: const EdgeInsets.all(6),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF8E6CEF),
+                        ),
+                      ),
+                    );
+                  }
 
+                  return _buildPaymentInformationSection(order, paymentCardSnapshot.data);
+                },
+              ),
+            ],
           ] else ...[
             // If no shipment, just show return eligibility
             _buildCompactInfoCard(
@@ -1119,11 +1143,217 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
               ],
             ),
           ),
+
         ],
       ),
     );
   }
 
+  Widget _buildPaymentInformationSection(OrdersModel order, PaymentCard? paymentCard) {
+    debugPrint(paymentCard != null
+        ? 'Payment card received: ${paymentCard.brand}, ****${paymentCard.lastFour}'
+        : 'Payment card is null');
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade300, // Or any color you want
+          width: 1.2, // Adjust thickness as needed
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(
+                  Icons.payment,
+                  size: 16,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Payment Information',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // Payment Card
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Payment Card',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  if (paymentCard != null) ...[
+                    Row(
+                      children: [
+                        Icon(
+                          _getCardBrandIcon(paymentCard.brand),
+                          size: 16,
+                          color: _getCardBrandColor(paymentCard.brand),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '${paymentCard.brand.toUpperCase()} •••• ${paymentCard.lastFour}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _getCardBrandColor(paymentCard.brand),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.credit_card_off,
+                          size: 16,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Unavailable',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+              // Transaction ID
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Transaction ID',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            order.payment ?? 'N/A',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.copy, size: 16, color: Colors.grey[600]),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: order.payment ?? ''));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Transaction ID copied!')),
+                            );
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+
+            ],
+          ),
+
+        ],
+      ),
+    );
+  }
+
+
+// Helper method to get card brand icon
+  IconData _getCardBrandIcon(String brand) {
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        return Icons.credit_card;
+      case 'mastercard':
+        return Icons.credit_card;
+      case 'amex':
+      case 'american express':
+        return Icons.credit_card;
+      case 'discover':
+        return Icons.credit_card;
+      default:
+        return Icons.credit_card;
+    }
+  }
+
+// Helper method to get card brand color
+  Color _getCardBrandColor(String brand) {
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        return const Color(0xFF1A1F71);
+      case 'mastercard':
+        return const Color(0xFFEB001B);
+      case 'amex':
+      case 'american express':
+        return const Color(0xFF006FCF);
+      case 'discover':
+        return const Color(0xFFFF6000);
+      default:
+        return Colors.grey;
+    }
+  }
 
 // Helper widget for info rows
   Widget _buildInfoRow({

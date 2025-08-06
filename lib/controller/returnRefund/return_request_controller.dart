@@ -252,7 +252,7 @@ class ReturnRequestController extends ChangeNotifier {
         returnDate: Timestamp.now(),
         returnImages: uploadedUrls,
         returnReason: selectedReason,
-        returnStatus: 'submitted',
+        returnStatus: 'pending_approval',
         returnComment: descriptionController.text,
         rejectReason: null, // Only set when rejected
         returnPrice: returnPrice,
@@ -268,6 +268,7 @@ class ReturnRequestController extends ChangeNotifier {
         pendinginspectionDate: null,
         completedinsepectionDate: null,
         cancelledDate: null,
+        refundID: null,
       );
 
       await FirebaseFirestore.instance

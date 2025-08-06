@@ -10,6 +10,7 @@ class OrdersModel {
   final bool eligibilityForReturn;
   final String? shipmentID;
   final String payment;
+  final String paymentCard;
   final String? cancelID;
   final int totalProduct;
 
@@ -33,6 +34,7 @@ class OrdersModel {
     required this.eligibilityForReturn,
     this.shipmentID,
     this.payment = "Mastercard",
+    required this.paymentCard,
     this.cancelID,
     this.confirmedDate,
     this.toShipDate,
@@ -53,7 +55,8 @@ class OrdersModel {
       totalAmount: double.tryParse(json['totalAmount'].toString()) ?? 0.0,
       eligibilityForReturn: json['eligibilityForReturn'] ?? false,
       shipmentID: json['shipmentID'],
-      payment: json['payment'] ?? 'Mastercard',
+      payment: json['payment'] ?? '',
+      paymentCard: json['paymentCard'] ?? '',
       cancelID: json['cancelID'],
       totalProduct: json['totalProduct'] ?? 0,
       // Parse new date fields
@@ -88,6 +91,7 @@ class OrdersModel {
       'eligibilityForReturn': eligibilityForReturn,
       'shipmentID': shipmentID,
       'payment': payment,
+      'paymentCard': paymentCard,
       'cancelID': cancelID,
       // Include new date fields
       'confirmedDate': confirmedDate != null ? Timestamp.fromDate(confirmedDate!) : null,
@@ -115,6 +119,7 @@ class OrdersModel {
     bool? eligibilityForReturn,
     String? shipmentID,
     String? payment,
+    String? paymentCard,
     String? cancelID,
     DateTime? confirmedDate,
     DateTime? toShipDate,
@@ -134,6 +139,7 @@ class OrdersModel {
       eligibilityForReturn: eligibilityForReturn ?? this.eligibilityForReturn,
       shipmentID: shipmentID ?? this.shipmentID,
       payment: payment ?? this.payment,
+      paymentCard: paymentCard ?? this.paymentCard,
       cancelID: cancelID ?? this.cancelID,
       confirmedDate: confirmedDate ?? this.confirmedDate,
       toShipDate: toShipDate ?? this.toShipDate,

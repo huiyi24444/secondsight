@@ -501,7 +501,8 @@ extension OrdersModelExtension on OrdersModel {
       totalAmount: this.totalAmount,
       eligibilityForReturn: this.eligibilityForReturn,
       shipmentID: this.shipmentID,
-        totalProduct: this.totalProduct
+        totalProduct: this.totalProduct,
+        paymentCard: this.paymentCard
     );
   }
 }

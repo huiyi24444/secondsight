@@ -25,6 +25,8 @@ class ReturnRequestModel {
   final Timestamp? completedinsepectionDate;
   final Timestamp? cancelledDate;
 
+  final String? refundID;
+
   ReturnRequestModel({
     required this.id,
     required this.orderProductID,
@@ -49,6 +51,8 @@ class ReturnRequestModel {
     this.pendinginspectionDate,
     this.completedinsepectionDate,
     this.cancelledDate,
+
+    this.refundID,
   });
 
   factory ReturnRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -85,6 +89,8 @@ class ReturnRequestModel {
       pendinginspectionDate: data['pendinginspectionDate'] as Timestamp?,
       completedinsepectionDate: data['completedinsepectionDate'] as Timestamp?,
       cancelledDate: data['cancelledDate'] as Timestamp?,
+
+      refundID: data['refundID'] as String? ?? '',
     );
   }
   Map<String, dynamic> toMap() {
@@ -108,6 +114,7 @@ class ReturnRequestModel {
       'pendinginspectionDate': pendinginspectionDate,
       'completedinsepectionDate': completedinsepectionDate,
       'cancelledDate': cancelledDate,
+      'refundID': refundID,
     };
 
     // Only include rejectReason if it's not null, cast to Object
