@@ -294,45 +294,84 @@ class ReturnStatusStepper extends StatelessWidget {
 
     return [
       {
-        'title': 'Request Submitted',
-        'isCompleted': _isStepCompleted('submitted'),
-        'isActive': status == 'submitted' || status == 'request_submitted',
-        'date': request.returnDate?.toDate(), // Assuming returnDate is the submission date
-        'pendingText': 'Pending submission',
-      },
-      {
         'title': 'Pending Approval',
-        'isCompleted': _isStepCompleted('pending'),
-        'isActive': status == 'pending' || status == 'pending_approval',
-        'date': request.pendingDate?.toDate(), // Add pendingDate to your model if available
+        'isCompleted': _isStepCompleted('pending_approval'),
+        'isActive': status == 'pending_approval',
+        'date': request.returnDate?.toDate(), // Use submission date
         'pendingText': 'Awaiting approval',
       },
       {
-        'title': 'Request Approved',
+        'title': 'Approved',
         'isCompleted': _isStepCompleted('approved'),
-        'isActive': status == 'approved' || status == 'request_approved',
-        'date': request.approvedDate?.toDate(), // Add approvedDate to your model if available
-        'pendingText': 'Approval pending',
+        'isActive': status == 'approved',
+        'date': request.approvedDate?.toDate(),
+        'pendingText': 'Awaiting collection',
+      },
+      {
+        'title': 'Pending Inspection',
+        'isCompleted': _isStepCompleted('pending_inspection'),
+        'isActive': status == 'pending_inspection',
+        'date': request.pendinginspectionDate?.toDate(),
+        'pendingText': 'Waiting for inspection',
+      },
+      {
+        'title': 'Inspection Completed',
+        'isCompleted': _isStepCompleted('completed_inspection'),
+        'isActive': status == 'completed_inspection',
+        'date': request.completedinsepectionDate?.toDate(),
+        'pendingText': 'Processing refund decision',
+      },
+      {
+        'title': status == 'refunded' ? 'Refunded' : status == 'not_refunded' ? 'Not Refunded' : 'Final Status',
+        'isCompleted': _isStepCompleted('refunded') || _isStepCompleted('not_refunded'),
+        'isActive': status == 'refunded' || status == 'not_refunded',
+        'date': request.completedDate?.toDate(),
+        'pendingText': 'Finalizing return',
       },
     ];
   }
+
 
   bool _isStepCompleted(String stepStatus) {
     final currentStatus = returnStatus.toLowerCase();
 
     switch (stepStatus) {
-      case 'submitted':
-        return ['submitted', 'request_submitted', 'pending', 'pending_approval', 'approved', 'request_approved']
-            .contains(currentStatus);
-      case 'pending':
-        return ['pending', 'pending_approval', 'approved', 'request_approved']
-            .contains(currentStatus);
+      case 'pending_approval':
+        return [
+          'approved',
+          'pending_inspection',
+          'completed_inspection',
+          'refunded',
+          'not_refunded',
+          'rejected',
+          'cancelled',
+        ].contains(currentStatus);
+
       case 'approved':
-        return ['approved', 'request_approved'].contains(currentStatus);
+        return [
+          'pending_inspection',
+          'completed_inspection',
+          'refunded',
+          'not_refunded',
+        ].contains(currentStatus);
+
+      case 'pending_inspection':
+        return ['completed_inspection', 'refunded', 'not_refunded'].contains(currentStatus);
+
+      case 'completed_inspection':
+        return ['refunded', 'not_refunded'].contains(currentStatus);
+
+      case 'refunded':
+        return currentStatus == 'refunded';
+
+      case 'not_refunded':
+        return currentStatus == 'not_refunded';
+
       default:
         return false;
     }
   }
+
   String _formatStatusDate(DateTime date) {
     // You can customize this format as needed
     return "${date.day}/${date.month}/${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";

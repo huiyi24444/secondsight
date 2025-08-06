@@ -128,14 +128,24 @@ class ReturnRequestDetailsView extends StatelessWidget {
   ReturnStatus _getStatusFromRequest(ReturnRequestModel request) {
     // Convert your request status to ReturnStatus enum
     switch (request.returnStatus?.toLowerCase()) {
-      case 'approved':
-        return ReturnStatus.approved;
-      case 'pending_inspection':
-        return ReturnStatus.pending_inspection;
-      case 'completed':
-        return ReturnStatus.completed;
       case 'pending_approval':
         return ReturnStatus.pending_approval;
+      case 'approved':
+        return ReturnStatus.approved;
+      case 'rejected':
+        return ReturnStatus.rejected;
+      case 'pending_inspection':
+        return ReturnStatus.pending_inspection;
+      case 'completed_inspection':
+        return ReturnStatus.completed_inspection;
+      case 'refunded':
+        return ReturnStatus.refunded;
+      case 'not_refunded':
+        return ReturnStatus.not_refunded;
+      case 'cancelled':
+        return ReturnStatus.cancelled;
+      case 'rejected':
+        return ReturnStatus.rejected;
       default:
         return ReturnStatus.pending_approval;
     }

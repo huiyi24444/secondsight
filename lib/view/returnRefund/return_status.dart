@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 
-enum ReturnStatus { pending_approval, approved, pending_inspection, completed }
-
+enum ReturnStatus {
+  pending_approval,
+  approved,
+  pending_inspection,
+  completed_inspection,
+  refunded,
+  not_refunded,
+  rejected,
+  cancelled,
+}
 
 class ReturnStatusInfo {
   final String title;
@@ -58,7 +66,16 @@ class ReturnStatusCard extends StatelessWidget {
           icon: Icons.inventory_outlined,
           color: Colors.orange,
         );
-      case ReturnStatus.completed:
+      case ReturnStatus.completed_inspection:
+        return const ReturnStatusInfo(
+          title: 'Inspection Complete',
+          subtitle: 'The item has been inspected',
+          description: 'Inspection is complete. We are processing the next steps (refund or resolution).',
+          actionText: 'Please wait for the final decision',
+          icon: Icons.verified_outlined,
+          color: Colors.teal,
+        );
+      case ReturnStatus.refunded:
         return const ReturnStatusInfo(
           title: 'Return Approved',
           subtitle: 'Your item has been approved for refund',
@@ -67,7 +84,37 @@ class ReturnStatusCard extends StatelessWidget {
           icon: Icons.check_circle_outline,
           color: Colors.blue,
         );
+      case ReturnStatus.not_refunded:
+        return const ReturnStatusInfo(
+          title: 'Return Not Refunded',
+          subtitle: 'Your return was processed, but refund was not issued',
+          description: 'The item was inspected, but does not meet the refund conditions. Contact support for further help.',
+          actionText: 'Contact support for assistance',
+          icon: Icons.cancel_presentation_outlined,
+          color: Colors.deepPurple,
+        );
+
+      case ReturnStatus.rejected:
+        return const ReturnStatusInfo(
+          title: 'Return Rejected',
+          subtitle: 'Your return request was not approved',
+          description: 'Based on our return policy, your return request was rejected. For more info, contact support.',
+          actionText: 'Review our return policy',
+          icon: Icons.block,
+          color: Colors.red,
+        );
+
+      case ReturnStatus.cancelled:
+        return const ReturnStatusInfo(
+          title: 'Return Cancelled',
+          subtitle: 'You have cancelled your return request',
+          description: 'The return process has been stopped as per your request.',
+          actionText: 'No further action required',
+          icon: Icons.cancel_outlined,
+          color: Colors.grey,
+        );
     }
+
   }
 
   @override
