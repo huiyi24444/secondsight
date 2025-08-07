@@ -44,10 +44,10 @@ class OrderDetailsManagementController {
 
   // Status transition validation constants
   static const Map<String, List<String>> allowedTransitions = {
-    'to_ship': ['to_receive', 'canceled'],
-    'to_receive': ['completed', 'canceled'],
+    'to_ship': ['to_receive', 'cancelled'],
+    'to_receive': ['completed', 'cancelled'],
     'completed': [],
-    'canceled': [],
+    'cancelled': [],
   };
 
   // Validation result constants
@@ -73,8 +73,8 @@ class OrderDetailsManagementController {
   String getTransitionErrorMessage(String fromStatus, String toStatus) {
     if (fromStatus == 'completed') {
       return 'Completed orders cannot be modified.';
-    } else if (fromStatus == 'canceled') {
-      return 'Canceled orders cannot be reactivated.';
+    } else if (fromStatus == 'cancelled') {
+      return 'Cancelled orders cannot be reactivated.';
     } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
       return 'Cannot revert to "To Ship" once tracking number is provided.';
     } else {
@@ -148,21 +148,73 @@ class OrderDetailsManagementController {
         .update({'completedDate': Timestamp.now()});
   }
 
-  // Update order cancellation
+  // Modified order cancellation to follow order controller's updateOrderCancellation
   Future<void> updateOrderCancellation({
     required String customerId,
     required String orderId,
     required String cancellationReason,
+    String? cancelNote,
   }) async {
-    await firestore
-        .collection('users')
-        .doc(customerId)
-        .collection('order')
-        .doc(orderId)
-        .update({
-      'cancellationReason': cancellationReason,
-      'canceledDate': Timestamp.now(),
-    });
+    try {
+      // First, verify the order can be cancelled
+      final orderDoc = await firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('order')
+          .doc(orderId)
+          .get();
+
+      if (!orderDoc.exists) {
+        throw Exception('Order not found');
+      }
+
+      final orderData = orderDoc.data() as Map<String, dynamic>;
+      final currentStatus = orderData['orderStatus']?.toString().toLowerCase();
+
+      if (currentStatus != 'to_ship') {
+        throw Exception('Only orders with "To Ship" status can be cancelled');
+      }
+
+      // Create cancellation document reference
+      final cancellationRef = firestore
+          .collection('cancellation')
+          .doc();
+
+      // Prepare cancellation data
+      final cancellationData = {
+        'orderID': orderId,
+        'cancelReason': cancellationReason,
+        'cancelDate': Timestamp.now(),
+        'cancelNote': cancelNote,
+        'cancelledBy': 'Admin', // Since this is from admin panel
+      };
+
+      // Use batch write for atomicity
+      final batch = firestore.batch();
+
+      // Create cancellation document
+      batch.set(cancellationRef, cancellationData);
+
+      // Update order document
+      batch.update(
+        firestore
+            .collection('users')
+            .doc(customerId)
+            .collection('order')
+            .doc(orderId),
+        {
+          'orderStatus': 'cancelled',
+          'cancelDate': Timestamp.now(),
+          'cancelID': cancellationRef.id,
+        },
+      );
+
+      // Commit batch
+      await batch.commit();
+
+    } catch (e) {
+      throw Exception('Failed to cancel order: $e');
+    }
   }
 
   // Update tracking number
@@ -241,7 +293,7 @@ class OrderDetailsManagementController {
         color: Colors.grey[700]!,
         isCompleted: true,
       ));
-    } else if (order.orderStatus != 'canceled') {
+    } else if (order.orderStatus != 'cancelled') {
       items.add(TimelineItem(
         title: 'Order Confirmed',
         date: null,
@@ -308,7 +360,7 @@ class OrderDetailsManagementController {
         isCompleted: true,
         isLast: true,
       ));
-    } else if (order.orderStatus != 'canceled') {
+    } else if (order.orderStatus != 'cancelled') {
       items.add(TimelineItem(
         title: 'Delivered',
         date: null,

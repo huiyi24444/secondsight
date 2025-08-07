@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RefundModel {
   final String id;
-  final String returnRequestId;
+  final String orderId;
+  final String? returnRequestId;
+  final String? cancelId;
   final double refundAmount;
   final String refundMethod;
   final DateTime refundDate;
@@ -13,7 +15,9 @@ class RefundModel {
 
   RefundModel({
     required this.id,
-    required this.returnRequestId,
+    required this.orderId,
+    this.returnRequestId,
+    this.cancelId,
     required this.refundAmount,
     required this.refundMethod,
     required this.refundDate,
@@ -23,7 +27,9 @@ class RefundModel {
   factory RefundModel.fromJson(Map<String, dynamic> json) {
     return RefundModel(
       id: json['id'] ?? '',
-      returnRequestId: json['returnRequestId'] ?? '',
+      orderId: json['orderId'] ?? '',
+      returnRequestId: json['returnRequestId'],
+      cancelId: json['cancelId'],
       refundAmount: (json['refundAmount'] ?? 0).toDouble(),
       refundMethod: json['refundMethod'] ?? '',
       refundDate: (json['refundDate'] as Timestamp).toDate(),
@@ -39,7 +45,9 @@ class RefundModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'orderId': orderId,
       'returnRequestId': returnRequestId,
+      'cancelId': cancelId,
       'refundAmount': refundAmount,
       'refundMethod': refundMethod,
       'refundDate': Timestamp.fromDate(refundDate),
@@ -49,16 +57,19 @@ class RefundModel {
 
   RefundModel copyWith({
     String? id,
+    String? orderId,
     String? returnRequestId,
+    String? cancelId,
     double? refundAmount,
     String? refundMethod,
     DateTime? refundDate,
     String? transactionId,
-
   }) {
     return RefundModel(
       id: id ?? this.id,
+      orderId: orderId ?? this.orderId,
       returnRequestId: returnRequestId ?? this.returnRequestId,
+      cancelId: cancelId ?? this.cancelId,
       refundAmount: refundAmount ?? this.refundAmount,
       refundMethod: refundMethod ?? this.refundMethod,
       refundDate: refundDate ?? this.refundDate,
