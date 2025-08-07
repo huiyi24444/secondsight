@@ -215,38 +215,37 @@ class ReturnManagementView extends StatelessWidget {
                                         PopupMenuButton<String>(
                                           icon: const Icon(Icons.more_vert),
                                           onSelected: (value) async {
-                                            if (value == 'delete') {
+                                            if (value == 'cancel') {
                                               showDialog(
                                                 context: context,
                                                 builder: (_) => AlertDialog(
-                                                  title: const Text('Delete Return'),
-                                                  content: const Text('Are you sure you want to delete this return?'),
+                                                  title: const Text('Cancel Return'),
+                                                  content: const Text('Are you sure you want to cancel this return request?'),
                                                   actions: [
                                                     TextButton(
                                                       onPressed: () => Navigator.pop(context),
-                                                      child: const Text('Cancel'),
+                                                      child: const Text('No'),
                                                     ),
                                                     ElevatedButton(
                                                       onPressed: () async {
                                                         Navigator.pop(context);
-                                                        await FirebaseFirestore.instance
-                                                            .collection('returnRequests')
-                                                            .doc(item['id'])
-                                                            .delete();
+                                                        // Use the controller's updateReturnStatus method to handle cancellation
+                                                        await controller.updateReturnStatus(context, item['userEmail'], item['id'], 'cancelled');
                                                         controller.loadReturns();
                                                       },
                                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                                      child: const Text('Delete'),
+                                                      child: const Text('Yes, Cancel'),
                                                     ),
                                                   ],
                                                 ),
                                               );
                                             } else {
+                                              // Handle other status updates
                                               controller.updateReturnStatus(context, item['userEmail'], item['id'], value);
                                             }
                                           },
                                           itemBuilder: (_) => const [
-                                            PopupMenuItem(value: 'delete', child: Text('Delete Return', style: TextStyle(color: Colors.red))),
+                                            PopupMenuItem(value: 'cancelled', child: Text('Cancel Return', style: TextStyle(color: Colors.red))),
                                           ],
                                         ),
                                       ],

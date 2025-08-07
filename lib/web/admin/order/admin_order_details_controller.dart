@@ -175,18 +175,38 @@ class OrderDetailsManagementController {
         throw Exception('Only orders with "To Ship" status can be cancelled');
       }
 
-      // Create cancellation document reference
-      final cancellationRef = firestore
-          .collection('cancellation')
-          .doc();
+      // Get order details for refund
+      final orderTotal = (orderData['totalAmount'] ?? 0.0) as double;
+      final paymentMethod = orderData['paymentMethod'] ?? 'Original Payment Method';
+      final payment = orderData['payment'] ?? 'Unknown'; // This will be used as transactionId
 
-      // Prepare cancellation data
+      // Create document references
+      final cancellationRef = firestore.collection('cancellation').doc();
+      final refundRef = firestore.collection('refunds').doc();
+
+      // Prepare cancellation data using the enhanced CancellationModel structure
       final cancellationData = {
-        'orderID': orderId,
+        'referenceID': orderId,
+        'cancellationType': 'order', // Specify this is an order cancellation
         'cancelReason': cancellationReason,
         'cancelDate': Timestamp.now(),
         'cancelNote': cancelNote,
         'cancelledBy': 'Admin', // Since this is from admin panel
+        // Include legacy fields for backward compatibility
+        'orderID': orderId,
+      };
+
+      // Prepare refund data using the RefundModel structure
+      final refundData = {
+        'orderId': orderId,
+        'returnRequestId': null, // null for cancellation refunds
+        'cancelId': cancellationRef.id,
+        'refundAmount': orderTotal,
+        'refundMethod': paymentMethod,
+        'refundDate': Timestamp.now(),
+        'transactionId': payment, // Use 'payment' attribute as transactionId
+        'customerId': customerId,
+        'refundType': 'cancellation',
       };
 
       // Use batch write for atomicity
@@ -194,6 +214,9 @@ class OrderDetailsManagementController {
 
       // Create cancellation document
       batch.set(cancellationRef, cancellationData);
+
+      // Create refund document in top-level 'refunds' collection
+      batch.set(refundRef, refundData);
 
       // Update order document
       batch.update(
@@ -206,6 +229,7 @@ class OrderDetailsManagementController {
           'orderStatus': 'cancelled',
           'cancelDate': Timestamp.now(),
           'cancelID': cancellationRef.id,
+          'refundID': refundRef.id, // Link to refund document
         },
       );
 
@@ -378,11 +402,11 @@ class OrderDetailsManagementController {
   Future<OrderData> loadOrderData({
     required String customerId,
     required String orderId,
-    String? paymentStatus,
+    String? payment,
   }) async {
     final results = await Future.wait([
       fetchShipmentData(customerId: customerId, orderId: orderId),
-      fetchPaymentData(customerId: customerId, paymentStatus: paymentStatus),
+      fetchPaymentData(customerId: customerId, payment: payment),
     ]);
 
     return OrderData(
@@ -419,11 +443,11 @@ class OrderDetailsManagementController {
 
   Future<PaymentCard?> fetchPaymentData({
     required String customerId,
-    String? paymentStatus,
+    String? payment,
     String? paymentCardId, // NEW: Optional parameter for specific card ID
   }) async {
     try {
-      if (paymentStatus == null || paymentStatus == 'Pending') {
+      if (payment == null || payment == 'Unknown') {
         return null;
       }
 

@@ -7,6 +7,8 @@ import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
 import '../../../model/user_model.dart';
+import '../../../view/widgets/dateTime_utils.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
@@ -241,7 +243,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                         size: 16, color: customer!.isVerified ? Colors.green : Colors.grey),
                                   ),
                                   const SizedBox(width: 10),
-                                  Text('User ID: ${widget.userId.substring(0, 8)}'),
+                                  Text('User ID: ${shortUserId(widget.userId)}'),
                                 ],
                               ),
                               const SizedBox(height: 30),
@@ -250,7 +252,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                               _buildInfoRow(
                                 'Last Transaction',
                                 customerOrders.isNotEmpty
-                                    ? _formatDate(customerOrders.first.orderDate)
+                                    ? DateFormatter.formatDateTime(customerOrders.first.orderDate)
                                     : 'No transactions',
                               ),
                               const SizedBox(height: 20),

@@ -154,13 +154,124 @@ class AdminReturnDetailsController extends ChangeNotifier {
   /// Update return status
   Future<bool> updateReturnStatus(String returnId, String newStatus) async {
     try {
-      await firestore
-          .collection('returnRequests')
-          .doc(returnId)
-          .update({
-        'returnStatus': newStatus,
-        '${newStatus}Date': FieldValue.serverTimestamp(),
-      });
+      // Special handling for refunded status transition
+      if (newStatus == 'refunded') {
+        // Get the return request details first
+        final returnDoc = await firestore
+            .collection('returnRequests')
+            .doc(returnId)
+            .get();
+
+        if (!returnDoc.exists) {
+          throw Exception('Return request not found');
+        }
+
+        final returnData = returnDoc.data() as Map<String, dynamic>;
+
+        // Get order details for refund
+        final userID = returnData['userID'];
+        final orderID = returnData['orderID'];
+        final refundAmount = (returnData['returnPrice'] ?? 0.0) as double;
+        final returnQuantity = returnData['returnQuantity'] ?? 1;
+        final totalRefundAmount = refundAmount * returnQuantity;
+
+        // Get payment method from original order
+        final orderDoc = await firestore
+            .collection('users')
+            .doc(userID)
+            .collection('order')
+            .doc(orderID)
+            .get();
+
+        final paymentMethod = orderDoc.exists
+            ? (orderDoc.data() as Map<String, dynamic>)['paymentMethod'] ?? 'Original Payment Method'
+            : 'Original Payment Method';
+
+        final payment = orderDoc.exists
+            ? (orderDoc.data() as Map<String, dynamic>)['payment'] ?? 'Unknown'
+            : 'Unknown';
+
+        // Create refund document reference
+        final refundRef = firestore.collection('refunds').doc();
+
+        // Prepare refund data using the RefundModel structure
+        final refundData = {
+          'orderId': orderID,
+          'returnRequestId': returnId,
+          'cancelId': null, // null for return refunds
+          'refundAmount': totalRefundAmount,
+          'refundMethod': paymentMethod,
+          'refundDate': FieldValue.serverTimestamp(),
+          'transactionId': payment, // Use 'payment' attribute as transactionId
+          'customerId': userID,
+          'refundType': 'return',
+        };
+
+        // Use batch write for atomicity
+        final batch = firestore.batch();
+
+        // Update return request status
+        batch.update(
+          firestore.collection('returnRequests').doc(returnId),
+          {
+            'returnStatus': newStatus,
+            '${newStatus}Date': FieldValue.serverTimestamp(),
+            'refundID': refundRef.id, // Link to refund document
+          },
+        );
+
+        // Create refund document in top-level 'refunds' collection
+        batch.set(refundRef, refundData);
+
+        // Commit batch
+        await batch.commit();
+      }
+      // Special handling for cancelled status transition
+      else if (newStatus == 'cancelled') {
+        // Create cancellation document reference
+        final cancellationRef = firestore.collection('cancellation').doc();
+
+        // Prepare cancellation data using the enhanced CancellationModel structure
+        final cancellationData = {
+          'referenceID': returnId,
+          'cancellationType': 'return_request', // Specify this is a return request cancellation
+          'cancelReason': 'Return request cancelled by admin', // Default reason, could be parameterized
+          'cancelDate': FieldValue.serverTimestamp(),
+          'cancelNote': null, // Could be added as parameter if needed
+          'cancelledBy': 'admin', // Since this is from admin panel
+          // Include legacy field for backward compatibility
+          'returnRequestID': returnId,
+        };
+
+        // Use batch write for atomicity
+        final batch = firestore.batch();
+
+        // Create cancellation document
+        batch.set(cancellationRef, cancellationData);
+
+        // Update return request status
+        batch.update(
+          firestore.collection('returnRequests').doc(returnId),
+          {
+            'returnStatus': newStatus,
+            '${newStatus}Date': FieldValue.serverTimestamp(),
+            'cancelID': cancellationRef.id, // Link to cancellation document
+          },
+        );
+
+        // Commit batch
+        await batch.commit();
+      }
+      else {
+        // Standard status update for other statuses
+        await firestore
+            .collection('returnRequests')
+            .doc(returnId)
+            .update({
+          'returnStatus': newStatus,
+          '${newStatus}Date': FieldValue.serverTimestamp(),
+        });
+      }
 
       return true;
     } catch (e) {

@@ -142,30 +142,149 @@ class ReturnManagementController extends ChangeNotifier {
   }
 
   Future<void> updateReturnStatus(BuildContext context, String userEmail, String returnId, String newStatus) async {
-    final returnRef = _firestore.collection('returnRequests').doc(returnId);
-    await returnRef.update({'returnStatus': newStatus});
+    try {
+      // Special handling for cancelled status transition
+      if (newStatus == 'cancelled') {
+        // Get the return request details first
+        final returnDoc = await _firestore
+            .collection('returnRequests')
+            .doc(returnId)
+            .get();
 
-    if (newStatus == 'refunded') {
-      final returnDoc = await returnRef.get();
-      final returnData = ReturnRequestModel.fromDocument(returnDoc);
-
-      // Extract necessary data
-      final userId = returnData.userID;
-      final orderId = returnData.orderID;
-      final orderProductId = returnData.orderProductID;
-
-      // Use the controller method here too for consistency
-      try {
-        final orderProductDoc = await getOrderProductDoc(userId, orderId, orderProductId);
-        if (orderProductDoc.exists) {
-          await orderProductDoc.reference.update({'orderStatus': 'refunded'});
+        if (!returnDoc.exists) {
+          throw Exception('Return request not found');
         }
-      } catch (e) {
-        print('Error updating order product status: $e');
+
+        final returnData = ReturnRequestModel.fromDocument(returnDoc);
+
+        // Create cancellation document reference
+        final cancellationRef = _firestore.collection('cancellation').doc();
+
+        // Prepare cancellation data using the enhanced CancellationModel structure
+        final cancellationData = {
+          'referenceID': returnId,
+          'cancellationType': 'return_request', // Specify this is a return request cancellation
+          'cancelReason': 'Return request cancelled by admin',
+          'cancelDate': FieldValue.serverTimestamp(),
+          'cancelNote': null,
+          'cancelledBy': 'admin', // Since this is from admin panel
+          // Include legacy field for backward compatibility
+          'returnRequestID': returnId,
+        };
+
+        // Use batch write for atomicity
+        final batch = _firestore.batch();
+
+        // Create cancellation document
+        batch.set(cancellationRef, cancellationData);
+
+        // Update return request status
+        batch.update(
+          _firestore.collection('returnRequests').doc(returnId),
+          {
+            'returnStatus': newStatus,
+            '${newStatus}Date': FieldValue.serverTimestamp(),
+            'cancelID': cancellationRef.id, // Link to cancellation document
+          },
+        );
+
+        // Commit batch
+        await batch.commit();
+      }
+      // Special handling for refunded status transition
+      else if (newStatus == 'refunded') {
+        final returnRef = _firestore.collection('returnRequests').doc(returnId);
+        final returnDoc = await returnRef.get();
+        final returnData = ReturnRequestModel.fromDocument(returnDoc);
+
+        // Extract necessary data
+        final userId = returnData.userID;
+        final orderId = returnData.orderID;
+        final orderProductId = returnData.orderProductID;
+        final refundAmount = (returnData.returnPrice ?? 0.0) as double;
+        final returnQuantity = returnData.returnQuantity ?? 1;
+        final totalRefundAmount = refundAmount * returnQuantity;
+
+        // Get payment method from original order
+        final orderDoc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('order')
+            .doc(orderId)
+            .get();
+
+        final paymentMethod = orderDoc.exists
+            ? (orderDoc.data() as Map<String, dynamic>)['paymentMethod'] ?? 'Original Payment Method'
+            : 'Original Payment Method';
+
+        final payment = orderDoc.exists
+            ? (orderDoc.data() as Map<String, dynamic>)['payment'] ?? 'Unknown'
+            : 'Unknown';
+
+        // Create refund document reference
+        final refundRef = _firestore.collection('refunds').doc();
+
+        // Prepare refund data using the RefundModel structure
+        final refundData = {
+          'orderId': orderId,
+          'returnRequestId': returnId,
+          'cancelId': null, // null for return refunds
+          'refundAmount': totalRefundAmount,
+          'refundMethod': paymentMethod,
+          'refundDate': FieldValue.serverTimestamp(),
+          'transactionId': payment, // Use 'payment' attribute as transactionId
+          'customerId': userId,
+          'refundType': 'return',
+        };
+
+        // Use batch write for atomicity
+        final batch = _firestore.batch();
+
+        // Update return request status
+        batch.update(
+          _firestore.collection('returnRequests').doc(returnId),
+          {
+            'returnStatus': newStatus,
+            '${newStatus}Date': FieldValue.serverTimestamp(),
+            'refundID': refundRef.id, // Link to refund document
+          },
+        );
+
+        // Create refund document in top-level 'refunds' collection
+        batch.set(refundRef, refundData);
+
+        // Update order product status
+        try {
+          final orderProductDoc = await getOrderProductDoc(userId, orderId, orderProductId);
+          if (orderProductDoc.exists) {
+            batch.update(orderProductDoc.reference, {'orderStatus': 'refunded'});
+          }
+        } catch (e) {
+          print('Error preparing order product status update: $e');
+        }
+
+        // Commit batch
+        await batch.commit();
+      }
+      else {
+        // Standard status update for other statuses
+        final returnRef = _firestore.collection('returnRequests').doc(returnId);
+        await returnRef.update({
+          'returnStatus': newStatus,
+          '${newStatus}Date': FieldValue.serverTimestamp(),
+        });
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Return status updated successfully')),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update return status: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

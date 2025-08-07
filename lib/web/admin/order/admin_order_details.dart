@@ -77,7 +77,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final data = await _controller.loadOrderData(
       customerId: widget.order.customerId!,
       orderId: widget.order.id,
-      paymentStatus: widget.order.payment,
+      payment: widget.order.payment,
     );
 
     setState(() {
@@ -237,55 +237,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       // Output: Jul 17, 2025 • 01:06 AM
                     )
                   ],
-                ),
-                const SizedBox(width: 24),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: OrderStatusUtils.getStatusColor(
-                      currentStatus,
-                    ).withOpacity(0.1),
-                    border: Border.all(
-                      color: OrderStatusUtils.getStatusColor(currentStatus),
-                    ),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: DropdownButton<String>(
-                    value: currentStatus,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    items: _controller.getAvailableStatuses(currentStatus)
-                        .map(
-                          (status) => DropdownMenuItem(
-                            value: status,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  margin: const EdgeInsets.only(right: 6),
-                                  decoration: BoxDecoration(
-                                    color: OrderStatusUtils.getStatusColor(
-                                      status,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                Text(
-                                  OrderStatusUtils.formatStatus(status),
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _handleStatusChange,
-                  ),
                 ),
               ],
             ),
@@ -1188,7 +1139,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           _buildInfoRow(
             'Shipped',
             shipment?.shippedDate != null
-                ? _formatDate(shipment!.shippedDate!)
+                ? _formatDateTime(shipment!.shippedDate!)
                 : 'Not yet shipped',
             valueColor: shipment?.shippedDate != null ? null : Colors.orange[600],
           ),
@@ -1378,7 +1329,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             _buildInfoRow('Note', cancelData!.cancelNote!),
           ],
           const SizedBox(height: 8),
-          _buildInfoRow('Date', _formatDate(cancelData!.cancelDate)),
+          _buildInfoRow('Date', _formatDateTime(cancelData!.cancelDate)),
         ],
       ),
     );
@@ -1492,8 +1443,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         case 'to_receive->completed':
           proceedWithUpdate = await _handleReceiveToCompleted();
           break;
-        case 'to_ship->canceled':
-        case 'to_receive->canceled':
+        case 'to_ship->cancelled':
+        case 'to_receive->cancelled':
           proceedWithUpdate = await _handleCancellation();
           break;
         default:
@@ -1655,77 +1606,170 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   // Handle order cancellation
   Future<bool> _handleCancellation() async {
     final reasonController = TextEditingController();
+    final cancelNoteController = TextEditingController();
+    String? selectedReason;
+
+    // Predefined cancellation reasons
+    final List<String> cancellationReasons = [
+      'Customer requested cancellation',
+      'Payment issues',
+      'Item out of stock',
+      'Shipping address issues',
+      'Duplicate order',
+      'Administrative error',
+      'Quality concerns',
+      'Other',
+    ];
 
     return await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Order'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (currentStatus == 'to_receive')
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This order has already been shipped. Cancellation may require return shipping.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.red[900],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Cancel Order'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (currentStatus == 'to_receive')
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.red[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This order has already been shipped. Cancellation may require return shipping.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red[900],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+
+              // Cancellation Reason Dropdown
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[400]!),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: selectedReason,
+                  decoration: const InputDecoration(
+                    labelText: 'Cancellation Reason *',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  ),
+                  hint: const Text('Select reason for cancellation'),
+                  items: cancellationReasons.map((reason) {
+                    return DropdownMenuItem<String>(
+                      value: reason,
+                      child: Text(
+                        reason,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedReason = value;
+                      // Update the reasonController with the selected value
+                      reasonController.text = value ?? '';
+                    });
+                  },
+                  isExpanded: true,
                 ),
               ),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Cancellation Reason *',
-                hintText: 'Enter reason for cancellation',
-                border: OutlineInputBorder(),
+
+              const SizedBox(height: 16),
+
+              // Additional Notes Text Field
+              TextField(
+                controller: cancelNoteController,
+                decoration: const InputDecoration(
+                  labelText: 'Additional Notes (Optional)',
+                  hintText: 'Add any additional details about the cancellation',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 3,
+                textInputAction: TextInputAction.newline,
               ),
-              maxLines: 3,
-              autofocus: true,
+
+              const SizedBox(height: 8),
+              Text(
+                'Please select a reason and optionally provide additional details.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Back'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Validate that a reason is selected
+                if (selectedReason == null || selectedReason!.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please select a cancellation reason'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // If "Other" is selected, make sure there's additional info
+                if (selectedReason == 'Other' && cancelNoteController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please provide additional details when selecting "Other"'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  await _controller.updateOrderCancellation(
+                    customerId: widget.order.customerId!,
+                    orderId: widget.order.id,
+                    cancellationReason: reasonController.text.trim(), // This contains the selected reason
+                    cancelNote: cancelNoteController.text.trim().isEmpty
+                        ? null
+                        : cancelNoteController.text.trim(), // This contains additional notes
+                  );
+                  Navigator.pop(context, true);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to cancel order: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Cancel Order'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Back'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please provide a cancellation reason'),
-                  ),
-                );
-                return;
-              }
-              await _controller.updateOrderCancellation(
-                customerId: widget.order.customerId!,
-                orderId: widget.order.id,
-                cancellationReason: reasonController.text.trim(),
-              );
-              Navigator.pop(context, true);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Cancel Order'),
-          ),
-        ],
       ),
     ) ?? false;
   }

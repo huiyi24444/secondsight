@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../model/user_model.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../widget/topbar.dart';
 import 'admin_customer_addition.dart';
 import 'admin_customer_controller.dart';
@@ -163,7 +164,7 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
                               rows: currentCustomers.map((customer) {
                                 return DataRow(cells: [
                                   const DataCell(Checkbox(value: false, onChanged: null)),
-                                  DataCell(Text('#${customer.id?.substring(0, 8) ?? 'N/A'}')),
+                                  DataCell(Text('#${shortUserId(customer.id) ?? 'N/A'}')),
                                   DataCell(Text(customer.fullName)),
                                   DataCell(Text(customer.email)),
                                   DataCell(Text(customer.phoneNum.toString())),

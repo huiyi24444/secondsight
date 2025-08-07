@@ -11,6 +11,9 @@ class RefundModel {
   final String refundMethod;
   final DateTime refundDate;
   final String transactionId;
+  final String customerId;
+  final String refundType;
+
 
 
   RefundModel({
@@ -22,6 +25,8 @@ class RefundModel {
     required this.refundMethod,
     required this.refundDate,
     required this.transactionId,
+    required this.customerId,
+    required this.refundType,
   });
 
   factory RefundModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +39,8 @@ class RefundModel {
       refundMethod: json['refundMethod'] ?? '',
       refundDate: (json['refundDate'] as Timestamp).toDate(),
       transactionId: json['transactionId'] ?? '',
+      customerId: json['customerId'] ?? '',
+      refundType: json['refundType'] ?? 'return',
     );
   }
 
@@ -52,6 +59,8 @@ class RefundModel {
       'refundMethod': refundMethod,
       'refundDate': Timestamp.fromDate(refundDate),
       'transactionId': transactionId,
+      'customerId': customerId,
+      'refundType': refundType,
     };
   }
 
@@ -64,6 +73,8 @@ class RefundModel {
     String? refundMethod,
     DateTime? refundDate,
     String? transactionId,
+    String? customerId,
+    String? refundType,
   }) {
     return RefundModel(
       id: id ?? this.id,
@@ -74,6 +85,8 @@ class RefundModel {
       refundMethod: refundMethod ?? this.refundMethod,
       refundDate: refundDate ?? this.refundDate,
       transactionId: transactionId ?? this.transactionId,
+      customerId: customerId ?? this.customerId,
+      refundType: refundType ?? this.refundType,
     );
   }
 }
