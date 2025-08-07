@@ -521,7 +521,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           SizedBox(
             width: 100,
             child: Text(
-              _formatDate(order.orderDate),
+              DateFormatter.formatDate(order.orderDate),
               textAlign: TextAlign.right,
             ),
           ),
@@ -531,13 +531,3 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'N/A';
-    return '${date.day} ${_getMonth(date.month)} ${date.year}';
-  }
-
-
-  String _getMonth(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month - 1];
-  }

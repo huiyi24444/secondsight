@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:secondsight/model/category_model.dart';
@@ -270,12 +271,18 @@ class _MyHomePageState extends State<MyHomePage> {
                             children: [
                               IconButton(
                                 icon: ClipOval(
-                                  child: Image.network(
-                                    category.catURL,
+                                  child: CachedNetworkImage(
+                                    imageUrl: category.catURL,
                                     width: 60,
                                     height: 60,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
+                                    placeholder: (context, url) => Container(
+                                      width: 60,
+                                      height: 60,
+                                      color: Colors.grey[200],
+                                      child: const CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                    errorWidget: (context, url, error) => Container(
                                       width: 60,
                                       height: 60,
                                       color: Colors.grey[200],

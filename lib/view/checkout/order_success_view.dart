@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../order/order_details_view.dart';
+import '../products/homepage.dart';
 
 
 class OrderSuccessScreen extends StatelessWidget {
@@ -18,6 +19,7 @@ class OrderSuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Color(0xFF8B5CF6),
       body: SafeArea(
+        bottom: false, // Don't respect bottom safe area
         child: Column(
           children: [
             Expanded(
@@ -88,6 +90,25 @@ class OrderSuccessScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(builder: (_) => MyHomePage()), // Replace with your actual homepage
+                                  (route) => false,
+                            );
+                          },
+                          child: Text(
+                            'Back to Homepage',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF8B5CF6),
+                              decoration: TextDecoration.underline,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),

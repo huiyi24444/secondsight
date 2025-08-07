@@ -93,52 +93,12 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                           if (_controller.canCancelOrder(order)) {
                             showCancelOrderDialog(
                               context: context,
-                              orderId: _controller.shortOrderId,
+                              orderId: widget.orderId,
+                              customerId: _controller.userId, // Add the customerId parameter
                               onCancel: () {
                                 print('User chose to keep the order');
                               },
-                              onConfirm: (reason, note) async {
-                                // Show loading
-                                showDialog(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (context) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-
-                                // Cancel the order
-                                final success = await _controller.cancelOrder(
-                                  cancelReason: reason,
-                                  cancelNote: note,
-                                  cancelledBy: _controller.userId,
-                                );
-
-                                // Close loading
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-
-                                if (success && context.mounted) {
-                                  // Show success message
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Order cancelled successfully'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-
-                                  // Navigate back
-                                  Navigator.of(context).pop();
-                                } else if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to cancel order'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              },
+                              // Remove the onConfirm parameter entirely since the new dialog handles everything internally
                             );
                           } else {
                             showDialog(

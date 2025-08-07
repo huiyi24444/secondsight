@@ -7,12 +7,14 @@ import '../../controller/order/cancel_dialog_controller.dart';
 
 class CancelOrderDialog extends StatefulWidget {
   final String orderId;
+  final String customerId;
   final VoidCallback? onCancel;
   final Function(String reason, String? note)? onConfirm;
 
   const CancelOrderDialog({
     super.key,
     required this.orderId,
+    required this.customerId,
     this.onCancel,
     this.onConfirm,
   });
@@ -69,7 +71,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
     return ChangeNotifierProvider<CancelOrderDialogController>.value(
       value: _controller,
       child: AnimatedBuilder(
-        animation: _animationController ?? AnimationController(duration: Duration.zero, vsync: this),
+        animation: _animationController ??
+            AnimationController(duration: Duration.zero, vsync: this),
         builder: (context, child) {
           // Safe access with null checks and defaults
           final fadeValue = _fadeAnimation?.value ?? 1.0;
@@ -81,13 +84,19 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
               color: Colors.black.withOpacity(0.6 * fadeValue),
               child: Center(
                 child: Transform.translate(
-                  offset: Offset(0, MediaQuery.of(context).size.height * slideValue),
+                  offset: Offset(0, MediaQuery
+                      .of(context)
+                      .size
+                      .height * slideValue),
                   child: Opacity(
                     opacity: fadeValue,
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(context).size.height * 0.85,
+                        maxHeight: MediaQuery
+                            .of(context)
+                            .size
+                            .height * 0.85,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -104,7 +113,7 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _buildHeader(),
-                          SizedBox(height:15),
+                          SizedBox(height: 15),
                           Flexible(
                             child: SingleChildScrollView(
                               physics: const BouncingScrollPhysics(),
@@ -319,7 +328,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
     );
   }
 
-  Widget _buildReasonCard(String reason, CancelOrderDialogController controller) {
+  Widget _buildReasonCard(String reason,
+      CancelOrderDialogController controller) {
     final isSelected = controller.selectedReason == reason;
 
     return GestureDetector(
@@ -329,7 +339,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8E6CEF).withOpacity(0.08) : Colors.white,
+          color: isSelected ? const Color(0xFF8E6CEF).withOpacity(0.08) : Colors
+              .white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? const Color(0xFF8E6CEF) : Colors.grey[200]!,
@@ -351,9 +362,11 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? const Color(0xFF8E6CEF) : Colors.transparent,
+                color: isSelected ? const Color(0xFF8E6CEF) : Colors
+                    .transparent,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF8E6CEF) : Colors.grey[300]!,
+                  color: isSelected ? const Color(0xFF8E6CEF) : Colors
+                      .grey[300]!,
                   width: 2,
                 ),
               ),
@@ -440,7 +453,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
                     child: Container(
                       height: 52,
                       decoration: BoxDecoration(
-                        gradient: controller.canProceed && !controller.isProcessing
+                        gradient: controller.canProceed &&
+                            !controller.isProcessing
                             ? LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -451,7 +465,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
                             ? null
                             : Colors.grey[300],
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: controller.canProceed && !controller.isProcessing
+                        boxShadow: controller.canProceed &&
+                            !controller.isProcessing
                             ? [
                           BoxShadow(
                             color: Colors.red.withOpacity(0.3),
@@ -462,7 +477,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
                             : [],
                       ),
                       child: ElevatedButton(
-                        onPressed: (controller.canProceed && !controller.isProcessing)
+                        onPressed: (controller.canProceed &&
+                            !controller.isProcessing)
                             ? () => _handleCancelOrder(controller)
                             : null,
                         style: ElevatedButton.styleFrom(
@@ -479,7 +495,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white),
                           ),
                         )
                             : const Text(
@@ -502,33 +519,67 @@ class _CancelOrderDialogState extends State<CancelOrderDialog>
   }
 
   void _handleCancelOrder(CancelOrderDialogController controller) async {
-    await controller.processCancellation(
-      onConfirm: widget.onConfirm ?? (_, __) {},
-      onComplete: () {
-        if (mounted) {
-          _animationController?.reverse().then((_) {
-            Navigator.of(context).pop();
-          });
-        }
-      },
-    );
+    try {
+      await controller.processOrderCancellationWithRefund(
+        orderId: widget.orderId,
+        customerId: widget.customerId,
+        onComplete: () {
+          if (mounted) {
+            _animationController?.reverse().then((_) {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'Order cancelled successfully. Refund will be processed within 3-5 business days.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              widget.onCancel?.call();
+            });
+          }
+        },
+        onError: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to cancel order. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
+
+
+
 }
 
-// Helper function to show the dialog
 Future<void> showCancelOrderDialog({
   required BuildContext context,
   required String orderId,
+  required String customerId, // Add this line
   VoidCallback? onCancel,
   Function(String reason, String? note)? onConfirm,
 }) {
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
-    barrierColor: Colors.transparent, // Custom background handled in widget
+    barrierColor: Colors.transparent,
     builder: (BuildContext context) {
       return CancelOrderDialog(
         orderId: orderId,
+        customerId: customerId, // Add this line
         onCancel: onCancel,
         onConfirm: onConfirm,
       );

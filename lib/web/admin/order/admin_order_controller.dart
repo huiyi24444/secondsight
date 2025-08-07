@@ -430,7 +430,7 @@ class OrderManagementController extends ChangeNotifier {
       }
 
       // Get order details for refund
-      final orderTotal = (orderData['totalAmount'] ?? 0.0) as double;
+      final orderTotal = ((orderData['totalAmount'] ?? 0.0) as double) - 8;
       final paymentMethod = orderData['paymentMethod'] ?? 'Original Payment Method';
       final payment = orderData['payment'] ?? 'Unknown'; // This will be used as transactionId
 
