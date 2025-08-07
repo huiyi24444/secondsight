@@ -420,35 +420,79 @@ class OrderDetailsManagementController {
   Future<PaymentCard?> fetchPaymentData({
     required String customerId,
     String? paymentStatus,
+    String? paymentCardId, // NEW: Optional parameter for specific card ID
   }) async {
     try {
       if (paymentStatus == null || paymentStatus == 'Pending') {
         return null;
       }
 
-      final paymentMethodsSnapshot = await firestore
+      // NEW: If paymentCardId is provided, fetch that specific card
+      if (paymentCardId != null) {
+        final cardDoc = await firestore
+            .collection('users')
+            .doc(customerId)
+            .collection('paymentCards') // Changed from 'paymentMethods' to 'paymentCards'
+            .doc(paymentCardId)
+            .get();
+
+        if (cardDoc.exists) {
+          return PaymentCard.fromDocument(cardDoc);
+        }
+      }
+
+      // Fallback: Find default payment method from paymentCards collection
+      final paymentCardsSnapshot = await firestore
           .collection('users')
           .doc(customerId)
-          .collection('paymentMethods')
+          .collection('paymentCards') // Changed from 'paymentMethods'
           .get();
 
-      if (paymentMethodsSnapshot.docs.isEmpty) {
+      if (paymentCardsSnapshot.docs.isEmpty) {
         return null;
       }
 
-      // Find default payment method
+      // Find default payment card
       QueryDocumentSnapshot<Map<String, dynamic>>? defaultPaymentDoc;
-      for (var doc in paymentMethodsSnapshot.docs) {
+      for (var doc in paymentCardsSnapshot.docs) {
         if (doc.data()['isDefault'] == true) {
           defaultPaymentDoc = doc;
           break;
         }
       }
 
-      defaultPaymentDoc ??= paymentMethodsSnapshot.docs.first;
+      defaultPaymentDoc ??= paymentCardsSnapshot.docs.first;
       return PaymentCard.fromDocument(defaultPaymentDoc);
     } catch (e) {
       debugPrint('Error fetching payment card: $e');
+      return null;
+    }
+  }
+
+  /// Fetch payment card details from paymentCards subcollection
+  Future<Map<String, dynamic>?> fetchPaymentCardDetails({
+    required String customerId,
+    required String paymentCardId,
+  }) async {
+    try {
+      final cardDoc = await firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('paymentCards')
+          .doc(paymentCardId)
+          .get();
+
+      if (cardDoc.exists) {
+        final data = cardDoc.data()!;
+        return {
+          'lastFour': data['lastFour'],
+          'brand': data['brand'],
+          // Add any other fields you need from the PaymentCard model
+        };
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching payment card details: $e');
       return null;
     }
   }

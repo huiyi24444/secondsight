@@ -26,6 +26,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   List<OrdersModel> customerOrders = [];
   bool isLoading = true;
   String currentPage = 'customers';
+  final Map<String, String> _orderProductsCache = {};
+  bool _showAllTransactions = false;
 
   @override
   void initState() {
@@ -58,6 +60,88 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     } catch (e) {
       print('Error loading customer details: $e');
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<String> _getOrderProductsDescription(String orderId) async {
+    // Check cache first
+    if (_orderProductsCache.containsKey(orderId)) {
+      return _orderProductsCache[orderId]!;
+    }
+
+    try {
+      // Get order products from subcollection
+      final orderProductsSnapshot = await _firestore
+          .collection('users')
+          .doc(widget.userId)
+          .collection('order')
+          .doc(orderId)
+          .collection('orderProducts')
+          .get();
+
+      if (orderProductsSnapshot.docs.isEmpty) {
+        _orderProductsCache[orderId] = 'No products found';
+        return 'No products found';
+      }
+
+      List<String> productNames = [];
+
+      // Get all product references first
+      List<Future<DocumentSnapshot>> productFutures = [];
+      List<int> quantities = [];
+
+      for (var orderProductDoc in orderProductsSnapshot.docs) {
+        final orderProductData = orderProductDoc.data();
+        final productRef = orderProductData['productID'] as DocumentReference;
+        final quantity = orderProductData['productQuantity'] as int;
+
+        productFutures.add(productRef.get());
+        quantities.add(quantity);
+      }
+
+      // Fetch all product details concurrently
+      final productDocs = await Future.wait(productFutures);
+
+      // Process results
+      for (int i = 0; i < productDocs.length; i++) {
+        final productDoc = productDocs[i];
+        final quantity = quantities[i];
+
+        if (productDoc.exists) {
+          final productData = productDoc.data() as Map<String, dynamic>;
+          final productName = productData['productName'] ?? 'Unknown Product';
+
+          if (quantity > 1) {
+            productNames.add('$productName (x$quantity)');
+          } else {
+            productNames.add(productName);
+          }
+        } else {
+          productNames.add('Unknown Product');
+        }
+      }
+
+      // Format the description
+      String description;
+      if (productNames.isEmpty) {
+        description = 'No products found';
+      } else if (productNames.length == 1) {
+        description = productNames.first;
+      } else if (productNames.length == 2) {
+        description = '${productNames[0]} + ${productNames[1]}';
+      } else {
+        description = '${productNames[0]} + ${productNames.length - 1} more';
+      }
+
+      // Cache the result
+      _orderProductsCache[orderId] = description;
+      return description;
+
+    } catch (e) {
+      print('Error fetching order products: $e');
+      final errorMsg = 'Error loading products';
+      _orderProductsCache[orderId] = errorMsg;
+      return errorMsg;
     }
   }
 
@@ -247,7 +331,14 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                         ),
                                         Row(
                                           children: [
-                                            TextButton(onPressed: () {}, child: const Text('View All')),
+                                            TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _showAllTransactions = !_showAllTransactions;
+                                                });
+                                              },
+                                              child: Text(_showAllTransactions ? 'Show Less' : 'View All'),
+                                            ),
                                             const SizedBox(width: 10),
                                             TextButton(onPressed: () {}, child: const Text('Filters')),
                                           ],
@@ -255,7 +346,25 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                       ],
                                     ),
                                     const SizedBox(height: 20),
-                                    ...customerOrders.take(5).map(_buildTransactionItem).toList(),
+                                    // Show transactions based on the toggle
+                                    ...(_showAllTransactions
+                                        ? customerOrders
+                                        : customerOrders.take(5)
+                                    ).map(_buildTransactionItem).toList(),
+
+                                    // Show count if there are more items
+                                    if (!_showAllTransactions && customerOrders.length > 5) ...[
+                                      const SizedBox(height: 16),
+                                      Center(
+                                        child: Text(
+                                          '${customerOrders.length - 5} more transactions',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -334,16 +443,61 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('#${order.shortOrderId}'),
-          const SizedBox(width: 20),
-          Text(
-            'Vintage Denim Jacket + 1 more', // Customize with actual items if needed
-            style: TextStyle(color: Colors.grey[600]),
+          // Order ID - Fixed width
+          SizedBox(
+            width: 90,
+            child: Text(
+              '#${order.shortOrderId}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
-          const Spacer(),
-          Text('RM ${order.totalAmount.toStringAsFixed(2)}'),
-          const SizedBox(width: 20),
+          const SizedBox(width: 24),
+          // Product Description - Flexible width
+          Expanded(
+            flex: 3,
+            child: FutureBuilder<String>(
+              future: _getOrderProductsDescription(order.id),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Text(
+                    'Loading products...',
+                    style: TextStyle(color: Colors.grey[600]),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Text(
+                    'Error loading products',
+                    style: TextStyle(color: Colors.red[600]),
+                  );
+                }
+
+                return Text(
+                  snapshot.data ?? 'No products found',
+                  style: TextStyle(color: Colors.grey[600]),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // Total Amount - Fixed width
+          SizedBox(
+            width: 80,
+            child: Text(
+              'RM ${order.totalAmount.toStringAsFixed(2)}',
+              textAlign: TextAlign.right,
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // Status Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
@@ -351,20 +505,28 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              order.orderStatus,
+                OrderStatusUtils.getStatusDisplayText(order.orderStatus),
               style: TextStyle(
                 color: OrderStatusUtils.getStatusColor(order.orderStatus),
                 fontSize: 12,
               ),
             ),
           ),
-          const SizedBox(width: 20),
-          Text(_formatDate(order.orderDate)),
+
+          const SizedBox(width: 16),
+
+          // Order Date - Fixed width
+          SizedBox(
+            width: 100,
+            child: Text(
+              _formatDate(order.orderDate),
+              textAlign: TextAlign.right,
+            ),
+          ),
         ],
       ),
     );
   }
-
   }
 
   String _formatDate(DateTime? date) {

@@ -292,39 +292,51 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           // Delete Button
           Container(
-            height: 36,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 5,
+            ),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
+              color: OrderStatusUtils.getStatusColor(
+                currentStatus,
+              ).withOpacity(0.1),
+              border: Border.all(
+                color: OrderStatusUtils.getStatusColor(currentStatus),
+              ),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: TextButton.icon(
-              onPressed: () {
-                if (widget.order.orderStatus == 'completed' ||
-                    widget.order.orderStatus == 'to_receive') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Cannot delete ${OrderStatusUtils.formatStatus(widget.order.orderStatus)} orders',
+            child: DropdownButton<String>(
+              value: currentStatus,
+              underline: const SizedBox(),
+              isDense: true,
+              items: _controller.getAvailableStatuses(currentStatus)
+                  .map(
+                    (status) => DropdownMenuItem(
+                  value: status,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: OrderStatusUtils.getStatusColor(
+                            status,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-                _showDeleteConfirmationDialog();
-              },
-              icon: const Icon(
-                Icons.delete_outline,
-                size: 16,
-                color: Colors.red,
-              ),
-              label: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red, fontSize: 13),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
+                      Text(
+                        OrderStatusUtils.formatStatus(status),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  .toList(),
+              onChanged: _handleStatusChange,
             ),
           ),
         ],
@@ -1068,20 +1080,60 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            widget.order.payment ?? 'Pending',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          if (paymentCard != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '•••• •••• •••• ${paymentCard!.lastFour}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontFamily: 'monospace',
+          const SizedBox(height: 12),
+          _buildInfoRow('Transaction ID', widget.order.payment ?? 'Pending'),
+
+          // Display payment card details if available and valid
+          if (widget.order.paymentCard != null && widget.order.paymentCard!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            FutureBuilder<Map<String, dynamic>?>(
+              future: _controller.fetchPaymentCardDetails(
+                customerId: widget.order.customerId!,
+                paymentCardId: widget.order.paymentCard!,
               ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return _buildInfoRow('Card', 'Loading...');
+                }
+
+                if (snapshot.hasError) {
+                  return _buildInfoRow('Card', 'Error loading card', valueColor: Colors.red[600]);
+                }
+
+                if (snapshot.hasData && snapshot.data != null) {
+                  final cardData = snapshot.data!;
+                  return Column(
+                    children: [
+                      _buildInfoRow(
+                        'Card',
+                        '•••• •••• •••• ${cardData['lastFour'] ?? '****'}',
+                        valueColor: Colors.grey[700],
+                      ),
+                      if (cardData['brand'] != null) ...[
+                        const SizedBox(height: 8),
+                        _buildInfoRow(
+                          'Type',
+                          cardData['brand'].toString().toUpperCase(),
+                          valueColor: Colors.grey[600],
+                        ),
+                      ],
+                    ],
+                  );
+                }
+
+                return _buildInfoRow(
+                  'Card',
+                  'Details unavailable',
+                  valueColor: Colors.grey[500],
+                );
+              },
+            ),
+          ] else if (widget.order.payment != null && widget.order.payment != 'Pending') ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              'Card',
+              'Not linked',
+              valueColor: Colors.grey[500],
             ),
           ],
         ],
@@ -1133,14 +1185,14 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             _buildInfoRow('Tracking', shipment!.trackingNumber!.toString()),
             const SizedBox(height: 8),
           ],
-          if (shipment?.shippedDate != null) ...[
-            _buildInfoRow('Shipped', _formatDate(shipment!.shippedDate!)),
-          ] else ...[
-            Text(
-              'Not yet shipped',
-              style: TextStyle(fontSize: 15, color: Colors.orange[600]),
-            ),
-          ],
+          _buildInfoRow(
+            'Shipped',
+            shipment?.shippedDate != null
+                ? _formatDate(shipment!.shippedDate!)
+                : 'Not yet shipped',
+            valueColor: shipment?.shippedDate != null ? null : Colors.orange[600],
+          ),
+
           const SizedBox(height: 8),
           if (shipment?.fullName?.isNotEmpty ?? false) ...[
             _buildInfoRow('Recipient', shipment!.fullName!),
@@ -1767,128 +1819,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     ) ?? false;
   }
 
-  // Show delete confirmation dialog
-  void _showDeleteConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delete_outline,
-                  size: 36,
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Delete Order',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Are you sure you want to delete this order?',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      size: 16,
-                      color: Colors.red[700],
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'This action cannot be undone.',
-                      style: TextStyle(fontSize: 12, color: Colors.red[700]),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          side: BorderSide(color: Colors.grey[300]!),
-                        ),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        Navigator.pop(context); // Close order details page
-
-                        try {
-                          await _controller.deleteOrder(
-                            customerId: widget.order.customerId!,
-                            orderId: widget.order.id,
-                          );
-                          await widget.onOrdersReload();
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error deleting order: $e')),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      child: const Text(
-                        'Delete Order',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
   // Show transition error
   void _showTransitionError(String from, String to) {
     final errorMessage = _controller.getTransitionErrorMessage(from, to);
@@ -2036,7 +1966,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2049,9 +1979,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
+              color: valueColor ?? Colors.black
           ),
         ),
       ],
