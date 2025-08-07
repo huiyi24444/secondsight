@@ -15,7 +15,7 @@ class ProductStatusUtils {
   }
 
   static String shortProductId(String id) {
-    if (id.length < 8) return id.toUpperCase();
-    return id.substring(0, 8).toUpperCase();
+    if (id.length < 12) return id.toUpperCase();
+    return id.substring(0, 12).toUpperCase();
   }
 }

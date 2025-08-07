@@ -341,7 +341,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       style: TextStyle(
                         fontSize: 13,
                         decoration: TextDecoration.underline,
-                        color: Colors.black87,
+                        color: Color(0xFF8E6CEF),
                       ),
                     ),
                   ),
@@ -379,7 +379,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       style: TextStyle(
                         fontSize: 13,
                         decoration: TextDecoration.underline,
-                        color: Colors.black87,
+                        color: Color(0xFF8E6CEF),
                       ),
                     ),
                   ),

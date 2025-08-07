@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:secondsight/view/products/product_view.dart';
@@ -15,6 +16,7 @@ import '../../services/recommendation_service.dart';
 import '../checkout/cart_view.dart';
 import '../widgets/cart_icon_widget.dart';
 import '../widgets/custom_back_button.dart';
+import '../widgets/product_status_utils.dart';
 import '../widgets/string_extensions.dart';
 
 class ProductDetailsView extends StatefulWidget {
@@ -30,6 +32,9 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   Category? _category;
+  bool _isValid(num? value) => value != null && value != 0;
+
+
 
   //product_details_view.dart
   @override
@@ -371,49 +376,77 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                           ),
                           _buildExpandableSection(
                             title: 'Details',
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Category section
+                                  // Category
                                   if (_category != null) ...[
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Category: ',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            _category!.catName,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
+                                    _buildDetailRow('Category', _category!.catName),
+                                    const Divider(height: 24),
                                   ],
-                                  // Description section
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      product.description,
-                                      textAlign: TextAlign.left,
-                                    ),
+
+                                  // Product ID with copy button
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: _buildDetailRow('Product ID',ProductStatusUtils.shortProductId(widget.productId)),
+                                      ),
+                                      IconButton(
+                                        onPressed: () {
+                                          Clipboard.setData(ClipboardData(text: widget.productId));
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Product ID copied to clipboard'),
+                                              duration: Duration(seconds: 2),
+                                              backgroundColor: Color(0xFF8E6CEF),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.copy, size: 18),
+                                        tooltip: 'Copy Product ID',
+                                        color: Colors.grey[600],
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 24),
+
+                                  // Description
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Description',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        product.description,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
                           ),
+
                           _buildExpandableSection(
                             title: 'Measurements',
                             child: _buildMeasurementsTable(
@@ -761,21 +794,15 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
     return Table(
       border: TableBorder.all(color: Colors.grey.shade300),
       children: [
-        if (measurements.bust != null) buildRow('Bust', measurements.bust),
-        if (measurements.waist != null) buildRow('Waist', measurements.waist),
-        if (measurements.hip != null) buildRow('Hip', measurements.hip),
-        if (measurements.shoulderWidth != null)
-          buildRow('Shoulder Width', measurements.shoulderWidth),
-        if (measurements.sleeveLength != null)
-          buildRow('Sleeve Length', measurements.sleeveLength),
-        if (measurements.shirtLength != null)
-          buildRow('Shirt Length', measurements.shirtLength),
-        if (measurements.inseam != null)
-          buildRow('Inseam', measurements.inseam),
-        if (measurements.outseam != null)
-          buildRow('Outseam', measurements.outseam),
-        if (measurements.totalLength != null)
-          buildRow('Total Length', measurements.totalLength),
+        if (_isValid(measurements.bust)) buildRow('Bust', measurements.bust),
+        if (_isValid(measurements.waist)) buildRow('Waist', measurements.waist),
+        if (_isValid(measurements.hip)) buildRow('Hip', measurements.hip),
+        if (_isValid(measurements.shoulderWidth)) buildRow('Shoulder Width', measurements.shoulderWidth),
+        if (_isValid(measurements.sleeveLength)) buildRow('Sleeve Length', measurements.sleeveLength),
+        if (_isValid(measurements.shirtLength)) buildRow('Shirt Length', measurements.shirtLength),
+        if (_isValid(measurements.inseam)) buildRow('Inseam', measurements.inseam),
+        if (_isValid(measurements.outseam)) buildRow('Outseam', measurements.outseam),
+        if (_isValid(measurements.totalLength)) buildRow('Total Length', measurements.totalLength),
       ],
     );
   }
@@ -858,6 +885,29 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
           ),
         ],
       ),
+    );
+  }
+  Widget _buildDetailRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 }
