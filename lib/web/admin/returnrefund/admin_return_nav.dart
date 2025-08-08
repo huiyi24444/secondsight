@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/return_status_utils.dart';
 import '../../../model/return_request_model.dart';
 import 'admin_return_details.dart';
 
@@ -77,115 +78,6 @@ class ReturnNavigationService {
     }
   }
 
-  // Quick action methods
-  Future<void> quickApprove(String currentStatus, Function(String?) handleStatusChange) async {
-    if (currentStatus == 'submitted' || currentStatus == 'pending') {
-      await handleStatusChange('approved');
-    }
-  }
-
-  Future<void> quickReject(String currentStatus, Function(String?) handleStatusChange) async {
-    if (currentStatus == 'submitted' || currentStatus == 'pending') {
-      await showRejectDialog(handleStatusChange);
-    }
-  }
-
-  Future<void> quickComplete(String currentStatus, Function(String?) handleStatusChange) async {
-    if (currentStatus == 'pending_inspection') {
-      await handleStatusChange('completed');
-    }
-  }
-
-  Future<void> quickCancel(String currentStatus, Function(String?) handleStatusChange) async {
-    if (currentStatus == 'pending_inspection') {
-      await handleStatusChange('cancelled');
-    }
-  }
-
-  Future<void> showRejectDialog(Function(String?) handleStatusChange) async {
-    final TextEditingController reasonController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Return Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                hintText: 'Enter rejection reason...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              autofocus: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true && reasonController.text.isNotEmpty) {
-      await handleStatusChange('rejected');
-      // TODO: Save rejection reason to Firestore
-    }
-  }
-
-  // Keyboard shortcut handler
-  bool handleKeyEvent(KeyEvent event, String currentStatus, Function(String?) handleStatusChange) {
-    if (event is KeyDownEvent) {
-      // Navigation shortcuts
-      if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-          event.logicalKey == LogicalKeyboardKey.keyP) {
-        navigateToPrevious();
-        return true;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
-          event.logicalKey == LogicalKeyboardKey.keyN) {
-        navigateToNext();
-        return true;
-      }
-
-      // Quick action shortcuts
-      if (event.logicalKey == LogicalKeyboardKey.keyA) {
-        quickApprove(currentStatus, handleStatusChange);
-        return true;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.keyR) {
-        quickReject(currentStatus, handleStatusChange);
-        return true;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.keyC) {
-        quickComplete(currentStatus, handleStatusChange);
-        return true;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.keyX) {
-        quickCancel(currentStatus, handleStatusChange);
-        return true;
-      }
-
-      // Escape to go back
-      if (event.logicalKey == LogicalKeyboardKey.escape) {
-        Navigator.pop(context);
-        return true;
-      }
-    }
-    return false;
-  }
 
   // Build navigation header widget
   Widget buildNavigationHeader(String returnId, String currentStatus, Function(String?) handleStatusChange) {
@@ -207,89 +99,6 @@ class ReturnNavigationService {
       ),
       child: Row(
         children: [
-          // Back button
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back to List (Esc)',
-          ),
-
-          const SizedBox(width: 16),
-
-          // Status indicator
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Return #${returnId.substring(0, 8).toUpperCase()}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  '${currentIndex + 1} of ${allReturns.length}$filterText',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Quick action buttons
-          if (currentStatus == 'submitted' || currentStatus == 'pending') ...[
-            ElevatedButton.icon(
-              onPressed: () => quickApprove(currentStatus, handleStatusChange),
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Approve (A)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () => quickReject(currentStatus, handleStatusChange),
-              icon: const Icon(Icons.close, size: 16),
-              label: const Text('Reject (R)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-          ],
-
-          if (currentStatus == 'pending_inspection') ...[
-            ElevatedButton.icon(
-              onPressed: () => quickComplete(currentStatus, handleStatusChange),
-              icon: const Icon(Icons.check_circle, size: 16),
-              label: const Text('Complete (C)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () => quickCancel(currentStatus, handleStatusChange),
-              icon: const Icon(Icons.cancel, size: 16),
-              label: const Text('Cancel (X)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-          ],
-
-          const SizedBox(width: 16),
-
           // Navigation buttons
           IconButton(
             onPressed: currentIndex > 0 ? navigateToPrevious : null,
@@ -306,5 +115,28 @@ class ReturnNavigationService {
         ],
       ),
     );
+  }
+  bool handleKeyEvent(KeyEvent event, String currentStatus, Function(String?) handleStatusChange) {
+    if (event is KeyDownEvent) {
+      // Navigate to previous return with Left Arrow or P key
+      if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+          event.logicalKey == LogicalKeyboardKey.keyP) {
+        if (currentIndex > 0) {
+          navigateToPrevious();
+          return true;
+        }
+      }
+
+      // Navigate to next return with Right Arrow or N key
+      if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+          event.logicalKey == LogicalKeyboardKey.keyN) {
+        if (currentIndex < allReturns.length - 1) {
+          navigateToNext();
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

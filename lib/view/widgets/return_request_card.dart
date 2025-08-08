@@ -126,7 +126,7 @@ class ReturnRequestCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Return #${returnRequest.id.substring(0, 6).toUpperCase()}',
+                          'Return #${ReturnStatusUtils.shortReturnId(returnRequest.id)}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

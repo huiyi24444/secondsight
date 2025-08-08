@@ -281,7 +281,7 @@ class ReturnRequestController extends ChangeNotifier {
         productImageUrl: productImageUrl,      // Denormalized
 
         // New date fields - initially null, will be set when status changes
-        pendingDate: null,
+        pendingDate: Timestamp.now(),
         approvedDate: null,
         rejectedDate: null,
         completedDate: null,

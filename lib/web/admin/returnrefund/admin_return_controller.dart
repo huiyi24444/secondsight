@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/return_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
 import '../../../view/widgets/product_status_utils.dart';
@@ -108,9 +109,7 @@ class ReturnManagementController extends ChangeNotifier {
           'id': entry['id'],
           'userEmail': entry['userEmail'],
           'returnRequest': returnRequest, // ← KEEP THE ORIGINAL MODEL!
-          'returnId': (entry['id'] as String? ?? '').length >= 8
-              ? (entry['id'] as String).substring(0, 8).toUpperCase()
-              : (entry['id'] as String? ?? '').toUpperCase(),
+          'returnId': ReturnStatusUtils.shortReturnId(entry['id'] as String?),
           'shortOrderId': shortOrderId,
           'orderProductId': returnRequest.orderProductID ?? '',
           'productId': ProductStatusUtils.shortProductId(returnRequest.productID) ?? '',

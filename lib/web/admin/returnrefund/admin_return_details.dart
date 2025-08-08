@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/return_status_utils.dart';
@@ -10,6 +11,7 @@ import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
 
 import '../../../model/order_product_model.dart';
+import '../../../view/widgets/dateTime_utils.dart';
 import '../../../view/widgets/order_status_utils.dart';
 import '../customer/admin_customer.dart';
 import '../order/admin_order.dart';
@@ -133,37 +135,156 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
 
   Widget _buildHeaderSection() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: ReturnStatusUtils.getReturnStatusColor(currentStatus).withOpacity(0.1),
-        border: Border.all(color: ReturnStatusUtils.getReturnStatusColor(currentStatus)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: DropdownButton<String>(
-        value: currentStatus,
-        underline: const SizedBox(),
-        isDense: true,
-        items: ['pending_approval', 'submitted', 'approved', 'rejected', 'refunded', 'not_refunded' 'cancelled', 'pending_inspection', 'completed_inspection']
-            .map((status) => DropdownMenuItem(
-          value: status,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                margin: const EdgeInsets.only(right: 6),
-                decoration: BoxDecoration(
-                  color: ReturnStatusUtils.getReturnStatusColor(status),
-                  shape: BoxShape.circle,
-                ),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ]
+        ),
+        child: Row(
+          children: [
+            // Left side - Return info and status
+            Expanded(
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Return #${ReturnStatusUtils.shortReturnId(widget.returnRequest.id)}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        DateFormatter.formatDateTime(widget.returnRequest.returnDate?.toDate()),
+                        // Output: Jul 17, 2025 • 01:06 AM
+                      )
+                    ],
+                  ),
+
+
+                ],
               ),
-              Text(widget.formatStatus(status), style: const TextStyle(fontSize: 13)),
-            ],
-          ),
-        )).toList(),
-        onChanged: _handleStatusChange,
-      ),
+            ),
+
+            // Right side - Navigation buttons
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                      color: ReturnStatusUtils.getReturnStatusColor(currentStatus).withOpacity(0.1),
+                      border: Border.all(color: ReturnStatusUtils.getReturnStatusColor(currentStatus)),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                  ),
+                  child: DropdownButton<String>(
+                    value: currentStatus,
+                    underline: const SizedBox(),
+                    isDense: true,
+                    items: [
+                      'pending_approval',
+                      'approved',
+                      'rejected',
+                      'refunded',
+                      'not_refunded',
+                      'cancelled',
+                      'pending_inspection',
+                      'completed_inspection',
+                    ].map((status) {
+                      return DropdownMenuItem(
+                        value: status,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: ReturnStatusUtils.getReturnStatusColor(status),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            Text(
+                              ReturnStatusUtils.getReturnStatusText(status),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: _handleStatusChange,
+                  ),
+
+                ),
+                const SizedBox(width: 20),
+                // Navigation counter/indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${widget.currentIndex + 1} of ${widget.allReturns.length}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Previous button
+                IconButton(
+                  onPressed: widget.currentIndex > 0 ? _navigationService.navigateToPrevious : null,
+                  icon: const Icon(Icons.chevron_left),
+                  tooltip: 'Previous (← or P)',
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    backgroundColor: widget.currentIndex > 0 ? Colors.grey[100] : Colors.grey[50],
+                    foregroundColor: widget.currentIndex > 0 ? Colors.black : Colors.grey[400],
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ),
+
+                // Next button
+                IconButton(
+                  onPressed: widget.currentIndex < widget.allReturns.length - 1 ? _navigationService.navigateToNext : null,
+                  icon: const Icon(Icons.chevron_right),
+                  tooltip: 'Next (→ or N)',
+                  iconSize: 28,
+                  style: IconButton.styleFrom(
+                    backgroundColor: widget.currentIndex < widget.allReturns.length - 1 ? Colors.grey[100] : Colors.grey[50],
+                    foregroundColor: widget.currentIndex < widget.allReturns.length - 1 ? Colors.black : Colors.grey[400],
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        )
     );
   }
 
@@ -205,8 +326,8 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
       value: _controller,
      child: Focus(
        focusNode: _focusNode,
-       onKeyEvent: (node, event) => _navigationService.handleKeyEvent(event, currentStatus,_handleStatusChange)
-       ? KeyEventResult.handled
+       onKeyEvent: (node, event) => _navigationService.handleKeyEvent(event, currentStatus, _handleStatusChange)
+           ? KeyEventResult.handled
            : KeyEventResult.ignored,
        child: Scaffold(
          backgroundColor: Colors.grey[100],
@@ -234,11 +355,6 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                    const CustomTopBar(
                      title: 'Returns',
                      subtitle: 'Return Details',
-                   ),
-                   _navigationService.buildNavigationHeader(
-                       widget.returnRequest.id,
-                       currentStatus,
-                       _handleStatusChange
                    ),
                    // Content Area
                    Expanded(
@@ -381,7 +497,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    currentStatus.toUpperCase(),
+                    ReturnStatusUtils.getReturnStatusText(currentStatus),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

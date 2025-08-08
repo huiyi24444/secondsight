@@ -1036,7 +1036,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Return #${returnId.substring(0, 6).toUpperCase()}',
+                                  'Return #${ReturnStatusUtils.shortReturnId(returnId)}',
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,

@@ -56,7 +56,7 @@ class ReturnDetailsDialog {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Return #${returnItem['returnId']}',
+                              Text('Return #${ReturnStatusUtils.shortReturnId(returnItem['returnId'])}',
                                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text('Order: #${returnItem['shortOrderId']}',

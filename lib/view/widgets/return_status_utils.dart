@@ -144,4 +144,12 @@ class ReturnStatusUtils {
     }
   }
 
+  static String shortReturnId(String? id) {
+    final safeId = id ?? '';
+    return safeId.length >= 8
+        ? safeId.substring(0, 8).toUpperCase()
+        : safeId.toUpperCase();
+  }
+
+
 }

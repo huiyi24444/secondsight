@@ -27,7 +27,7 @@ class ReturnRequestDetailsView extends StatelessWidget {
       appBar: AppBar(
         leading: const CustomBackButton(),
         title: Text(
-          'Return #${returnRequestId.substring(0, 6).toUpperCase()}',
+          'Return #${ReturnStatusUtils.shortReturnId(returnRequestId)}',
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
