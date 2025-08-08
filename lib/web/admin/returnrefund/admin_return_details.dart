@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/return_status_utils.dart';
+import 'package:secondsight/view/widgets/user_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
@@ -844,7 +845,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Order ID', widget.returnRequest.userID),
+          _buildInfoRow('Order ID', widget.returnRequest.orderID),
           if (controller.customerDetails != null) ...[
             const SizedBox(height: 8),
             _buildInfoRow('Order Status', controller.getCustomerName()),
@@ -893,13 +894,14 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('User ID', widget.returnRequest.userID),
-          if (customerDetails != null) ...[
+          _buildInfoRow('User ID', shortUserId(widget.returnRequest.userID)),
+          const SizedBox(height: 8),
+          _buildInfoRow('Name', controller.getCustomerName()),
+          const SizedBox(height: 8),
+          _buildInfoRow('Phone', controller.getCustomerPhone()),
+          if (controller.customerDetails != null) ...[
             const SizedBox(height: 8),
-            _buildInfoRow('Name',
-                '${customerDetails!['firstName'] ?? ''} ${customerDetails!['lastName'] ?? ''}'.trim()),
-            const SizedBox(height: 8),
-            _buildInfoRow('Phone', customerDetails!['phoneNumber'] ?? 'N/A'),
+            _buildInfoRow('Email', controller.customerDetails!['email'] ?? 'N/A'),
           ],
         ],
       ),

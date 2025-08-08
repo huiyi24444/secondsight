@@ -134,22 +134,32 @@ class AdminReturnDetailsController extends ChangeNotifier {
   }
 
   /// Load customer details from Firestore
+  /// Load customer details from Firestore
   Future<void> _loadCustomerDetails(String? userID) async {
-    if (userID == null || userID.isEmpty) return;
+    if (userID == null || userID.isEmpty) {
+      print('[DEBUG] UserID is null or empty. Aborting fetch.');
+      return;
+    }
+
+    print('[DEBUG] Fetching customer details for userID: $userID');
 
     try {
       final customerDoc = await firestore
-          .collection('customers')
+          .collection('users')
           .doc(userID)
           .get();
 
       if (customerDoc.exists) {
         _customerDetails = customerDoc.data() as Map<String, dynamic>;
+        print('[DEBUG] Customer data retrieved: $_customerDetails');
+      } else {
+        print('[DEBUG] No customer document found for userID: $userID');
       }
     } catch (e) {
-      // Handle error silently or use proper error logging
+      print('[ERROR] Failed to load customer details for userID: $userID. Error: $e');
     }
   }
+
 
   /// Update return status
   Future<bool> updateReturnStatus(String returnId, String newStatus) async {
@@ -297,16 +307,16 @@ class AdminReturnDetailsController extends ChangeNotifier {
   String getCustomerName() {
     if (_customerDetails == null) return 'N/A';
 
-    final firstName = _customerDetails!['firstName'] ?? '';
-    final lastName = _customerDetails!['lastName'] ?? '';
+    final fullName = _customerDetails!['fullName'] ?? '';
 
-    return '$firstName $lastName'.trim();
+    return '$fullName';
   }
 
   /// Get customer phone number
   String getCustomerPhone() {
-    return _customerDetails?['phoneNumber'] ?? 'N/A';
+    return _customerDetails?['phoneNum']?.toString() ?? 'N/A';
   }
+
 
   /// Get formatted order ID (shortened)
   String getShortOrderId() {

@@ -64,62 +64,79 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         backgroundColor: const Color(0xFFFAFAFA),
         appBar: AppBar(
           leading: const CustomBackButton(),
-          title: Text(
-            'Order #${_controller.shortOrderId}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+          title: StreamBuilder<DocumentSnapshot>(
+            stream: _controller.getOrderStream(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final order = _controller.createOrderFromDocument(snapshot.data!);
+                return Text(
+                  'Order #${order.shortOrderId}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              } else {
+                // Fallback while loading - create a short ID from widget.orderId
+                final fallbackId = widget.orderId.length >= 6
+                    ? widget.orderId.substring(0, 8).toUpperCase()
+                    : widget.orderId.toUpperCase();
+                return Text(
+                  'Order #$fallbackId',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }
+            },
           ),
           centerTitle: true,
           backgroundColor: const Color(0xFFFAFAFA),
           elevation: 0,
           foregroundColor: Colors.black87,
 
-            actions: [
-        // Wrap PopupMenuButton in StreamBuilder to access current order status
-              // In your order details page
-              StreamBuilder<DocumentSnapshot>(
-                stream: _controller.getOrderStream(),
-                builder: (context, orderSnapshot) {
-                  return PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) {
-                      if (value == 'cancel') {
-                        if (orderSnapshot.hasData) {
-                          final data = orderSnapshot.data!;
-                          final order = _controller.createOrderFromDocument(data);
+          actions: [
+            // Your existing PopupMenuButton with StreamBuilder
+            StreamBuilder<DocumentSnapshot>(
+              stream: _controller.getOrderStream(),
+              builder: (context, orderSnapshot) {
+                return PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'cancel') {
+                      if (orderSnapshot.hasData) {
+                        final data = orderSnapshot.data!;
+                        final order = _controller.createOrderFromDocument(data);
 
-                          if (_controller.canCancelOrder(order)) {
-                            showCancelOrderDialog(
-                              context: context,
-                              orderId: widget.orderId,
-                              customerId: _controller.userId, // Add the customerId parameter
-                              onCancel: () {
-                                print('User chose to keep the order');
-                              },
-                              // Remove the onConfirm parameter entirely since the new dialog handles everything internally
-                            );
-                          } else {
-                            showDialog(
-                              context: context,
-                              builder: (context) => const CancelUnavailableDialog(),
-                            );
-                          }
+                        if (_controller.canCancelOrder(order)) {
+                          showCancelOrderDialog(
+                            context: context,
+                            orderId: widget.orderId,
+                            customerId: _controller.userId,
+                            onCancel: () {
+                              print('User chose to keep the order');
+                            },
+                          );
+                        } else {
+                          showDialog(
+                            context: context,
+                            builder: (context) => const CancelUnavailableDialog(),
+                          );
                         }
                       }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem<String>(
-                        value: 'cancel',
-                        child: Text('Cancel order'),
-                      ),
-                    ],
-                  );
-                },
-              )
-
-            ],
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'cancel',
+                      child: Text('Cancel order'),
+                    ),
+                  ],
+                );
+              },
+            )
+          ],
         ),
         body: StreamBuilder<DocumentSnapshot>(
           stream: _controller.getOrderStream(),

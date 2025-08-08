@@ -3,12 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/dateTime_utils.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
 import '../../../admin_main.dart';
 import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../../../model/return_request_model.dart';
 import '../../../model/shipment_model.dart';
 import '../../../model/payment_cards_model.dart';
 import '../../../view/returnRefund/return_request_details.dart';
@@ -17,6 +19,7 @@ import '../../../view/widgets/return_status_utils.dart';
 import '../../../view/widgets/user_utils.dart';
 import '../customer/admin_customer.dart';
 import '../returnrefund/admin_return.dart';
+import '../returnrefund/admin_return_details.dart';
 import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
@@ -233,7 +236,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      DateFormat('MMM dd, yyyy • hh:mm a').format(widget.order.orderDate),
+                      DateFormatter.formatDateTime(widget.order.orderDate),
                       // Output: Jul 17, 2025 • 01:06 AM
                     )
                   ],
@@ -870,18 +873,152 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     final createdAt = (returnData['createdTime'] as Timestamp?)?.toDate();
                     final reason = returnData['reason'] ?? 'Not specified';
 
+
                     return GestureDetector(
-                      onTap: () {
-                        // Navigate to return request details
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ReturnRequestDetailsView(
-                              returnRequestId: returnId,
-                              userId: widget.order.customerId ?? '',
+                      onTap: () async {
+                        try {
+                          // Access return request from the top-level 'returnRequests' collection
+                          final returnDoc = await FirebaseFirestore.instance
+                              .collection('returnRequests')
+                              .doc(returnId)
+                              .get();
+
+                          if (!returnDoc.exists) {
+                            // Show error if return request not found
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Return request not found'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Create ReturnRequestModel from the document using the new model structure
+                          final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
+
+                          // Navigate to admin return details page
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ReturnDetailsPage(
+                                returnRequest: returnRequest,
+                                onUpdateReturnStatus: (returnId, newStatus) async {
+                                  try {
+                                    // Create update data with current timestamp for status changes
+                                    Map<String, dynamic> updateData = {'returnStatus': newStatus};
+
+                                    // Add timestamp fields based on the new status
+                                    switch (newStatus.toLowerCase()) {
+                                      case 'pending':
+                                        updateData['pendingDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'approved':
+                                        updateData['approvedDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'rejected':
+                                        updateData['rejectedDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'completed':
+                                        updateData['completedDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'pending_inspection':
+                                        updateData['pendinginspectionDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'completed_inspection':
+                                        updateData['completedinsepectionDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                      case 'cancelled':
+                                        updateData['cancelledDate'] = FieldValue.serverTimestamp();
+                                        break;
+                                    }
+
+                                    // Update the return request in the top-level collection
+                                    await FirebaseFirestore.instance
+                                        .collection('returnRequests')
+                                        .doc(returnId)
+                                        .update(updateData);
+
+                                    return true;
+                                  } catch (e) {
+                                    print('Error updating return status: $e');
+                                    return false;
+                                  }
+                                },
+                                formatDate: (timestamp) {
+                                  final date = timestamp.toDate();
+                                  final now = DateTime.now();
+                                  final difference = now.difference(date);
+
+                                  if (difference.inDays == 0) {
+                                    return 'Today at ${DateFormat('HH:mm').format(date)}';
+                                  } else if (difference.inDays == 1) {
+                                    return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
+                                  } else if (difference.inDays < 7) {
+                                    return '${difference.inDays} days ago';
+                                  } else {
+                                    return DateFormat('MMM dd, yyyy').format(date);
+                                  }
+                                },
+                                formatStatus: (status) {
+                                  switch (status.toLowerCase()) {
+                                    case 'submitted':
+                                      return 'Submitted';
+                                    case 'pending':
+                                      return 'Pending Review';
+                                    case 'approved':
+                                      return 'Approved';
+                                    case 'rejected':
+                                      return 'Rejected';
+                                    case 'refunded':
+                                      return 'Refunded';
+                                    case 'not_refunded':
+                                      return 'Not Refunded';
+                                    case 'cancelled':
+                                      return 'Cancelled';
+                                    case 'pending_inspection':
+                                      return 'Pending Inspection';
+                                    case 'completed_inspection':
+                                      return 'Completed Inspection';
+                                    case 'completed':
+                                      return 'Completed';
+                                    default:
+                                      return status.substring(0, 1).toUpperCase() + status.substring(1);
+                                  }
+                                },
+                                firestore: FirebaseFirestore.instance,
+                                getOrderProductDoc: (userId, orderId, orderProductId) async {
+                                  try {
+                                    // Since orderProductID is now a string, we can directly use it
+                                    final doc = await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(userId)
+                                        .collection('order')
+                                        .doc(orderId)
+                                        .collection('orderProducts')
+                                        .doc(orderProductId)
+                                        .get();
+                                    return doc.exists ? doc : null;
+                                  } catch (e) {
+                                    print('Error getting order product doc: $e');
+                                    return null;
+                                  }
+                                },
+                                allReturns: [], // You may need to populate this with current returns list
+                                currentIndex: 0, // Set appropriate index
+                                selectedFilter: null, // Set appropriate filter if needed
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        } catch (e) {
+                          // Show error if navigation fails
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error loading return details: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -1265,7 +1402,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Customer',
+                'Customer Details',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
@@ -1329,7 +1466,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             _buildInfoRow('Note', cancelData!.cancelNote!),
           ],
           const SizedBox(height: 8),
-          _buildInfoRow('Date', _formatDateTime(cancelData!.cancelDate)),
+          _buildInfoRow('Date', DateFormatter.formatDateTime(cancelData!.cancelDate)),
         ],
       ),
     );
