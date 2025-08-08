@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
+import '../../../model/refund_model.dart';
 import '../../../model/return_request_model.dart';
 
 class AdminReturnDetailsController extends ChangeNotifier {
@@ -34,7 +35,11 @@ class AdminReturnDetailsController extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await loadReturnData();
+    await Future.wait([
+      loadReturnData(),
+      _loadCustomerDetails(returnRequest.userID),
+      loadOrderDetails(returnRequest.orderID, returnRequest.userID), // Add this line
+    ]);
 
     _isLoading = false;
     notifyListeners();
@@ -49,7 +54,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
 
       // Load data concurrently for better performance
       await Future.wait([
-        _loadOrderDetails(orderID, userID),
+        loadOrderDetails(orderID, userID),
         _loadOrderProductDetails(userID, orderID, orderProductID),
         _loadCustomerDetails(userID),
       ]);
@@ -61,7 +66,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   }
 
   /// Load order details from Firestore
-  Future<void> _loadOrderDetails(String? orderID, String? userID) async {
+  Future<void> loadOrderDetails(String? orderID, String? userID) async {
     if (orderID == null || orderID.isEmpty || userID == null || userID.isEmpty) {
       return;
     }
@@ -79,9 +84,10 @@ class AdminReturnDetailsController extends ChangeNotifier {
           orderDoc.data() as Map<String, dynamic>,
           orderDoc.id,
         );
+        notifyListeners(); // Notify listeners when order is loaded
       }
     } catch (e) {
-      // Handle error silently or use proper error logging
+      debugPrint('Error loading order details: $e');
     }
   }
 
@@ -157,6 +163,40 @@ class AdminReturnDetailsController extends ChangeNotifier {
       }
     } catch (e) {
       print('[ERROR] Failed to load customer details for userID: $userID. Error: $e');
+    }
+  }
+
+  Future<RefundModel?> loadRefundDetails(String? refundID) async {
+    if (refundID == null || refundID.isEmpty) {
+      return null;
+    }
+
+    try {
+      final refundDoc = await firestore
+          .collection('refunds')
+          .doc(refundID)
+          .get();
+
+      if (refundDoc.exists) {
+        return RefundModel.fromDocument(refundDoc);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error loading refund details: $e');
+      return null;
+    }
+  }
+
+  String formatRefundType(String refundType) {
+    switch (refundType.toLowerCase()) {
+      case 'return':
+        return 'Return Refund';
+      case 'cancellation':
+        return 'Order Cancellation';
+      case 'partial':
+        return 'Partial Refund';
+      default:
+        return refundType.substring(0, 1).toUpperCase() + refundType.substring(1);
     }
   }
 
@@ -321,7 +361,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   /// Get formatted order ID (shortened)
   String getShortOrderId() {
     final orderId = returnRequest.orderID;
-    return orderId.length > 8 ? orderId.substring(0, 8) : orderId;
+    return (orderId.length > 8 ? orderId.substring(0, 8) : orderId).toUpperCase();
   }
 
   /// Get return timeline data

@@ -418,6 +418,30 @@ class OrderDetailsManagementController {
     );
   }
 
+  Future<Map<String, dynamic>?> fetchCustomerDetails(String customerId) async {
+    try {
+      final doc = await firestore
+          .collection('users')
+          .doc(customerId)
+          .get();
+
+      if (doc.exists) {
+        final userData = doc.data() as Map<String, dynamic>;
+        return {
+          'fullName': userData['fullName'] ?? 'Unknown',
+          'phoneNum': userData['phoneNum']?.toString() ?? 'No phone number',
+          'email': userData['email'] ?? 'No email',
+          'profilePic': userData['profilePic'] ?? '',
+          'isVerified': userData['isVerified'] ?? false,
+        };
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching customer details: $e');
+      return null;
+    }
+  }
+
   Future<ShipmentModel?> fetchShipmentData({
     required String customerId,
     required String orderId,

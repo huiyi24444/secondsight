@@ -57,8 +57,10 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   bool isLoading = true;
   String currentPage = 'orders';
   String? customerFullName;
+  int? phoneNum;
   late OrderDetailsManagementController _controller;
   CancellationModel? cancelData;
+  Map<String, dynamic>? customerDetails;
 
   // Define allowed status transitions
   static const Map<String, List<String>> allowedTransitions = {
@@ -74,8 +76,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _controller = OrderDetailsManagementController(firestore: widget.firestore);
     currentStatus = widget.order.orderStatus;
     _loadOrderData();
-    fetchCustomerName();
+    _fetchCustomerDetails();
     _fetchCancellationData();
+  }
+
+  Future<void> _fetchCustomerDetails() async {
+    if (widget.order.customerId != null) {
+      final details = await _controller.fetchCustomerDetails(widget.order.customerId!);
+      setState(() {
+        customerDetails = details;
+      });
+    }
   }
 
   Future<void> _loadOrderData() async {
@@ -1253,24 +1264,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     );
   }
 
-  Future<void> fetchCustomerName() async {
-    if (widget.order.customerId != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.order.customerId)
-          .get();
 
-      if (doc.exists) {
-        setState(() {
-          customerFullName = doc['fullName'];
-        });
-      } else {
-        setState(() {
-          customerFullName = "Unknown";
-        });
-      }
-    }
-  }
+
 
   Widget _buildCustomerInfoCard() {
     return Container(
@@ -1314,29 +1309,31 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
 
               // Right side - View Details link
-              ViewDetailsLink(onTap: () {
-                // Navigate to CustomerDetailsPage
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CustomerDetailsPage(
-                      userId: widget.order.customerId ?? "",
+              ViewDetailsLink(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CustomerDetailsPage(
+                        userId: widget.order.customerId ?? "",
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
               ),
             ],
           ),
 
           const SizedBox(height: 12),
 
-          // Customer information rows
+          // Customer information rows using controller data
           _buildInfoRow('User ID', shortUserId(widget.order.customerId ?? "")),
           const SizedBox(height: 8),
-          _buildInfoRow('Full Name', customerFullName ?? "Not found"),
+          _buildInfoRow('Full Name', customerDetails?['fullName'] ?? "Loading..."),
           const SizedBox(height: 8),
-          _buildInfoRow('Email', widget.customerNames[widget.order.customerId] ?? 'No Email Available'),
+          _buildInfoRow('Phone', customerDetails?['phoneNum'] ?? 'Loading...'),
+          const SizedBox(height: 8),
+          _buildInfoRow('Email', customerDetails?['email'] ?? 'Loading...'),
         ],
       ),
     );

@@ -8,18 +8,22 @@ import 'package:secondsight/view/widgets/return_status_utils.dart';
 import 'package:secondsight/view/widgets/user_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/order_model.dart';
+import '../../../model/refund_model.dart';
 import '../../../model/return_request_model.dart';
 
 import '../../../model/order_product_model.dart';
 import '../../../view/widgets/dateTime_utils.dart';
 import '../../../view/widgets/order_status_utils.dart';
 import '../customer/admin_customer.dart';
+import '../customer/admin_customer_details.dart';
 import '../order/admin_order.dart';
+import '../order/admin_order_details.dart';
 import '../product/admin_product.dart';
 
 import '../services/admin_auth_provider.dart';
 import '../widget/sidebar.dart';
 import '../widget/topbar.dart';
+import '../widget/viewdetails_button.dart';
 import 'admin_return_controller.dart';
 import 'admin_return_details_controller.dart';
 import 'admin_return_nav.dart';
@@ -398,6 +402,10 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildReturnSummaryCard(controller),
+                    if (widget.returnRequest.returnImages.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _buildImagesCard(),
+                    ],
                     const SizedBox(height: 20),
                     _buildReturnTimeline(controller),
                   ],
@@ -411,17 +419,14 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
+                    _buildReasonInfoCard(),
+                    const SizedBox(height: 16),
                     _buildOrderInfoCard(controller),
                     const SizedBox(height: 16),
                     _buildCustomerInfoCard(controller),
                     const SizedBox(height: 16),
                     _buildPaymentInfoCard(controller),
                     const SizedBox(height: 16),
-                    _buildReasonInfoCard(),
-                    if (widget.returnRequest.returnImages.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildImagesCard(),
-                    ],
                   ],
                 ),
               ),
@@ -944,29 +949,67 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
+              // Left side - Title with icon
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.shopping_bag, color: Colors.blue, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Order Details',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+
+              // Right side - View Details link
+              if (controller.order != null)
+                ViewDetailsLink(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsPage(
+                          order: controller.order!,
+                          products: [], // You might need to load products separately
+                          productDetails: {},
+                          customerNames: {},
+                          firestore: FirebaseFirestore.instance,
+                          onOrdersReload: () async {},
+                        ),
+                      ),
+                    );
+                  },
+                  fontSize: 12,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  arrowSize: 10,
                 ),
-                child: const Icon(Icons.shopping_bag, color: Colors.blue, size: 14),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Order Details',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Order ID', widget.returnRequest.orderID),
-          if (controller.customerDetails != null) ...[
+
+          // Display order information
+          _buildInfoRow('Order ID', controller.getShortOrderId()),
+          if (controller.order != null) ...[
             const SizedBox(height: 8),
-            _buildInfoRow('Order Status', controller.getCustomerName()),
+            _buildInfoRow('Order Status', OrderStatusUtils.getStatusDisplayText(controller.order!.orderStatus)),
             const SizedBox(height: 8),
-            _buildInfoRow('Order Date', controller.getCustomerPhone()),
+            _buildInfoRow('Order Date', DateFormatter.formatDateTime(controller.order!.orderDate)),
+            const SizedBox(height: 8),
+            _buildInfoRow('Total Amount', 'RM ${controller.order!.totalAmount.toStringAsFixed(2)}'),
+          ] else ...[
+            const SizedBox(height: 8),
+            _buildInfoRow('Order Status', 'Loading...'),
+            const SizedBox(height: 8),
+            _buildInfoRow('Order Date', 'Loading...'),
           ],
         ],
       ),
@@ -993,26 +1036,44 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.person, color: Colors.purple, size: 14),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.purple, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Customer Details',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Text(
-                'Customer Details',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+
+              ViewDetailsLink(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CustomerDetailsPage(
+                        userId: widget.returnRequest.userID?? "",
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
           const SizedBox(height: 12),
           _buildInfoRow('User ID', shortUserId(widget.returnRequest.userID)),
           const SizedBox(height: 8),
-          _buildInfoRow('Name', controller.getCustomerName()),
+          _buildInfoRow('Full Name', controller.getCustomerName()),
           const SizedBox(height: 8),
           _buildInfoRow('Phone', controller.getCustomerPhone()),
           if (controller.customerDetails != null) ...[
@@ -1051,23 +1112,108 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.payment, color: Colors.green, size: 14),
+                child: const Icon(Icons.account_balance_wallet, color: Colors.green, size: 14),
               ),
               const SizedBox(width: 8),
               const Text(
-                'Payment Details',
+                'Refund Details',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Method', 'Credit Card'),
-          const SizedBox(height: 8),
-          _buildInfoRow('Return Amount',
-              'RM ${controller.getTotalReturnPrice().toStringAsFixed(2)}'),
-          const SizedBox(height: 8),
-          _buildInfoRow('Refund Status',
-              controller.isRefundCompleted() ? 'Refunded' : 'Pending'),
+
+          // Check if refundID exists
+          if (widget.returnRequest.refundID != null && widget.returnRequest.refundID!.isNotEmpty) ...[
+            // Show refund details using FutureBuilder
+            FutureBuilder<RefundModel?>(
+              future: controller.loadRefundDetails(widget.returnRequest.refundID),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Column(
+                    children: [
+                      _buildInfoRow('Refund Status', 'Loading...'),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Amount', 'Loading...'),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Method', 'Loading...'),
+                    ],
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Column(
+                    children: [
+                      _buildInfoRow('Refund Status', 'Error loading', valueColor: Colors.red[600]),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Amount', 'RM ${controller.getTotalReturnPrice().toStringAsFixed(2)}'),
+                    ],
+                  );
+                }
+
+                if (snapshot.hasData && snapshot.data != null) {
+                  final refund = snapshot.data!;
+                  return Column(
+                    children: [
+                      _buildInfoRow('Refund Status', 'Completed', valueColor: Colors.green[600]),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Amount', 'RM ${refund.refundAmount.toStringAsFixed(2)}'),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Method', refund.refundMethod),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Date', DateFormatter.formatDateTime(refund.refundDate)),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Transaction ID', refund.transactionId),
+                      const SizedBox(height: 8),
+                      _buildInfoRow('Refund Type', controller.formatRefundType(refund.refundType)),
+                    ],
+                  );
+                }
+
+                // No refund data found
+                return Column(
+                  children: [
+                    _buildInfoRow('Refund Status', 'Not Found', valueColor: Colors.red[600]),
+                    const SizedBox(height: 8),
+                    _buildInfoRow('Expected Amount', 'RM ${controller.getTotalReturnPrice().toStringAsFixed(2)}'),
+                  ],
+                );
+              },
+            ),
+          ] else ...[
+            // No refundID - show pending refund info
+            _buildInfoRow('Refund Status', 'Pending', valueColor: Colors.orange[600]),
+            const SizedBox(height: 8),
+            _buildInfoRow('Expected Amount', 'RM ${controller.getTotalReturnPrice().toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            _buildInfoRow('Refund Method', 'To be determined'),
+            const SizedBox(height: 12),
+
+            // Info box for pending refund
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange[700], size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Refund will be processed once return is approved',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1216,9 +1362,10 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+              crossAxisCount: 4, // More columns = smaller images
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
+              childAspectRatio: 1, // Adjust if needed to change height/width ratio
             ),
             itemCount: widget.returnRequest.returnImages.length,
             itemBuilder: (context, index) {
@@ -1294,7 +1441,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1307,9 +1454,10 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
+            color: valueColor ?? Colors.black,
           ),
         ),
       ],
