@@ -143,7 +143,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
         value: currentStatus,
         underline: const SizedBox(),
         isDense: true,
-        items: ['pending', 'submitted', 'approved', 'rejected', 'refunded', 'not_refunded' 'cancelled', 'pending_inspection', 'completed_inspection']
+        items: ['pending_approval', 'submitted', 'approved', 'rejected', 'refunded', 'not_refunded' 'cancelled', 'pending_inspection', 'completed_inspection']
             .map((status) => DropdownMenuItem(
           value: status,
           child: Row(

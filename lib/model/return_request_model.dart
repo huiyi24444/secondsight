@@ -5,6 +5,7 @@ class ReturnRequestModel {
   final String orderProductID;
   final String orderID;
   final String userID;
+
   final Timestamp returnDate;
   final List<String> returnImages;
   final String returnReason;
@@ -14,6 +15,7 @@ class ReturnRequestModel {
   final double returnPrice;
 
   final int returnQuantity;      // From orderProduct
+  final String productID;
   final String productName;      // From product
   final String productImageUrl;  // From product (just the main image)
 
@@ -41,6 +43,7 @@ class ReturnRequestModel {
     required this.returnPrice,
 
     required this.returnQuantity,
+    required this.productID,
     required this.productName,
     required this.productImageUrl,
 
@@ -80,6 +83,7 @@ class ReturnRequestModel {
           ? (data['returnPrice'] as num).toDouble()
           : 0.0,
       returnQuantity: data['returnQuantity'] as int? ?? 0,
+      productID: data['productID'] as String? ?? 'Unknown ID',
       productName: data['productName'] as String? ?? 'Unknown Product',
       productImageUrl: data['productImageUrl'] as String? ?? '',
       pendingDate: data['pendingDate'] as Timestamp?,
@@ -105,6 +109,7 @@ class ReturnRequestModel {
       'returnComment': returnComment,
       'returnPrice': returnPrice,
       'returnQuantity': returnQuantity,
+      'productID': productID,
       'productName': productName,
       'productImageUrl': productImageUrl,
       'pendingDate': pendingDate,

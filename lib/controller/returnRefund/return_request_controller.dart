@@ -29,6 +29,7 @@ class ReturnRequestController extends ChangeNotifier {
   OrderProductModel? orderProduct;
   Map<String, dynamic>? productData;
   ReturnRequestModel? returnRequest;
+  String? productDocumentId;
 
   final List<String> returnReasons = [
     'Item Defect',
@@ -71,6 +72,16 @@ class ReturnRequestController extends ChangeNotifier {
 
     // When creating new return, use product data
     return productData?['productName'] ?? 'Unknown Product';
+  }
+
+  String get productID {
+    // When viewing existing return, use denormalized data
+    if (returnRequest != null) {
+      return returnRequest!.productID;
+    }
+
+    // When creating new return, use the document ID from DocumentReference
+    return productDocumentId ?? 'Unknown Product ID';
   }
 
   int get quantity {
@@ -116,6 +127,10 @@ class ReturnRequestController extends ChangeNotifier {
       }
 
       if (orderProduct?.productID != null) {
+        // Extract the document ID from the DocumentReference
+        productDocumentId = orderProduct!.productID!.id;
+
+        // Get the product document using the reference
         final productDoc = await orderProduct!.productID!.get();
         if (productDoc.exists) {
           productData = productDoc.data() as Map<String, dynamic>?;
@@ -238,6 +253,10 @@ class ReturnRequestController extends ChangeNotifier {
       final double returnPrice = orderProduct?.totalPrice ?? 0.0;
       final int returnQuantity = orderProduct?.productQuantity ?? 1;
       final String productName = productData?['productName'] ?? 'Unknown Product';
+
+      // Use the document ID as productID instead of getting it from productData
+      final String productID = productDocumentId ?? 'Unknown Product ID';
+
       final productURLList = productData?['productURL'];
       final String productImageUrl = (productURLList is List && productURLList.isNotEmpty)
           ? productURLList.first.toString()
@@ -257,6 +276,7 @@ class ReturnRequestController extends ChangeNotifier {
         rejectReason: null, // Only set when rejected
         returnPrice: returnPrice,
         returnQuantity: returnQuantity,        // Denormalized
+        productID: productID,                  // Now uses document ID
         productName: productName,              // Denormalized
         productImageUrl: productImageUrl,      // Denormalized
 

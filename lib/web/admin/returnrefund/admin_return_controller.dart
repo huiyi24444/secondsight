@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
+import '../../../view/widgets/product_status_utils.dart';
 
 class ReturnManagementController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,6 +14,25 @@ class ReturnManagementController extends ChangeNotifier {
   String selectedTab = 'All';
   int currentPage = 1;
   int itemsPerPage = 10;
+
+  Future<OrdersModel?> getOrderModel(String userId, String orderId) async {
+    try {
+      final orderDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .get();
+
+      if (orderDoc.exists) {
+        return OrdersModel.fromJson(orderDoc.data() as Map<String, dynamic>, orderDoc.id);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching order: $e');
+      return null;
+    }
+  }
 
   // Add this method to the controller
   Future<DocumentSnapshot> getOrderProductDoc(String userId, String orderID, String orderProductID) {
@@ -78,6 +99,11 @@ class ReturnManagementController extends ChangeNotifier {
           print('Error fetching order product data: $e');
         }
 
+        OrdersModel? orderModel = await getOrderModel(returnRequest.userID, returnRequest.orderID);
+        String shortOrderId = orderModel?.shortOrderId ??
+            (orderId.length >= 6 ? orderId.substring(0, 6).toUpperCase() : orderId.toUpperCase());
+
+
         return {
           'id': entry['id'],
           'userEmail': entry['userEmail'],
@@ -85,8 +111,9 @@ class ReturnManagementController extends ChangeNotifier {
           'returnId': (entry['id'] as String? ?? '').length >= 8
               ? (entry['id'] as String).substring(0, 8).toUpperCase()
               : (entry['id'] as String? ?? '').toUpperCase(),
-          'shortOrderId': orderId.length >= 6 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase(),
+          'shortOrderId': shortOrderId,
           'orderProductId': returnRequest.orderProductID ?? '',
+          'productId': ProductStatusUtils.shortProductId(returnRequest.productID) ?? '',
           'date': returnRequest.returnDate?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
           'returnPrice': returnRequest.returnPrice ?? 0.0,
           'status': returnRequest.returnStatus ?? 'unknown',
@@ -325,6 +352,7 @@ class ReturnManagementController extends ChangeNotifier {
           rejectReason: data['rejectReason'],
           returnPrice: (data['returnPrice'] ?? 0.0).toDouble(),
           returnQuantity: data['returnQuantity'] ?? 1,
+          productID: data['productID'] ?? 'Unknown ID',
           productName: data['productName'] ?? 'Unknown Product',
           productImageUrl: data['productImageUrl'] ?? '',
           pendingDate: data['pendingDate'] as Timestamp?,
