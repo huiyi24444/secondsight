@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/dateTime_utils.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import 'package:secondsight/web/admin/product/admin_product.dart';
+import 'package:secondsight/web/admin/widget/viewdetails_button.dart';
 import '../../../admin_main.dart';
 import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
@@ -18,6 +19,7 @@ import '../../../view/widgets/product_status_utils.dart';
 import '../../../view/widgets/return_status_utils.dart';
 import '../../../view/widgets/user_utils.dart';
 import '../customer/admin_customer.dart';
+import '../customer/admin_customer_details.dart';
 import '../returnrefund/admin_return.dart';
 import '../returnrefund/admin_return_details.dart';
 import '../services/admin_auth_provider.dart';
@@ -786,7 +788,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           const SizedBox(height: 12),
 
           // Return Eligibility
-          // Return Eligibility - Enhanced display
           _buildReturnEligibilityInfo(widget.order),
 
           // Check if there are return requests for this order
@@ -796,7 +797,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 .where('userID', isEqualTo: widget.order.customerId)
                 .where('orderID', isEqualTo: widget.order.id)
                 .snapshots(),
-
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(
@@ -811,324 +811,224 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               }
 
               if (snapshot.data!.docs.isEmpty) {
-                // No return requests found - show message
-                return Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'No return requests for this order',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildNoReturnRequestsMessage();
               }
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-
-                  // Active Return Requests Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Active Return Requests (${snapshot.data!.docs.length})',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Return Request List
-                  ...snapshot.data!.docs.map((doc) {
-                    final returnData = doc.data() as Map<String, dynamic>;
-                    final returnId = doc.id;
-                    final status = returnData['status'] ?? 'Pending';
-                    final createdAt = (returnData['createdTime'] as Timestamp?)?.toDate();
-                    final reason = returnData['reason'] ?? 'Not specified';
-
-
-                    return GestureDetector(
-                      onTap: () async {
-                        try {
-                          // Access return request from the top-level 'returnRequests' collection
-                          final returnDoc = await FirebaseFirestore.instance
-                              .collection('returnRequests')
-                              .doc(returnId)
-                              .get();
-
-                          if (!returnDoc.exists) {
-                            // Show error if return request not found
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Return request not found'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            return;
-                          }
-
-                          // Create ReturnRequestModel from the document using the new model structure
-                          final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
-
-                          // Navigate to admin return details page
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ReturnDetailsPage(
-                                returnRequest: returnRequest,
-                                onUpdateReturnStatus: (returnId, newStatus) async {
-                                  try {
-                                    // Create update data with current timestamp for status changes
-                                    Map<String, dynamic> updateData = {'returnStatus': newStatus};
-
-                                    // Add timestamp fields based on the new status
-                                    switch (newStatus.toLowerCase()) {
-                                      case 'pending':
-                                        updateData['pendingDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'approved':
-                                        updateData['approvedDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'rejected':
-                                        updateData['rejectedDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'completed':
-                                        updateData['completedDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'pending_inspection':
-                                        updateData['pendinginspectionDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'completed_inspection':
-                                        updateData['completedinsepectionDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                      case 'cancelled':
-                                        updateData['cancelledDate'] = FieldValue.serverTimestamp();
-                                        break;
-                                    }
-
-                                    // Update the return request in the top-level collection
-                                    await FirebaseFirestore.instance
-                                        .collection('returnRequests')
-                                        .doc(returnId)
-                                        .update(updateData);
-
-                                    return true;
-                                  } catch (e) {
-                                    print('Error updating return status: $e');
-                                    return false;
-                                  }
-                                },
-                                formatDate: (timestamp) {
-                                  final date = timestamp.toDate();
-                                  final now = DateTime.now();
-                                  final difference = now.difference(date);
-
-                                  if (difference.inDays == 0) {
-                                    return 'Today at ${DateFormat('HH:mm').format(date)}';
-                                  } else if (difference.inDays == 1) {
-                                    return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
-                                  } else if (difference.inDays < 7) {
-                                    return '${difference.inDays} days ago';
-                                  } else {
-                                    return DateFormat('MMM dd, yyyy').format(date);
-                                  }
-                                },
-                                formatStatus: (status) {
-                                  switch (status.toLowerCase()) {
-                                    case 'submitted':
-                                      return 'Submitted';
-                                    case 'pending':
-                                      return 'Pending Review';
-                                    case 'approved':
-                                      return 'Approved';
-                                    case 'rejected':
-                                      return 'Rejected';
-                                    case 'refunded':
-                                      return 'Refunded';
-                                    case 'not_refunded':
-                                      return 'Not Refunded';
-                                    case 'cancelled':
-                                      return 'Cancelled';
-                                    case 'pending_inspection':
-                                      return 'Pending Inspection';
-                                    case 'completed_inspection':
-                                      return 'Completed Inspection';
-                                    case 'completed':
-                                      return 'Completed';
-                                    default:
-                                      return status.substring(0, 1).toUpperCase() + status.substring(1);
-                                  }
-                                },
-                                firestore: FirebaseFirestore.instance,
-                                getOrderProductDoc: (userId, orderId, orderProductId) async {
-                                  try {
-                                    // Since orderProductID is now a string, we can directly use it
-                                    final doc = await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(userId)
-                                        .collection('order')
-                                        .doc(orderId)
-                                        .collection('orderProducts')
-                                        .doc(orderProductId)
-                                        .get();
-                                    return doc.exists ? doc : null;
-                                  } catch (e) {
-                                    print('Error getting order product doc: $e');
-                                    return null;
-                                  }
-                                },
-                                allReturns: [], // You may need to populate this with current returns list
-                                currentIndex: 0, // Set appropriate index
-                                selectedFilter: null, // Set appropriate filter if needed
-                              ),
-                            ),
-                          );
-                        } catch (e) {
-                          // Show error if navigation fails
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error loading return details: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Return ID and Status
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Return #${ReturnStatusUtils.shortReturnId(returnId)}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: ReturnStatusUtils.getReturnStatusColor(status).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: ReturnStatusUtils.getReturnStatusColor(status),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-
-                            // Reason
-                            Row(
-                              children: [
-                                const Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    'Reason: $reason',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            // Date
-                            if (createdAt != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Requested: ${DateFormat('MMM d, y').format(createdAt)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-
-                            // View Details Link
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'View Details',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 12,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ],
-              );
+              return _buildReturnRequestsList(snapshot.data!.docs);
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNoReturnRequestsMessage() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'No return requests for this order',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildReturnRequestsList(List<QueryDocumentSnapshot> docs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+
+        // Active Return Requests Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Active Return Requests (${docs.length})',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Return Request List
+        ...docs.map((doc) => _buildReturnRequestItem(doc)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildReturnRequestItem(QueryDocumentSnapshot doc) {
+    final returnData = doc.data() as Map<String, dynamic>;
+    final returnId = doc.id;
+    final status = returnData['status'] ?? 'Pending';
+    final createdAt = (returnData['createdTime'] as Timestamp?)?.toDate();
+    final reason = returnData['reason'] ?? 'Not specified';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Return ID and Status
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Return #${ReturnStatusUtils.shortReturnId(returnId)}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: ReturnStatusUtils.getReturnStatusColor(status).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: ReturnStatusUtils.getReturnStatusColor(status),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Reason
+          Row(
+            children: [
+              const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Reason: $reason',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          // Date
+          if (createdAt != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  'Requested: ${DateFormat('MMM d, y').format(createdAt)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          // View Details Link - USING REUSABLE WIDGET
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ViewDetailsLink(
+                onTap: () => _handleReturnDetailsNavigation(returnId),
+                fontSize: 12,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                arrowSize: 10,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleReturnDetailsNavigation(String returnId) async {
+    try {
+      // Access return request from the top-level 'returnRequests' collection
+      final returnDoc = await FirebaseFirestore.instance
+          .collection('returnRequests')
+          .doc(returnId)
+          .get();
+
+      if (!returnDoc.exists) {
+        _showErrorMessage('Return request not found');
+        return;
+      }
+
+      // Create ReturnRequestModel from the document
+      final returnRequest = ReturnRequestModel.fromDocument(returnDoc);
+
+      // Navigate to admin return details page
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReturnDetailsPage(
+            returnRequest: returnRequest,
+            onUpdateReturnStatus: _controller.updateReturnStatus,
+            formatDate: _controller.formatReturnDate,
+            formatStatus: _controller.formatReturnStatus,
+            firestore: FirebaseFirestore.instance,
+            getOrderProductDoc: _controller.getOrderProductDoc,
+            allReturns: [], // Populate with current returns list if needed
+            currentIndex: 0, // Set appropriate index
+            selectedFilter: null, // Set appropriate filter if needed
+          ),
+        ),
+      );
+    } catch (e) {
+      _showErrorMessage('Error loading return details: $e');
+    }
+  }
+
+// Helper method for error messages
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
       ),
     );
   }
@@ -1390,29 +1290,53 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header row with title and view details link
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.person, color: Colors.purple, size: 14),
+              // Left side - Title with icon
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.purple, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Customer Details',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Text(
-                'Customer Details',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+
+              // Right side - View Details link
+              ViewDetailsLink(onTap: () {
+                // Navigate to CustomerDetailsPage
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CustomerDetailsPage(
+                      userId: widget.order.customerId ?? "",
+                    ),
+                  ),
+                );
+              },
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _buildInfoRow('Email', widget.customerNames[widget.order.customerId] ?? 'No Email Available'),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 12),
+
+          // Customer information rows
           _buildInfoRow('User ID', shortUserId(widget.order.customerId ?? "")),
           const SizedBox(height: 8),
-          _buildInfoRow('Full Name', customerFullName ?? "Not found")
+          _buildInfoRow('Full Name', customerFullName ?? "Not found"),
+          const SizedBox(height: 8),
+          _buildInfoRow('Email', widget.customerNames[widget.order.customerId] ?? 'No Email Available'),
         ],
       ),
     );

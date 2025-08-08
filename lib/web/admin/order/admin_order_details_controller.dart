@@ -3,12 +3,15 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/payment_cards_model.dart';
+import '../../../model/return_request_model.dart';
 import '../../../model/shipment_model.dart';
+import '../../../view/widgets/return_status_utils.dart';
 
 class TimelineItem {
   final String title;
@@ -521,6 +524,8 @@ class OrderDetailsManagementController {
     }
   }
 
+
+
   Future<bool> hasReturnRequest(String orderId) async {
     try {
       final query = await firestore
@@ -557,6 +562,206 @@ class OrderDetailsManagementController {
       debugPrint('Stack trace: $stackTrace');
       return null;
     }
+  }
+
+  Future<bool> updateReturnStatus(String returnId, String newStatus) async {
+    try {
+      Map<String, dynamic> updateData = {'returnStatus': newStatus};
+
+      // Add timestamp fields based on the new status
+      switch (newStatus.toLowerCase()) {
+        case 'pending':
+          updateData['pendingDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'approved':
+          updateData['approvedDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'rejected':
+          updateData['rejectedDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'completed':
+          updateData['completedDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'pending_inspection':
+          updateData['pendinginspectionDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'completed_inspection':
+          updateData['completedinsepectionDate'] = FieldValue.serverTimestamp();
+          break;
+        case 'cancelled':
+          updateData['cancelledDate'] = FieldValue.serverTimestamp();
+          break;
+      }
+
+      await firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .update(updateData);
+
+      return true;
+    } catch (e) {
+      debugPrint('Error updating return status: $e');
+      return false;
+    }
+  }
+
+  /// Format return date for display
+  String formatReturnDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday at ${DateFormat('HH:mm').format(date)}';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return DateFormat('dd MMM, yyyy').format(date);
+    }
+  }
+
+  String formatReturnStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'submitted':
+        return 'Submitted';
+      case 'pending':
+        return 'Pending Review';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'refunded':
+        return 'Refunded';
+      case 'not_refunded':
+        return 'Not Refunded';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'pending_inspection':
+        return 'Pending Inspection';
+      case 'completed_inspection':
+        return 'Completed Inspection';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status.substring(0, 1).toUpperCase() + status.substring(1);
+    }
+  }
+
+
+  /// Get order product document
+  Future<DocumentSnapshot?> getOrderProductDoc(String userId, String orderId, String orderProductId) async {
+    try {
+      final doc = await firestore
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .collection('orderProducts')
+          .doc(orderProductId)
+          .get();
+      return doc.exists ? doc : null;
+    } catch (e) {
+      debugPrint('Error getting order product doc: $e');
+      return null;
+    }
+  }
+
+  /// Get return request model by ID
+  Future<ReturnRequestModel?> getReturnRequestModel(String returnId) async {
+    try {
+      final returnDoc = await firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .get();
+
+      if (!returnDoc.exists) {
+        throw Exception('Return request not found');
+      }
+
+      return ReturnRequestModel.fromDocument(returnDoc);
+    } catch (e) {
+      debugPrint('Error getting return request: $e');
+      rethrow;
+    }
+  }
+
+  /// Get stream of return requests for an order
+  Stream<QuerySnapshot> getOrderReturnRequestsStream(String customerId, String orderId) {
+    return firestore
+        .collection('returnRequests')
+        .where('userID', isEqualTo: customerId)
+        .where('orderID', isEqualTo: orderId)
+        .snapshots();
+  }
+
+  /// Format return request display data
+  Map<String, dynamic> formatReturnRequestDisplayData(Map<String, dynamic> returnData) {
+    final status = returnData['status'] ?? 'Pending';
+    final createdAt = (returnData['createdTime'] as Timestamp?)?.toDate();
+    final reason = returnData['reason'] ?? 'Not specified';
+
+    return {
+      'status': status,
+      'createdAt': createdAt,
+      'reason': reason,
+      'formattedDate': createdAt != null
+          ? DateFormat('MMM d, y').format(createdAt)
+          : 'Unknown date',
+      'statusColor': ReturnStatusUtils.getReturnStatusColor(status),
+    };
+  }
+
+  /// Get return eligibility info
+  Map<String, dynamic> getReturnEligibilityInfo(OrdersModel order) {
+    if (!order.eligibilityForReturn) {
+      return {
+        'text': 'Not Eligible',
+        'color': Colors.grey,
+        'isEligible': false,
+      };
+    }
+
+    if (order.orderStatus.toLowerCase() != 'completed' &&
+        order.orderStatus.toLowerCase() != 'delivered') {
+      return {
+        'text': 'Not Eligible',
+        'color': Colors.grey,
+        'isEligible': false,
+      };
+    }
+
+    if (order.completedDate != null) {
+      final daysSinceCompleted = DateTime.now().difference(order.completedDate!).inDays;
+      final daysRemaining = 5 - daysSinceCompleted;
+
+      if (daysRemaining <= 0) {
+        return {
+          'text': 'Expired',
+          'color': Colors.red,
+          'isEligible': false,
+        };
+      } else if (daysRemaining == 1) {
+        return {
+          'text': 'Expires Today',
+          'color': Colors.orange,
+          'isEligible': true,
+        };
+      } else {
+        return {
+          'text': '$daysRemaining days remaining',
+          'color': daysRemaining <= 2 ? Colors.amber : Colors.green,
+          'isEligible': true,
+        };
+      }
+    }
+
+    return {
+      'text': 'Yes',
+      'color': Colors.green,
+      'isEligible': true,
+    };
   }
 
 
