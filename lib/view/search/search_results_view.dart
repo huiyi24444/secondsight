@@ -356,6 +356,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         leading: const CustomBackButton(),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         toolbarHeight: 70,
         titleSpacing: 0,
@@ -471,15 +472,16 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                 : _results.isEmpty
                 ? Center(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 120),
                   Image.asset(
                     'assets/images/no_results.png',
-                    width: 200,
-                    height: 200,
+                    width: 250,
+                    height: 250,
                     fit: BoxFit.contain,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   Text(
                     'No results found',
                     style: TextStyle(
@@ -489,35 +491,6 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Try searching for "${widget.keyword}" with different filters',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      'shirts', 'dresses', 'shoes', 'bags'
-                    ].map((suggestion) {
-                      return GestureDetector(
-                        onTap: () {
-                          _searchController.text = suggestion;
-                          _navigateToSearchView();
-                        },
-                        child: Chip(
-                          label: Text(suggestion),
-                          backgroundColor: Colors.deepPurple.shade50,
-                          side: BorderSide(
-                            color: Colors.deepPurple.shade200,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
                 ],
               ),
             )
@@ -543,9 +516,10 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                   child: GridView.count(
                     crossAxisCount: 2,
                     childAspectRatio: 0.60,
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 1,
+
                     children: _results
                         .map((p) => ProductCard(product: p))
                         .toList(),
