@@ -8,6 +8,7 @@ class CustomSearchBar extends StatelessWidget {
   final bool readOnly;
   final Function(String)? onSearchSubmitted;
   final List<String> recentSearches;
+  final VoidCallback? onTap;
 
   const CustomSearchBar({
     super.key,
@@ -16,12 +17,17 @@ class CustomSearchBar extends StatelessWidget {
     this.readOnly = false,
     this.onSearchSubmitted,
     this.recentSearches = const [],
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
+        if (onTap != null) {
+          onTap!();
+          return;
+        }
         if (readOnly) {
           final keyword = await Navigator.push(
             context,
