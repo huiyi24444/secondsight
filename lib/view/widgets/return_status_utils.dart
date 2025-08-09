@@ -151,5 +151,28 @@ class ReturnStatusUtils {
         : safeId.toUpperCase();
   }
 
+  static String getStatusNotes(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending_approval':
+        return 'Awaiting admin review and approval';
+      case 'approved':
+        return 'Return request has been approved';
+      case 'rejected':
+        return 'Return request was declined';
+      case 'completed_inspection':
+        return 'Item inspection completed successfully';
+      case 'pending_inspection':
+        return 'Item being inspected by team';
+      case 'refunded':
+        return 'Refund has been processed and completed';
+      case 'not_refunded':
+        return 'Refund was not processed';
+      case 'cancelled':
+        return 'Return request was cancelled';
+      default:
+        return 'Status information not available';
+    }
+  }
+
 
 }
