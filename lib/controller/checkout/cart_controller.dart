@@ -16,7 +16,6 @@ class CartController {
 
         // Safely cast or skip if invalid
         if (data['productID'] is! DocumentReference) {
-          print('Invalid productID in cart item: ${data['productID']}');
           continue;
         }
 
@@ -31,7 +30,6 @@ class CartController {
       }
       return cartItems;
     } catch (e, stack) {
-      print('Error loading cart: $e');
       print(stack);
       return [];
     }

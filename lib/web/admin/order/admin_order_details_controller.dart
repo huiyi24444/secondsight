@@ -437,7 +437,6 @@ class OrderDetailsManagementController {
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching customer details: $e');
       return null;
     }
   }
@@ -463,7 +462,6 @@ class OrderDetailsManagementController {
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching shipment: $e');
       return null;
     }
   }
@@ -515,7 +513,6 @@ class OrderDetailsManagementController {
       defaultPaymentDoc ??= paymentCardsSnapshot.docs.first;
       return PaymentCard.fromDocument(defaultPaymentDoc);
     } catch (e) {
-      debugPrint('Error fetching payment card: $e');
       return null;
     }
   }
@@ -543,7 +540,6 @@ class OrderDetailsManagementController {
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching payment card details: $e');
       return null;
     }
   }
@@ -560,14 +556,12 @@ class OrderDetailsManagementController {
 
       return query.docs.isNotEmpty;
     } catch (e) {
-      debugPrint('Error checking return request: $e');
       return false;
     }
   }
 
   Future<CancellationModel?> getCancellationDetails(String cancelID) async {
     try {
-      print('Fetching cancellation details for cancelID: $cancelID');
 
       final doc = await FirebaseFirestore.instance
           .collection('cancellation')
@@ -575,15 +569,10 @@ class OrderDetailsManagementController {
           .get();
 
       if (!doc.exists) {
-        debugPrint('Cancellation document not found for ID: $cancelID');
         return null;
       }
-
-      debugPrint('Cancellation document fetched successfully for ID: $cancelID');
       return CancellationModel.fromDocument(doc);
     } catch (e, stackTrace) {
-      debugPrint('Error fetching cancellation details for ID: $cancelID -> $e');
-      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -624,7 +613,6 @@ class OrderDetailsManagementController {
 
       return true;
     } catch (e) {
-      debugPrint('Error updating return status: $e');
       return false;
     }
   }
@@ -687,7 +675,6 @@ class OrderDetailsManagementController {
           .get();
       return doc.exists ? doc : null;
     } catch (e) {
-      debugPrint('Error getting order product doc: $e');
       return null;
     }
   }
@@ -706,7 +693,6 @@ class OrderDetailsManagementController {
 
       return ReturnRequestModel.fromDocument(returnDoc);
     } catch (e) {
-      debugPrint('Error getting return request: $e');
       rethrow;
     }
   }

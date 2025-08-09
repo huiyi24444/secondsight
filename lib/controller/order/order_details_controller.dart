@@ -55,7 +55,6 @@ class OrderDetailsController extends ChangeNotifier {
 
   Future<ShipmentModel?> fetchShipment(String userId, String orderId, String? shipmentId) async {
     if (shipmentId == null) {
-      print("Shipment ID is null.");
       return null;
     }
 
@@ -70,19 +69,16 @@ class OrderDetailsController extends ChangeNotifier {
           .get();
 
       if (!snapshot.exists) {
-        print("Shipment document not found.");
         return null;
       }
 
       final data = snapshot.data();
       if (data == null) {
-        print("Shipment data is null.");
         return null;
       }
 
       return ShipmentModel.fromMap(data, snapshot.id);
     } catch (e) {
-      print("Error fetching shipment: $e");
       return null;
     }
   }
@@ -103,7 +99,6 @@ class OrderDetailsController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error marking order as completed: $e');
       return false;
     }
   }
@@ -120,7 +115,6 @@ class OrderDetailsController extends ChangeNotifier {
     // If more than 10 days have passed since to_receive date, auto-complete the order
     if (daysSinceShipped >= 14) {
       await markOrderAsCompleted();
-      debugPrint('Order auto-completed after 14 days');
     }
   }
 
@@ -252,7 +246,6 @@ class OrderDetailsController extends ChangeNotifier {
         'eligibilityForReturn': eligible,
       });
     } catch (e) {
-      debugPrint('Error updating return eligibility: $e');
     }
   }
 
@@ -293,7 +286,6 @@ class OrderDetailsController extends ChangeNotifier {
       resetRatingState();
       return true;
     } catch (e) {
-      debugPrint('Error submitting rating: $e');
       return false;
     }
   }
@@ -469,14 +461,12 @@ class OrderDetailsController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error canceling order: $e');
       return false;
     }
   }
 
   Future<CancellationModel?> getCancellationDetails(String cancelID) async {
     try {
-      print('Fetching cancellation details for cancelID: $cancelID');
 
       final doc = await FirebaseFirestore.instance
           .collection('cancellation')
@@ -484,15 +474,10 @@ class OrderDetailsController extends ChangeNotifier {
           .get();
 
       if (!doc.exists) {
-        debugPrint('Cancellation document not found for ID: $cancelID');
         return null;
       }
-
-      debugPrint('Cancellation document fetched successfully for ID: $cancelID');
       return CancellationModel.fromDocument(doc);
     } catch (e, stackTrace) {
-      debugPrint('Error fetching cancellation details for ID: $cancelID -> $e');
-      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -544,7 +529,6 @@ class OrderDetailsController extends ChangeNotifier {
 
       return snapshot.docs.length > 1;
     } catch (e) {
-      debugPrint('Error checking product count: $e');
       return false;
     }
   }
@@ -601,8 +585,6 @@ class OrderDetailsController extends ChangeNotifier {
 
   Future<PaymentCard?> fetchPaymentCard(String paymentCardId) async {
     try {
-      print("Fetching payment card with ID: $paymentCardId for user: $userId");
-
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)  // Add user ID here
@@ -611,14 +593,11 @@ class OrderDetailsController extends ChangeNotifier {
           .get();
 
       if (doc.exists) {
-        print("Payment card document FOUND: ${doc.data()}");
         return PaymentCard.fromDocument(doc);
       } else {
-        print("Payment card document NOT found for ID: $paymentCardId under user: $userId");
         return null;
       }
     } catch (e) {
-      print("Error fetching payment card: $e");
       return null;
     }
   }

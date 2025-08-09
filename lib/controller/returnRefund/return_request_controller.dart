@@ -105,7 +105,6 @@ class ReturnRequestController extends ChangeNotifier {
       hasExistingReturnRequest = existingRequests.docs.isNotEmpty;
       notifyListeners();
     } catch (e) {
-      debugPrint('Error checking existing return request: $e');
       rethrow;
     }
   }
@@ -140,7 +139,6 @@ class ReturnRequestController extends ChangeNotifier {
       await checkExistingReturnRequest();
       notifyListeners();
     } catch (e) {
-      debugPrint('Error loading order product: $e');
       rethrow;
     }
   }

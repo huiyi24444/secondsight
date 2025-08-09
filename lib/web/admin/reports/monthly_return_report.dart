@@ -18,19 +18,14 @@ class MonthlyReturnReport {
       DateTime selectedMonth,
       Function(bool) setIsGenerating,
       ) async {
-    print('[DEBUG] Report generation started for ${DateFormat('MMMM yyyy').format(selectedMonth)}');
 
     setIsGenerating(true);
 
     try {
       // Fetch return data
-      print('[DEBUG] Fetching return data...');
       final returnData = await _fetchReturnData(selectedMonth);
-      print('[DEBUG] Return data fetched successfully: $returnData');
 
       final pdf = pw.Document();
-
-      print('[DEBUG] Building PDF content...');
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -191,24 +186,19 @@ class MonthlyReturnReport {
         ),
       );
 
-      print('[DEBUG] PDF built successfully. Saving and sharing...');
 
       await Printing.sharePdf(
         bytes: await pdf.save(),
         filename: 'monthly_return_report_${DateFormat('yyyy_MM').format(selectedMonth)}.pdf',
       );
 
-      print('[DEBUG] PDF shared successfully.');
-    } catch (e, stack) {
-      print('[ERROR] Failed to generate report: $e');
-      print('[ERROR] Stack trace: $stack');
 
+    } catch (e, stack) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error generating report: $e')),
       );
     } finally {
       setIsGenerating(false);
-      print('[DEBUG] Report generation completed.');
     }
   }
 
@@ -237,7 +227,6 @@ class MonthlyReturnReport {
             returns.add(returnRequest);
           }
         } catch (e) {
-          print('Error parsing return request ${doc.id}: $e');
           continue; // Skip this document and continue with others
         }
       }
@@ -327,7 +316,6 @@ class MonthlyReturnReport {
       };
 
     } catch (e) {
-      print('Error fetching return data: $e');
       // Return empty data structure to prevent null errors
       return {
         'totalReturns': 0,

@@ -148,7 +148,6 @@ class CancelOrderDialogController extends ChangeNotifier {
 
     } catch (e) {
       setProcessing(false);
-      debugPrint('Error cancelling order: $e');
       onError?.call();
       rethrow;
     }

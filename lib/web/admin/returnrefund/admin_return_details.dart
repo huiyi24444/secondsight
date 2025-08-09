@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/product_status_utils.dart';
 import 'package:secondsight/view/widgets/return_status_utils.dart';
 import 'package:secondsight/view/widgets/user_utils.dart';
 import '../../../admin_main.dart';
@@ -538,6 +539,19 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 Expanded(
                   flex: 3,
                   child: Text(
+                    'PRODUCT ID',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
                     'ORDER ID',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -589,6 +603,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 ),
               ],
             ),
+
           ),
 
           // Product Item Row
@@ -679,6 +694,14 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                     style: const TextStyle(fontSize: 14),
                   ),
                 ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    '#${controller.getShortOrderId()}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
                 // Quantity
                 Expanded(
                   flex: 2,
@@ -701,100 +724,12 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    'RM ${totalPrice.toStringAsFixed(2)}',
+                    ProductStatusUtils.shortProductId(widget.returnRequest.productID),
                     textAlign: TextAlign.right,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Summary Section
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                // Product ID info row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Product ID',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    Text(
-                      widget.returnRequest.orderProductID,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Divider
-                Divider(color: Colors.grey[300], thickness: 1),
-                const SizedBox(height: 16),
-
-                // Return Amount Total
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.orange.withOpacity(0.1),
-                        Colors.orange.withOpacity(0.05),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.orange.withOpacity(0.2),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.account_balance_wallet,
-                              color: Colors.orange,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'RETURN AMOUNT',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'RM ${totalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
