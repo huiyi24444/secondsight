@@ -161,7 +161,7 @@ class OrderManagementController extends ChangeNotifier {
       // Load orders for each user
       for (final userDoc in usersSnapshot.docs) {
         final userId = userDoc.id;
-        customerNameMap[userId] = userDoc.data()['name'] ?? userDoc.data()['email'] ?? userId;
+        customerNameMap[userId] = userId;
 
         final ordersSnapshot = await userDoc.reference.collection('order').get();
 

@@ -408,7 +408,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 Expanded(
                   flex: 3,
                   child: Text(
-                    'SKU',
+                    'PRODUCT ID',
                     textAlign: TextAlign.center, // ADD THIS
                     style: TextStyle(
                       fontSize: 12,

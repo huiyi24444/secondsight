@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../model/order_model.dart';
 import '../dashboard/admin_dashboard_controller.dart';
 
 class AdminReportController {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
 
   /// Fetch all orders and attach userId (customerId)
   static Future<List<OrdersModel>> fetchAllOrders() async {
@@ -469,5 +471,26 @@ class AdminReportController {
       final data = doc.data();
       return OrdersModel.fromDocument(doc); // Ensure you pass the doc
     }).toList();
+  }
+
+  Future<String> getCurrentAdminName() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('admins')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          return userData?['name'] ?? userData?['fullName'] ?? 'Admin';
+        }
+      }
+      return 'Admin';
+    } catch (e) {
+      print('Error fetching admin name: $e');
+      return 'Admin';
+    }
   }
 }

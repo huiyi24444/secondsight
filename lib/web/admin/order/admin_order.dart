@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/user_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../view/widgets/order_status_utils.dart';
 import '../widget/topbar.dart';
@@ -606,7 +607,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
               Expanded(
                 flex: 2,
                 child: Text(
-                  controller.customerNames[order.customerId] ?? 'Unknown',
+                  shortUserId(controller.customerNames[order.customerId] ?? 'Unknown'),
                   style: const TextStyle(fontSize: 13),
                 ),
               ),

@@ -6,12 +6,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:intl/intl.dart';
+import 'package:secondsight/view/widgets/product_status_utils.dart';
 import '../../../model/order_model.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../dashboard/admin_dashboard_controller.dart';
 import 'admin_report_controller.dart';
 
 class DailySalesReport {
   final AdminReportController _controller = AdminReportController();
+  Map<String, String> _customerNames = {};
+  Map<String, List<Map<String, dynamic>>> _orderProducts = {};
+
 
   Future<void> generateDailySalesReport(
       BuildContext context,
@@ -29,6 +34,8 @@ class DailySalesReport {
 
       // Fetch detailed orders for the day
       final orders = await _fetchDayOrders(selectedDate);
+      final adminName = await _controller.getCurrentAdminName();
+
 
       final pdf = pw.Document();
 
@@ -36,10 +43,18 @@ class DailySalesReport {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(40),
+          footer: (context) => pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          ),
           build: (context) => [
             _buildPdfHeader(
               'DAILY SALES REPORT',
               DateFormat('dd MMMM yyyy').format(selectedDate).toUpperCase(),
+              adminName,
             ),
             pw.SizedBox(height: 30),
 
@@ -87,30 +102,32 @@ class DailySalesReport {
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
               columnWidths: {
-                0: pw.FixedColumnWidth(70),
-                1: pw.FixedColumnWidth(60),
-                2: pw.FixedColumnWidth(80),
-                3: pw.FlexColumnWidth(),
-                4: pw.FixedColumnWidth(30),
-                5: pw.FixedColumnWidth(50),
-                6: pw.FixedColumnWidth(50),
-                7: pw.FixedColumnWidth(60),
+                0: pw.FixedColumnWidth(70),    // Order ID
+                1: pw.FixedColumnWidth(50),    // Time
+                2: pw.FixedColumnWidth(80),    // Customer
+                3: pw.FlexColumnWidth(2),      // Product ID/Name
+                4: pw.FixedColumnWidth(30),    // Qty (individual product)
+                5: pw.FixedColumnWidth(50),    // Price (individual product)
+                6: pw.FixedColumnWidth(60),    // Total (order total - only shown on first row)
+                7: pw.FixedColumnWidth(50),    // Status (only shown on first row)
               },
               children: [
+                // Header row
                 pw.TableRow(
                   decoration: pw.BoxDecoration(color: PdfColors.grey200),
                   children: [
                     _buildTableHeader('Order ID', fontSize: 9),
                     _buildTableHeader('Time', fontSize: 9),
                     _buildTableHeader('Customer', fontSize: 9),
-                    _buildTableHeader('Products', fontSize: 9),
+                    _buildTableHeader('Product', fontSize: 9),
                     _buildTableHeader('Qty', fontSize: 9),
                     _buildTableHeader('Price', fontSize: 9),
-                    _buildTableHeader('Total', fontSize: 9),
+                    _buildTableHeader('Order Total', fontSize: 9),
                     _buildTableHeader('Status', fontSize: 9),
                   ],
                 ),
-                ...orders.map((order) => _buildOrderRow(order)).toList(),
+                // MODIFIED: Generate rows for each product
+                ..._buildProductRows(orders),
               ],
             ),
 
@@ -146,10 +163,127 @@ class DailySalesReport {
     }
   }
 
-  // Helper methods for fetching data
+  List<pw.TableRow> _buildProductRows(List<OrdersModel> orders) {
+    List<pw.TableRow> rows = [];
+
+    for (final order in orders) {
+      final products = _orderProducts[order.id] ?? [];
+
+      if (products.isEmpty) {
+        // If no products, show one row with "No products"
+        rows.add(_buildProductRow(
+          order: order,
+          product: null,
+          isFirstProduct: true,
+          productCount: 0,
+        ));
+      } else {
+        // Add a row for each product
+        for (int i = 0; i < products.length; i++) {
+          rows.add(_buildProductRow(
+            order: order,
+            product: products[i],
+            isFirstProduct: i == 0, // Only show order info on first product row
+            productCount: products.length,
+          ));
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  // NEW: Build individual product row
+  pw.TableRow _buildProductRow({
+    required OrdersModel order,
+    required Map<String, dynamic>? product,
+    required bool isFirstProduct,
+    required int productCount,
+  }) {
+    return pw.TableRow(
+      children: [
+        // Order ID (only show on first product row)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            isFirstProduct ? '#${order.shortOrderId}' : '',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // Time (only show on first product row)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            isFirstProduct ? DateFormat('HH:mm').format(order.orderDate) : '',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // Customer (only show on first product row)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            isFirstProduct
+                ? shortUserId(_customerNames[order.customerId] ?? order.customerId ?? 'N/A')
+                : '',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // Product ID/Name (show for each product)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            product != null
+                ? '${ProductStatusUtils.shortProductId(product['id'])}'
+                : 'No products',
+            style: pw.TextStyle(
+              fontSize: 8,
+              color: product != null ? PdfColors.black : PdfColors.grey600,
+            ),
+          ),
+        ),
+        // Individual Product Quantity
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            product != null ? '${product['quantity']}' : '-',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // Individual Product Price
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            product != null ? 'RM${product['price'].toStringAsFixed(2)}' : '-',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // Order Total (only show on first product row)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            isFirstProduct ? 'RM${order.totalAmount.toStringAsFixed(2)}' : '',
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          ),
+        ),
+        // Order Status (only show on first product row)
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Text(
+            isFirstProduct ? _getStatusShort(order.orderStatus) : '',
+            style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+
   Future<List<OrdersModel>> _fetchDayOrders(DateTime date) async {
     final startDate = DateTime(date.year, date.month, date.day);
     final endDate = startDate.add(Duration(days: 1));
+
+    // Build customer names map
+    await _buildCustomerNamesMap();
 
     final snapshot = await FirebaseFirestore.instance
         .collectionGroup('order')
@@ -158,11 +292,83 @@ class DailySalesReport {
         .orderBy('orderDate')
         .get();
 
-    return snapshot.docs.map((doc) => OrdersModel.fromJson(doc.data(), doc.id)).toList();
+    // Process each order and fetch product details
+    List<OrdersModel> orders = [];
+
+    for (final doc in snapshot.docs) {
+      final userId = doc.reference.parent.parent!.id;
+      final order = OrdersModel.fromJson(doc.data(), doc.id);
+      final orderWithCustomer = order.copyWith(customerId: userId);
+
+      // Fetch product details for this order
+      await _fetchOrderProducts(userId, order.id);
+
+      orders.add(orderWithCustomer);
+    }
+
+    return orders;
+  }
+
+  // NEW: Fetch product details for a specific order
+  Future<void> _fetchOrderProducts(String userId, String orderId) async {
+    try {
+      final orderProductsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('order')
+          .doc(orderId)
+          .collection('orderProducts')
+          .get();
+
+      List<Map<String, dynamic>> productDetails = [];
+
+      for (final orderProductDoc in orderProductsSnapshot.docs) {
+        final orderProductData = orderProductDoc.data();
+        final productRef = orderProductData['productID'] as DocumentReference;
+        final quantity = orderProductData['productQuantity'] as int;
+        final price = (orderProductData['price'] as num).toDouble();
+
+        // Get product details
+        final productDoc = await productRef.get();
+        if (productDoc.exists) {
+          final productData = productDoc.data() as Map<String, dynamic>;
+          final productName = productData['productName'] ?? 'Unknown Product';
+          final productId = productDoc.id;
+
+          productDetails.add({
+            'id': productId,
+            'name': productName,
+            'quantity': quantity,
+            'price': price,
+          });
+        }
+      }
+
+      _orderProducts[orderId] = productDetails;
+    } catch (e) {
+      print('Error fetching order products: $e');
+      _orderProducts[orderId] = [];
+    }
+  }
+
+
+
+  Future<void> _buildCustomerNamesMap() async {
+    try {
+      final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
+
+      for (final userDoc in usersSnapshot.docs) {
+        final userId = userDoc.id;
+        // Always use userId (similar to your OrderManagementController modification)
+        _customerNames[userId] = userId;
+      }
+    } catch (e) {
+      print('Error building customer names map: $e');
+    }
   }
 
   // PDF Helper Methods
-  pw.Widget _buildPdfHeader(String title, String date) {
+  pw.Widget _buildPdfHeader(String title, String date, String adminName) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -180,6 +386,10 @@ class DailySalesReport {
             pw.Text(
               'Report Period: $date',
               style: pw.TextStyle(fontSize: 12),
+            ),
+            pw.Text(
+              'Created By: $adminName',
+              style: pw.TextStyle(fontSize: 10,  color: PdfColors.grey600),
             ),
             pw.Text(
               'Generated: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())}',
@@ -230,6 +440,9 @@ class DailySalesReport {
   }
 
   pw.TableRow _buildOrderRow(OrdersModel order) {
+    final products = _orderProducts[order.id] ?? [];
+    final totalQuantity = products.fold(0, (sum, product) => sum + (product['quantity'] as int));
+
     return pw.TableRow(
       children: [
         pw.Container(
@@ -246,27 +459,31 @@ class DailySalesReport {
         pw.Container(
           padding: pw.EdgeInsets.all(5),
           child: pw.Text(
-            order.customerId ?? 'N/A',
+            shortUserId(
+                _customerNames[order.customerId] ?? order.customerId ?? 'N/A'
+            ),
             style: pw.TextStyle(fontSize: 8),
+          ),
+        ),
+        // MODIFIED: Product details column - shows each product
+        pw.Container(
+          padding: pw.EdgeInsets.all(5),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: products.isEmpty
+                ? [pw.Text('No products', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600))]
+                : products.map((product) => pw.Padding(
+              padding: pw.EdgeInsets.only(bottom: 2),
+              child: pw.Text(
+                '${ProductStatusUtils.shortProductId(product['id'])} (${product['quantity']}x)',
+                style: pw.TextStyle(fontSize: 7),
+              ),
+            )).toList(),
           ),
         ),
         pw.Container(
           padding: pw.EdgeInsets.all(5),
-          child: pw.Text(
-            '${order.totalProduct} items',
-            style: pw.TextStyle(fontSize: 8),
-          ),
-        ),
-        pw.Container(
-          padding: pw.EdgeInsets.all(5),
-          child: pw.Text('${order.totalProduct}', style: pw.TextStyle(fontSize: 8)),
-        ),
-        pw.Container(
-          padding: pw.EdgeInsets.all(5),
-          child: pw.Text(
-            'RM${(order.totalAmount / order.totalProduct).toStringAsFixed(2)}',
-            style: pw.TextStyle(fontSize: 8),
-          ),
+          child: pw.Text('$totalQuantity', style: pw.TextStyle(fontSize: 8)),
         ),
         pw.Container(
           padding: pw.EdgeInsets.all(5),
@@ -285,6 +502,7 @@ class DailySalesReport {
       ],
     );
   }
+
 
   String _getStatusShort(String status) {
     switch (status) {

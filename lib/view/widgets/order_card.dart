@@ -16,7 +16,7 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final formattedDate = DateFormat('MMM dd, yyyy').format(order.orderDate);
+    final formattedDate = DateFormat('dd MMM, yyyy').format(order.orderDate);
 
     return GestureDetector(
       onTap: () {

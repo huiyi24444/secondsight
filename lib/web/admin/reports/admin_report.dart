@@ -262,7 +262,7 @@ class _AdminReportPageState extends State<AdminReportPage> {
                                               child: Text(
                                                 'Cancel',
                                                 style: TextStyle(
-                                                  color: Colors.grey[600],
+                                                  color: Colors.white,
                                                   fontSize: 16,
                                                 ),
                                               ),
@@ -285,13 +285,16 @@ class _AdminReportPageState extends State<AdminReportPage> {
                                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                                 ),
                                               )
-                                                  : Icon(Icons.download_outlined),
+                                                  : Icon(
+                                                Icons.download_outlined,
+                                                color: Colors.white,
+                                              ),
                                               label: Text(
                                                 isGenerating ? 'Generating...' : 'Generate Report',
-                                                style: TextStyle(fontSize: 16),
+                                                style: TextStyle(fontSize: 16,  color: Colors.white,),
                                               ),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: Color(0xFF3498DB),
+                                                backgroundColor: Color(0xFF8E6CEF),
                                                 padding: EdgeInsets.symmetric(
                                                   horizontal: 24,
                                                   vertical: 12,

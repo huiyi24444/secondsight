@@ -30,6 +30,13 @@ class MonthlyReturnReport {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(40),
+          footer: (context) => pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          ),
           build: (context) => [
             _buildPdfHeader(
               'MONTHLY RETURN REQUEST REPORT',

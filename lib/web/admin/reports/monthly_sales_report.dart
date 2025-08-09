@@ -13,27 +13,6 @@ import 'admin_report_controller.dart';
 class MonthlySalesReport {
   final AdminReportController _controller = AdminReportController();
 
-  Future<String> _getCurrentAdminName() async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('admins')
-            .doc(currentUser.uid)
-            .get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data();
-          return userData?['name'] ?? userData?['name'] ?? 'Admin';
-        }
-      }
-      return 'Admin';
-    } catch (e) {
-      print('Error fetching admin name: $e');
-      return 'Admin';
-    }
-  }
-
   String _formatChange(int change) {
     if (change == 0) return 'remained the same';
     return change > 0
@@ -61,7 +40,7 @@ class MonthlySalesReport {
       // Fetch category-wise sales data
       final categoryData = await _fetchCategorySales(selectedMonth);
       // Fetch current admin name
-      final adminName = await _getCurrentAdminName();
+      final adminName = await _controller.getCurrentAdminName();
       print('Revenue Change: ${stats.revenueChange}');
       print('Order Change: ${stats.orderChange}');
       final pdf = pw.Document();
