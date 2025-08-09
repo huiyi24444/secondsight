@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +19,37 @@ class CustomTopBar extends StatefulWidget {
 
 class _CustomTopBarState extends State<CustomTopBar> {
   bool isHovered = false;
+  String adminName = 'Admin';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminName();
+  }
+
+  Future<void> _loadAdminName() async {
+    try {
+      final adminProvider = Provider.of<AdminAuthProvider>(context, listen: false);
+      final userId = adminProvider.userId; // Assuming AdminAuthProvider has userId property
+
+      if (userId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('admins')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists && mounted) {
+          final userData = userDoc.data();
+          setState(() {
+            adminName = userData?['name'] ?? 'Admin';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching admin name: $e');
+      // Keep default 'Admin' name if error occurs
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +106,17 @@ class _CustomTopBarState extends State<CustomTopBar> {
           const SizedBox(width: 10),
           CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.grey[300],
-            child: const Icon(Icons.person, color: Colors.grey),
+            backgroundColor: const Color(0xFF7C3AED).withOpacity(0.1),
+            child: Text(
+              adminName.isNotEmpty ? adminName[0].toUpperCase() : 'A',
+              style: const TextStyle(
+                fontSize: 20,
+                color: Color(0xFF7C3AED),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 20),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

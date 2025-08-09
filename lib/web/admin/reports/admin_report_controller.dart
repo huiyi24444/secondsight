@@ -196,6 +196,84 @@ class AdminReportController {
     }
   }
 
+  Future<Map<String, dynamic>> fetchCategorySales(DateTime selectedMonth) async {
+    try {
+      final startOfMonth = DateTime(selectedMonth.year, selectedMonth.month, 1);
+      final endOfMonth = DateTime(selectedMonth.year, selectedMonth.month + 1, 0, 23, 59, 59);
+
+      Map<String, dynamic> categoryData = {};
+
+      // Get all users
+      final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
+
+      for (final userDoc in usersSnapshot.docs) {
+        // Get orders for the selected month
+        final ordersSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userDoc.id)
+            .collection('order')
+            .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+            .where('orderDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth))
+            .where('orderStatus', isEqualTo: 'completed') // Only completed orders
+            .get();
+
+        for (final orderDoc in ordersSnapshot.docs) {
+          // Get order products for each order
+          final orderProductsSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userDoc.id)
+              .collection('order')
+              .doc(orderDoc.id)
+              .collection('orderProducts')
+              .get();
+
+          for (final orderProductDoc in orderProductsSnapshot.docs) {
+            final orderProductData = orderProductDoc.data();
+            final productRef = orderProductData['productID'] as DocumentReference;
+            final quantity = orderProductData['productQuantity'] as int;
+            final totalPrice = (orderProductData['totalPrice'] as num).toDouble();
+
+            // Get product details
+            final productDoc = await productRef.get();
+            if (productDoc.exists) {
+              final productData = productDoc.data() as Map<String, dynamic>;
+              final categoryRef = productData['category'] as DocumentReference;
+
+              // Get category details
+              final categoryDoc = await categoryRef.get();
+              if (categoryDoc.exists) {
+                final categoryData_doc = categoryDoc.data() as Map<String, dynamic>;
+                final categoryName = categoryData_doc['catName'] as String;
+
+                // Accumulate data for this category
+                if (categoryData.containsKey(categoryName)) {
+                  categoryData[categoryName]['units'] += quantity;
+                  categoryData[categoryName]['revenue'] += totalPrice;
+                } else {
+                  categoryData[categoryName] = {
+                    'units': quantity,
+                    'revenue': totalPrice,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return categoryData.isNotEmpty ? categoryData : {
+        'No Data': {'units': 0, 'revenue': 0.0},
+      };
+
+    } catch (e) {
+      print('Error fetching category sales: $e');
+      // Return empty data on error
+      return {
+        'Error': {'units': 0, 'revenue': 0.0},
+      };
+    }
+  }
+
   Map<String, DateTime> _calculateDateRanges(DateFilterType filterType, DateTime selectedDate) {
     DateTime currentStart, currentEnd, previousStart, previousEnd;
 

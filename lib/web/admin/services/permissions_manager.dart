@@ -9,6 +9,7 @@ class AdminPermissions {
   static const String editUsers = 'edit_users';
 
   // Product Management
+  static const String viewDashboard = 'view_dashboard';
   static const String viewProducts = 'view_products';
   static const String createProducts = 'create_products';
   static const String editProducts = 'edit_products';
@@ -18,13 +19,13 @@ class AdminPermissions {
   static const String viewOrders = 'view_orders';
   static const String processOrders = 'process_orders';
   static const String cancelOrders = 'cancel_orders';
+
   //static const String refundOrders = 'refund_orders';
 
   static const String viewReturns = 'view_returns';
   static const String createReturns = 'create_returns';
   static const String editReturns = 'edit_returns';
   static const String cancelReturns = 'delete_returns';
-
 
   // Category Management
   static const String viewCategories = 'view_categories';
@@ -68,6 +69,7 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.createUsers,
         AdminPermissions.editUsers,
+        AdminPermissions.viewDashboard,
         AdminPermissions.viewProducts,
         AdminPermissions.createProducts,
         AdminPermissions.editProducts,
@@ -75,6 +77,10 @@ class AdminRoles {
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
         AdminPermissions.cancelOrders,
+        AdminPermissions.viewReturns,
+        AdminPermissions.createReturns,
+        AdminPermissions.editReturns,
+        AdminPermissions.cancelReturns,
         AdminPermissions.viewCategories,
         AdminPermissions.manageCategories,
         AdminPermissions.viewConversations,
@@ -93,13 +99,21 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.createUsers,
         AdminPermissions.editUsers,
+        AdminPermissions.viewDashboard,
         AdminPermissions.viewProducts,
         AdminPermissions.createProducts,
         AdminPermissions.editProducts,
+        AdminPermissions.deleteProducts,
         AdminPermissions.viewOrders,
         AdminPermissions.processOrders,
+        AdminPermissions.cancelOrders,
+        AdminPermissions.viewReturns,
+        AdminPermissions.createReturns,
+        AdminPermissions.editReturns,
+        AdminPermissions.cancelReturns,
         AdminPermissions.viewCategories,
         AdminPermissions.manageCategories,
+        AdminPermissions.viewConversations,
         AdminPermissions.viewAnalytics,
         AdminPermissions.exportReports,
       ],
@@ -185,10 +199,21 @@ class PermissionGroups {
         AdminPermissions.cancelOrders,
       ],
     ),
+    'returns': PermissionGroup(
+      name: 'Return Management',
+      icon: 	Icons.autorenew,
+      permissions: [
+        AdminPermissions.viewReturns,
+        AdminPermissions.createReturns,
+        AdminPermissions.editReturns,
+        AdminPermissions.cancelReturns,
+      ],
+    ),
     'support': PermissionGroup(
       name: 'Customer Support',
       icon: Icons.support_agent,
       permissions: [
+        AdminPermissions.viewConversations,
       ],
     ),
     'analytics': PermissionGroup(
@@ -212,20 +237,17 @@ class PermissionGroups {
     'system': PermissionGroup(
       name: 'System Settings',
       icon: Icons.settings,
-      permissions: [
-      ],
+      permissions: [],
     ),
     'financial': PermissionGroup(
       name: 'Financial',
       icon: Icons.attach_money,
-      permissions: [
-      ],
+      permissions: [],
     ),
     'marketing': PermissionGroup(
       name: 'Marketing',
       icon: Icons.campaign,
-      permissions: [
-      ],
+      permissions: [],
     ),
   };
 }
@@ -263,6 +285,13 @@ class PermissionHelper {
       AdminPermissions.processOrders: 'Process Orders',
       AdminPermissions.cancelOrders: 'Cancel Orders',
 
+      //returns
+      AdminPermissions.viewReturns: 'View Returns',
+      AdminPermissions.createReturns: 'Create Returns',
+      AdminPermissions.editReturns: 'Edit Returns',
+      AdminPermissions.cancelReturns: 'Cancel Returns',
+
+
       // Categories
       AdminPermissions.viewCategories: 'View Categories',
       AdminPermissions.manageCategories: 'Manage Categories',
@@ -281,42 +310,29 @@ class PermissionHelper {
     return permissionNames[permission] ?? permission;
   }
 
-  /// Get description for a permission
-  static String getPermissionDescription(String permission) {
-    final Map<String, String> descriptions = {
-      AdminPermissions.viewUsers: 'View user profiles and account information',
-      AdminPermissions.createUsers: 'Create new user accounts',
-      AdminPermissions.editUsers: 'Modify user information and settings',
-
-      AdminPermissions.viewProducts: 'View product listings and details',
-      AdminPermissions.createProducts: 'Add new products to the catalog',
-      AdminPermissions.editProducts: 'Modify product information and pricing',
-      AdminPermissions.deleteProducts: 'Remove products from the catalog',
-
-      AdminPermissions.viewOrders: 'View customer orders and order details',
-      AdminPermissions.processOrders: 'Update order status and process shipments',
-      AdminPermissions.cancelOrders: 'Cancel pending or processing orders',
-
-      AdminPermissions.managePermissions: 'Assign and modify admin permissions',
-      // Add more descriptions as needed
-    };
-
-    return descriptions[permission] ?? '';
-  }
-
   /// Check if a list of permissions includes a specific permission
   static bool hasPermission(List<String> userPermissions, String permission) {
     return userPermissions.contains(permission);
   }
 
   /// Check if a list of permissions includes all required permissions
-  static bool hasAllPermissions(List<String> userPermissions, List<String> requiredPermissions) {
-    return requiredPermissions.every((permission) => userPermissions.contains(permission));
+  static bool hasAllPermissions(
+    List<String> userPermissions,
+    List<String> requiredPermissions,
+  ) {
+    return requiredPermissions.every(
+      (permission) => userPermissions.contains(permission),
+    );
   }
 
   /// Check if a list of permissions includes any of the required permissions
-  static bool hasAnyPermission(List<String> userPermissions, List<String> requiredPermissions) {
-    return requiredPermissions.any((permission) => userPermissions.contains(permission));
+  static bool hasAnyPermission(
+    List<String> userPermissions,
+    List<String> requiredPermissions,
+  ) {
+    return requiredPermissions.any(
+      (permission) => userPermissions.contains(permission),
+    );
   }
 
   /// Get permissions for a role

@@ -88,7 +88,7 @@ class _AdminReportPageState extends State<AdminReportPage> {
                                       // Report Options
                                       _buildReportOption(
                                         id: 'monthly_sales',
-                                        title: 'Monthly Sales Summary',
+                                        title: 'Monthly Sales Summary Report',
                                         subtitle: 'Comprehensive overview of monthly sales performance',
                                         icon: Icons.trending_up_outlined,
                                         color: Color(0xFF3498DB),
@@ -96,7 +96,7 @@ class _AdminReportPageState extends State<AdminReportPage> {
 
                                       _buildReportOption(
                                         id: 'daily_sales',
-                                        title: 'Daily Sales Report',
+                                        title: 'Daily Sales Summary Report',
                                         subtitle: 'Detailed breakdown of daily transactions',
                                         icon: Icons.receipt_outlined,
                                         color: Color(0xFF27AE60),

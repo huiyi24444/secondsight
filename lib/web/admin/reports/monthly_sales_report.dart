@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -11,6 +12,27 @@ import 'admin_report_controller.dart';
 
 class MonthlySalesReport {
   final AdminReportController _controller = AdminReportController();
+
+  Future<String> _getCurrentAdminName() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('admins')
+            .doc(currentUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          return userData?['name'] ?? userData?['name'] ?? 'Admin';
+        }
+      }
+      return 'Admin';
+    } catch (e) {
+      print('Error fetching admin name: $e');
+      return 'Admin';
+    }
+  }
 
   String _formatChange(int change) {
     if (change == 0) return 'remained the same';
@@ -38,6 +60,8 @@ class MonthlySalesReport {
 
       // Fetch category-wise sales data
       final categoryData = await _fetchCategorySales(selectedMonth);
+      // Fetch current admin name
+      final adminName = await _getCurrentAdminName();
       print('Revenue Change: ${stats.revenueChange}');
       print('Order Change: ${stats.orderChange}');
       final pdf = pw.Document();
@@ -46,10 +70,18 @@ class MonthlySalesReport {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(40),
+          footer: (context) => pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+          ),
           build: (context) => [
             _buildPdfHeader(
               'MONTHLY SALES SUMMARY REPORT',
               DateFormat('MMMM yyyy').format(selectedMonth).toUpperCase(),
+              adminName,
             ),
             pw.SizedBox(height: 20),
 
@@ -173,10 +205,10 @@ class MonthlySalesReport {
                     .toList(),
               ],
             ),
-
             pw.SizedBox(height: 30),
+            pw.NewPage(),
 
-            // Visual representation - Sales Distribution
+            // Sales Distribution Visualization (moved to second page)
             pw.Text(
               'Sales Distribution Visualization',
               style: pw.TextStyle(
@@ -190,7 +222,7 @@ class MonthlySalesReport {
 
             pw.SizedBox(height: 30),
 
-            // Order Status Analysis
+            // Order Status Analysis (on second page after visualization)
             pw.Text(
               'Order Status Analysis',
               style: pw.TextStyle(
@@ -228,22 +260,13 @@ class MonthlySalesReport {
     }
   }
 
-  // Helper methods for fetching data
   Future<Map<String, dynamic>> _fetchCategorySales(DateTime month) async {
-    // This would fetch actual category data from Firestore
-    // For now, returning sample data structure
-    return {
-      'Jackets': {'units': 89, 'revenue': 12460.0},
-      'Dresses': {'units': 124, 'revenue': 9920.0},
-      'Shirts': {'units': 156, 'revenue': 7800.0},
-      'Pants': {'units': 98, 'revenue': 6860.0},
-      'Accessories': {'units': 234, 'revenue': 4680.0},
-      'Others': {'units': 87, 'revenue': 3958.0},
-    };
+    // Use the controller to fetch real category data instead of mock data
+    return await _controller.fetchCategorySales(month);
   }
 
   // PDF Helper Methods
-  pw.Widget _buildPdfHeader(String title, String date) {
+  pw.Widget _buildPdfHeader(String title, String date, String adminName) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -263,8 +286,8 @@ class MonthlySalesReport {
               style: pw.TextStyle(fontSize: 12),
             ),
             pw.Text(
-              'Created By: HY Admin',
-              style: pw.TextStyle(fontSize: 11,  color: PdfColors.grey600),
+              'Created By: $adminName',
+              style: pw.TextStyle(fontSize: 10,  color: PdfColors.grey600),
             ),
             pw.Text(
               'Generated: ${DateFormat('dd MMM yyyy, HH:mm').format(DateTime.now())}',
@@ -353,6 +376,17 @@ class MonthlySalesReport {
   }
 
   pw.Widget _buildSalesDistributionChart(Map<String, dynamic> categoryData, int totalRevenue) {
+    if (categoryData.isEmpty || totalRevenue == 0) {
+      return pw.Center(
+        child: pw.Text(
+          'No data to display',
+          style: pw.TextStyle(
+            fontSize: 12,
+            color: PdfColors.grey600,
+          ),
+        ),
+      );
+    }
     return pw.Container(
       height: 200,
       child: pw.Row(

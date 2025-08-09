@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/dateTime_utils.dart';
 import '../../../admin_main.dart';
 import '../../../model/admin_log_model.dart';
 import '../../../model/admin_model.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../services/admin_auth_provider.dart';
 import '../services/permissions_manager.dart';
 import '../widget/sidebar.dart';
@@ -406,7 +408,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Admin ID',
-                  '#${admin.id.substring(0, 8)}...',
+                  '#${shortUserId(admin.id)}',
                   Icons.fingerprint,
                   Colors.blue,
                 ),
@@ -415,7 +417,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Created Date',
-                  DateFormat('MMM d, y').format(admin.createdAt),
+                 DateFormatter.formatDateTime(admin.createdAt),
                   Icons.calendar_today,
                   Colors.orange,
                 ),
@@ -499,7 +501,12 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildActivitySummaryItem('Last Login', _controller.formatDateTime(admin.lastLogin), Icons.login),
+                _buildActivitySummaryItem(
+                  'Last Login',
+                  '${DateFormatter.formatDateTime(admin.lastLogin)} (${_controller.formatDateTime(admin.lastLogin)})',
+                  Icons.login,
+                ),
+
                 const SizedBox(height: 12),
                 _buildActivitySummaryItem('Total Logins This Month', '45', Icons.timeline),
                 const SizedBox(height: 12),
@@ -694,7 +701,6 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
 
   Widget _buildPermissionItem(String permission) {
     final permissionName = PermissionHelper.getPermissionName(permission);
-    final permissionDescription = PermissionHelper.getPermissionDescription(permission);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -731,16 +737,6 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (permissionDescription.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    permissionDescription,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),

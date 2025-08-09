@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../model/admin_model.dart';
+import '../../../view/widgets/user_utils.dart';
 import '../services/permissions_guard.dart';
 import '../services/permissions_manager.dart';
 import '../services/admin_auth_provider.dart';
@@ -252,7 +253,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                       },
                     ),
                   ),
-                  DataCell(Text('#${admin['id']}')),
+                  DataCell(Text('#${shortUserId(admin['id'])}')),
                   DataCell(
                     Row(
                       children: [
