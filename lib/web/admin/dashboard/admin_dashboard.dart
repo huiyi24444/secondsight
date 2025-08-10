@@ -7,6 +7,7 @@ import 'package:secondsight/web/admin/dashboard/small_order_card.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../services/admin_auth_provider.dart';
+import '../services/admin_nav.dart';
 import '../widget/blinkingdot.dart';
 import '../widget/topbar.dart';
 import 'admin_dashboard_controller.dart';
@@ -328,6 +329,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               icon: Icons.inventory_2,
               color: Colors.orange,
               isUrgent: data!.activeToShipOrders > 20,
+              onTap: () => _navigateToOrderManagement('To Ship'),
             ),
             const SizedBox(width: 16),
             _buildStatusCard(
@@ -336,6 +338,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               subtitle: 'On the way',
               icon: Icons.local_shipping,
               color: Colors.blue,
+              onTap: () => _navigateToOrderManagement('To Receive'),
             ),
             const SizedBox(width: 16),
             _buildStatusCard(
@@ -344,6 +347,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               subtitle: _selectedFilter == DateFilterType.all ? 'All time' : _getPeriodText(),
               icon: Icons.check_circle,
               color: Colors.green,
+              onTap: () => _navigateToOrderManagement('Completed'),
             ),
             const SizedBox(width: 16),
             _buildStatusCard(
@@ -352,6 +356,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               subtitle: _selectedFilter == DateFilterType.all ? 'All time' : _getPeriodText(),
               icon: Icons.cancel,
               color: Colors.red,
+              onTap: () => _navigateToOrderManagement('Cancelled'),
             ),
           ],
         ),
@@ -393,6 +398,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               icon: Icons.hourglass_top,
               color: Colors.orange,
               isUrgent: data!.activeToShipOrders > 20,
+              onTap: () => _navigateToReturnManagement('Pending Approval'),
             ),
             const SizedBox(width: 16),
             _buildStatusCard(
@@ -401,6 +407,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               subtitle: 'Checking return condition',
               icon: Icons.search,
               color: Colors.blue,
+              onTap: () => _navigateToReturnManagement('Pending Inspection'),
             ),
             const SizedBox(width: 16),
           ],
@@ -856,81 +863,110 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required IconData icon,
     required Color color,
     bool isUrgent = false,
+    VoidCallback? onTap,
   }) {
     return Expanded(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(12), // Reduced from 20
+      child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8), // Reduced from 10
-          border: isUrgent ? Border.all(color: color.withOpacity(0.3), width: 1.5) : null, // Reduced width
+          borderRadius: BorderRadius.circular(8),
+          border: isUrgent
+              ? Border.all(color: color.withOpacity(0.3), width: 1.5)
+              : onTap != null
+              ? Border.all(color: Colors.grey.withOpacity(0.2), width: 1)
+              : null,
           boxShadow: [
             BoxShadow(
               color: isUrgent ? color.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
-              spreadRadius: 0, // Reduced from 1
-              blurRadius: 4, // Reduced from 5
+              spreadRadius: 0,
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-        child: Row( // Changed from Column to Row for horizontal layout
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10), // Slightly increased for better proportion
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 24), // Slightly larger icon
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min, // Minimize vertical space
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            hoverColor: onTap != null ? Colors.grey.withOpacity(0.05) : null,
+            splashColor: onTap != null ? color.withOpacity(0.1) : null,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        value,
-                        style: const TextStyle(
-                          fontSize: 22, // Reduced from 28
-                          fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              value,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (isUrgent) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ),
-                      if (isUrgent) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (onTap != null) ...[
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                size: 12,
+                                color: Colors.grey[400],
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 10,
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2), // Reduced spacing
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 13, // Reduced from 14
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 10, // Reduced from 11
                     ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1114,6 +1150,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       default:
         return 'Unknown';
     }
+  }
+
+  void _navigateToOrderManagement(String selectedTab) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminNavigator(
+          initialPage: 'orders',
+          pageParams: {'initialTab': selectedTab},
+        ),
+      ),
+    );
+  }
+
+  void _navigateToReturnManagement(String selectedTab) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminNavigator(
+          initialPage: 'returns',
+          pageParams: {'initialTab': selectedTab},
+        ),
+      ),
+    );
   }
 
   void _selectDate() async {

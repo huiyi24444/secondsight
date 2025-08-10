@@ -17,8 +17,9 @@ import 'admin_auth_provider.dart';
 
 class AdminNavigator extends StatefulWidget {
   final String? initialPage;
+  final Map<String, dynamic>? pageParams;
 
-  const AdminNavigator({Key? key, this.initialPage}) : super(key: key);
+  const AdminNavigator({Key? key, this.initialPage,  this.pageParams}) : super(key: key);
 
   @override
   _AdminNavigatorState createState() => _AdminNavigatorState();
@@ -49,13 +50,17 @@ class _AdminNavigatorState extends State<AdminNavigator> {
       case 'orders':
         return PermissionGuard(
           requiredPermissions: [AdminPermissions.viewOrders],
-          child: OrderManagementPage(),
+          child: OrderManagementPage(
+            initialTab: widget.pageParams?['initialTab'], // Use widget.pageParams
+          ),
           fallback: _buildNoPermissionPage('Order Management'),
         );
       case 'returns':
         return PermissionGuard(
           requiredPermissions: [AdminPermissions.viewReturns],
-          child: ReturnManagementPage(),
+          child: ReturnManagementPage(
+            initialTab: widget.pageParams?['initialTab'],
+          ),
           fallback: _buildNoPermissionPage('Return Management'),
         );
       case 'customers':

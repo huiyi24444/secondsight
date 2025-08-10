@@ -12,7 +12,9 @@ import 'admin_order_controller.dart';
 import 'admin_order_details.dart';
 
 class OrderManagementPage extends StatefulWidget {
-  const OrderManagementPage({Key? key}) : super(key: key);
+  final String? initialTab;
+
+  const OrderManagementPage({Key? key,  this.initialTab}) : super(key: key);
 
   @override
   State<OrderManagementPage> createState() => _OrderManagementPageState();
@@ -26,6 +28,10 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   void initState() {
     super.initState();
     _controller = OrderManagementController();
+
+    if (widget.initialTab != null) {
+      _controller.setSelectedTab(widget.initialTab!);
+    }
   }
 
   @override
@@ -125,6 +131,8 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       setState(() => _isProcessing = false);
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {

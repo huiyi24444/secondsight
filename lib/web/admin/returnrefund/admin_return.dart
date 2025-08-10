@@ -10,12 +10,16 @@ import 'admin_return_controller.dart';
 import 'admin_return_details.dart';
 
 class ReturnManagementPage extends StatelessWidget {
-  const ReturnManagementPage({super.key});
+  final String? initialTab;
+
+  const ReturnManagementPage({super.key, this.initialTab});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ReturnManagementController()..loadReturns(),
+      create: (_) => ReturnManagementController()
+        ..selectedTab = initialTab ?? 'All' // Set initial tab
+        ..loadReturns(),
       child: const ReturnManagementView(),
     );
   }
@@ -99,11 +103,17 @@ class ReturnManagementView extends StatelessWidget {
                             children: [
                               _buildFilterTab(context, 'All'),
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Submitted'),  // Updated from 'Pending'
+                              _buildFilterTab(context, 'Pending Approval'),
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Approved'),
                               const SizedBox(width: 20),
-                              _buildFilterTab(context, 'Completed'),  // Updated from 'Refunded'
+                              _buildFilterTab(context, 'Pending Inspection'),
+                              const SizedBox(width: 20),
+                              _buildFilterTab(context, 'Completed Inspection'),
+                              const SizedBox(width: 20),
+                              _buildFilterTab(context, 'Refunded'),
+                              const SizedBox(width: 20),
+                              _buildFilterTab(context, 'Not Refunded'),
                               const SizedBox(width: 20),
                               _buildFilterTab(context, 'Rejected'),
                               const SizedBox(width: 20),
@@ -116,6 +126,20 @@ class ReturnManagementView extends StatelessWidget {
                         Expanded(
                           child: controller.isLoading
                               ? const Center(child: CircularProgressIndicator())
+                              : controller.filteredReturns.isEmpty
+                              ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[300]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No return requests found',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          )
                               : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(

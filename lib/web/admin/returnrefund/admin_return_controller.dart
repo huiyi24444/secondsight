@@ -137,16 +137,27 @@ class ReturnManagementController extends ChangeNotifier {
     if (selectedTab != 'All') {
       filtered = filtered.where((returnItem) {
         switch (selectedTab) {
-          case 'Submitted':  // Updated from 'Pending'
-            return returnItem['status'] == 'submitted';
+          case 'Pending Approval':
+            return returnItem['status'] == 'pending_approval';
           case 'Approved':
             return returnItem['status'] == 'approved';
-          case 'Completed':  // Updated from 'Refunded'
-            return returnItem['status'] == 'completed';
+          case 'Pending Inspection':
+            return returnItem['status'] == 'pending_inspection';
+          case 'Completed Inspection':
+            return returnItem['status'] == 'completed_inspection';
+          case 'Refunded':
+            return returnItem['status'] == 'refunded';
+          case 'Not Refunded':
+            return returnItem['status'] == 'not_refunded';
           case 'Rejected':
             return returnItem['status'] == 'rejected';
           case 'Cancelled':
             return returnItem['status'] == 'cancelled';
+        // Keep the old ones for backward compatibility
+          case 'Submitted':
+            return returnItem['status'] == 'submitted';
+          case 'Completed':
+            return returnItem['status'] == 'completed';
           default:
             return true;
         }

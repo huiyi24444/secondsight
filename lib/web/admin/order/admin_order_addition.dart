@@ -352,7 +352,10 @@ class _CreateOrderDialogState extends State<CreateOrderDialog> {
                           ),
                         );
                       },
-                      child: const Text('Create Order'),
+                      child: const Text(
+                        'Create Order',
+                        style: TextStyle(color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF7C3AED),
                         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
