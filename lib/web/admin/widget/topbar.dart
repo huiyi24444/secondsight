@@ -19,7 +19,7 @@ class CustomTopBar extends StatefulWidget {
 
 class _CustomTopBarState extends State<CustomTopBar> {
   bool isHovered = false;
-  String adminName = 'Admin';
+  String adminName = ' ';
 
   @override
   void initState() {

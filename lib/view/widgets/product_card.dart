@@ -61,6 +61,7 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                     child: Container(
                       width: double.infinity,
                       height: double.infinity,
+                      color: Color(0xFFD1D3D0),
                       child: CachedNetworkImage(
                         imageUrl: imageUrl,
                         fit: BoxFit.cover,

@@ -305,72 +305,164 @@ class AdminDashboardController {
   Future<Map<String, dynamic>> _calculatePerformanceMetrics() async {
     final metrics = <String, dynamic>{};
 
-    // Get a sample of recent completed orders for performance calculation
-    final recentCompletedOrders = await _firestore
-        .collectionGroup('order')
-        .where('orderStatus', isEqualTo: 'completed')
-        .orderBy('orderDate', descending: true)
-        .limit(100) // Sample size
-        .get();
+    try {
+      // Get recent orders with various statuses for comprehensive analysis
+      final recentOrdersQuery = await _firestore
+          .collectionGroup('order')
+          .orderBy('orderDate', descending: true)
+          .limit(200) // Increased sample size for better accuracy
+          .get();
 
-    final completedOrders = recentCompletedOrders.docs
-        .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
-        .toList();
+      final allRecentOrders = recentOrdersQuery.docs
+          .map((doc) => OrdersModel.fromJson(doc.data(), doc.id))
+          .toList();
 
-    if (completedOrders.isNotEmpty) {
-      // Calculate average processing time (if date fields exist)
-      int totalProcessingHours = 0;
-      int processedCount = 0;
+      if (allRecentOrders.isEmpty) {
+        return {
+          'avgProcessingHours': 0,
+          'avgShippingHours': 'No data',        // Changed from 0
+          'fulfillmentRate': 'No data',         // Changed from 0
+          'avgCompletionHours': 'No data',      // Added this line
+          'processingEfficiency': 0,
+          'cancellationRate': 0,
+        };
+      }
+      // Calculate average processing time (order creation to shipping)
+      double totalProcessingHours = 0;
+      int processedOrdersCount = 0;
 
-      for (final order in completedOrders) {
-        // For now, estimate based on order date
-        // In real implementation with status dates, use: order.toShipDate - order.orderDate
+      for (final order in allRecentOrders) {
+        // Only calculate for orders that have been shipped (have toShipDate or toReceiveDate)
         if (order.toShipDate != null) {
-          totalProcessingHours += order.toShipDate!.difference(order.orderDate).inHours;
-          processedCount++;
-        } else {
-          // Estimate: assume 24 hours processing time
-          totalProcessingHours += 24;
-          processedCount++;
+          final processingTime = order.toShipDate!.difference(order.orderDate).inHours;
+          if (processingTime >= 0) { // Ensure valid time difference
+            totalProcessingHours += processingTime;
+            processedOrdersCount++;
+          }
+        } else if (order.toReceiveDate != null) {
+          // If toShipDate is missing but toReceiveDate exists, estimate processing time
+          // This handles cases where toShipDate wasn't properly recorded
+          final processingTime = order.toReceiveDate!.difference(order.orderDate).inHours;
+          if (processingTime >= 0) {
+            // Assume 12 hours of shipping time, so processing = total - 12
+            totalProcessingHours += (processingTime - 12).clamp(0, double.infinity);
+            processedOrdersCount++;
+          }
         }
       }
 
-      if (processedCount > 0) {
-        metrics['avgProcessingHours'] = (totalProcessingHours / processedCount).round();
-      } else {
-        metrics['avgProcessingHours'] = 24; // Default
+      metrics['avgProcessingHours'] = processedOrdersCount > 0
+          ? (totalProcessingHours / processedOrdersCount).round()
+          : 0;
+
+      // Calculate average shipping time (shipping to delivery)
+      double totalShippingHours = 0;
+      int shippedOrdersCount = 0;
+
+      for (final order in allRecentOrders) {
+        DateTime? shippingStartDate;
+        DateTime? deliveryDate;
+
+        // Determine shipping start date (priority: toReceiveDate > toShipDate)
+        if (order.toReceiveDate != null) {
+          shippingStartDate = order.toReceiveDate;
+        } else if (order.toShipDate != null) {
+          shippingStartDate = order.toShipDate;
+        }
+
+        // Determine delivery date
+        if (order.completedDate != null) {
+          deliveryDate = order.completedDate;
+        }
+
+        // Calculate shipping time if both dates are available
+        if (shippingStartDate != null && deliveryDate != null) {
+          final shippingTime = deliveryDate.difference(shippingStartDate).inHours;
+          if (shippingTime >= 0) { // Ensure valid time difference
+            totalShippingHours += shippingTime;
+            shippedOrdersCount++;
+          }
+        }
       }
 
-      // Calculate average shipping time
-      // For now, estimate. With full implementation, use: completedDate - toReceiveDate
-      metrics['avgShippingHours'] = 72; // 3 days estimate
+      metrics['avgShippingHours'] = shippedOrdersCount > 0
+          ? (totalShippingHours / shippedOrdersCount).round()
+          : 'No data';  // Changed from : 0
 
-      // Calculate fulfillment rate
-      final totalOrders = await _firestore
-          .collectionGroup('order')
-          .get();
+      // Calculate fulfillment rate (completed orders / total orders)
+      final completedOrdersCount = allRecentOrders
+          .where((order) => order.orderStatus == 'completed')
+          .length;
 
-      final completedCount = await _firestore
-          .collectionGroup('order')
-          .where('orderStatus', isEqualTo: 'completed')
-          .get();
+      final nonCancelledOrdersCount = allRecentOrders
+          .where((order) => order.orderStatus != 'cancelled')
+          .length;
 
-      if (totalOrders.docs.isNotEmpty) {
-        metrics['fulfillmentRate'] =
-            ((completedCount.docs.length / totalOrders.docs.length) * 100).round();
-      } else {
-        metrics['fulfillmentRate'] = 0;
+      // Use non-cancelled orders as the base for fulfillment rate calculation
+      metrics['fulfillmentRate'] = nonCancelledOrdersCount > 0
+          ? ((completedOrdersCount / nonCancelledOrdersCount) * 100).round()
+          : 'No data';  // Changed from : 0
+
+
+      // Additional performance metrics
+
+      // Calculate average order completion time (order creation to completion)
+      double totalCompletionHours = 0;
+      int completedOrdersForTime = 0;
+
+      for (final order in allRecentOrders) {
+        if (order.orderStatus == 'completed' && order.completedDate != null) {
+          final completionTime = order.completedDate!.difference(order.orderDate).inHours;
+          if (completionTime >= 0) {
+            totalCompletionHours += completionTime;
+            completedOrdersForTime++;
+          }
+        }
       }
-    } else {
-      // Default values if no data
-      metrics['avgProcessingHours'] = 0;
-      metrics['avgShippingHours'] = 0;
-      metrics['fulfillmentRate'] = 0;
+
+      metrics['avgCompletionHours'] = completedOrdersForTime > 0
+          ? (totalCompletionHours / completedOrdersForTime).round()
+          : 'No data';  // Changed from : 0
+
+      // Calculate order processing efficiency (orders processed within 24 hours)
+      final ordersProcessedWithin24h = allRecentOrders.where((order) {
+        if (order.toShipDate == null) return false;
+        final processingTime = order.toShipDate!.difference(order.orderDate).inHours;
+        return processingTime <= 24 && processingTime >= 0;
+      }).length;
+
+      final totalProcessableOrders = allRecentOrders
+          .where((order) => order.toShipDate != null || order.orderStatus == 'to_ship')
+          .length;
+
+      metrics['processingEfficiency'] = totalProcessableOrders > 0
+          ? ((ordersProcessedWithin24h / totalProcessableOrders) * 100).round()
+          : 0;
+
+      // Calculate cancellation rate
+      final cancelledOrdersCount = allRecentOrders
+          .where((order) => order.orderStatus == 'cancelled')
+          .length;
+
+      metrics['cancellationRate'] = allRecentOrders.isNotEmpty
+          ? ((cancelledOrdersCount / allRecentOrders.length) * 100).round()
+          : 0;
+
+    } catch (e) {
+      print('Error calculating performance metrics: $e');
+      // Return default values on error
+      return {
+        'avgProcessingHours': 0,
+        'avgShippingHours': 0,
+        'fulfillmentRate': 0,
+        'avgCompletionHours': 0,
+        'processingEfficiency': 0,
+        'cancellationRate': 0,
+      };
     }
 
     return metrics;
   }
-
   // Keep the existing method for updating order status
   Future<void> updateOrderStatus({
     required String userId,
@@ -459,6 +551,9 @@ class AdminDashboardController {
       pendingInspectionReturns: pendingInspectionReturns,
     );
   }
+
+
+
 }
 
 // DashboardStats class remains the same

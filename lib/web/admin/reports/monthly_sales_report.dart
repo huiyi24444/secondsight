@@ -22,8 +22,6 @@ class MonthlySalesReport {
 
 
   Future<void> generateMonthlySalesReport(
-
-
       BuildContext context,
       DateTime selectedMonth,
       Function(bool) setIsGenerating,
@@ -33,6 +31,11 @@ class MonthlySalesReport {
     try {
       // Fetch real data from dashboard controller
       final stats = await _controller.fetchDashboardStats(
+        filterType: DateFilterType.month,
+        selectedDate: selectedMonth,
+      );
+
+      final performanceMetrics = await _controller.fetchPerformanceMetricsForPeriod(
         filterType: DateFilterType.month,
         selectedDate: selectedMonth,
       );
@@ -222,6 +225,73 @@ class MonthlySalesReport {
             ),
 
             pw.SizedBox(height: 30),
+
+            pw.SizedBox(height: 30),
+            pw.Text(
+              'Performance Metrics',
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 15),
+
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    _buildTableHeader('Metric'),
+                    _buildTableHeader('Value'),
+                    _buildTableHeader('Comparison'),
+                    _buildTableHeader('Target'),
+                  ],
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Average Processing Time',
+                  _formatMetricValue(performanceMetrics['avgProcessingHours']),
+                  '< 24 hours',
+                  performanceMetrics['avgProcessingHoursChange'],
+                  false, // Lower is better for processing time
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Average Shipping Time',
+                  _formatMetricValue(performanceMetrics['avgShippingHours']),
+                  '< 72 hours',
+                  performanceMetrics['avgShippingHoursChange'],
+                  false, // Lower is better for shipping time
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Average Completion Time',
+                  _formatMetricValue(performanceMetrics['avgCompletionHours']),
+                  '< 5 days',
+                  performanceMetrics['avgCompletionHoursChange'],
+                  false, // Lower is better for completion time
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Fulfillment Rate',
+                  _formatMetricValue(performanceMetrics['fulfillmentRate'], isPercentage: true),
+                  '> 95%',
+                  performanceMetrics['fulfillmentRateChange'],
+                  true, // Higher is better for fulfillment rate
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Processing Efficiency',
+                  _formatMetricValue(performanceMetrics['processingEfficiency'], isPercentage: true), // Use formatMetricValue
+                  '> 80%',
+                  performanceMetrics['processingEfficiencyChange'],
+                  true,
+                ),
+                _buildPerformanceRowWithComparison(
+                  'Cancellation Rate',
+                  _formatMetricValue(performanceMetrics['cancellationRate'], isPercentage: true), // Use formatMetricValue
+                  '< 5%',
+                  performanceMetrics['cancellationRateChange'],
+                  false,
+                ),
+              ],
+            ),
           ],
         ),
       );
@@ -239,9 +309,79 @@ class MonthlySalesReport {
     }
   }
 
+  String _formatMetricValue(dynamic value, {bool isPercentage = false}) {
+    if (value is String) {
+      return value; // Return 'No data' as is
+    } else if (value is int) {
+      if (isPercentage) {
+        return '$value%';
+      } else {
+        return _formatHours(value);
+      }
+    }
+    return 'No data';
+  }
+
+  String _formatHours(int hours) {
+    if (hours == 0) return 'No data';
+    if (hours < 24) return '$hours hours';
+    final days = hours ~/ 24;
+    final remainingHours = hours % 24;
+    if (remainingHours == 0) return '$days days';
+    return '$days days ${remainingHours}h';
+  }
+
   Future<Map<String, dynamic>> _fetchCategorySales(DateTime month) async {
     // Use the controller to fetch real category data instead of mock data
     return await _controller.fetchCategorySales(month);
+  }
+
+  pw.TableRow _buildPerformanceRowWithComparison(
+      String metric,
+      String value,
+      String target,
+      int? changeValue,
+      bool higherIsBetter
+      ) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(metric, style: pw.TextStyle(fontSize: 11)),
+        ),
+        pw.Container(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        ),
+
+        pw.Container(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(
+            changeValue == null
+                ? 'N/A'
+                : '${changeValue >= 0 ? '+' : ''}${changeValue}%',
+            style: pw.TextStyle(
+              fontSize: 11,
+              color: changeValue == null
+                  ? PdfColors.black
+                  : _getChangeColor(changeValue, higherIsBetter),
+            ),
+          ),
+        ),
+        pw.Container(
+          padding: pw.EdgeInsets.all(8),
+          child: pw.Text(target, style: pw.TextStyle(fontSize: 11, color: PdfColors.grey600)),
+        ),
+      ],
+    );
+  }
+
+// Helper method to determine color based on whether higher is better
+  PdfColor _getChangeColor(int changeValue, bool higherIsBetter) {
+    if (changeValue == 0) return PdfColors.black;
+
+    bool isImprovement = higherIsBetter ? changeValue > 0 : changeValue < 0;
+    return isImprovement ? PdfColors.green : PdfColors.red;
   }
 
   // PDF Helper Methods

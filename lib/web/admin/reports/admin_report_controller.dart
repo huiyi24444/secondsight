@@ -493,4 +493,248 @@ class AdminReportController {
       return 'Admin';
     }
   }
+
+  Future<Map<String, dynamic>> calculatePerformanceMetricsForPeriod({
+    DateFilterType filterType = DateFilterType.month,
+    DateTime? selectedDate,
+  }) async {
+    final metrics = <String, dynamic>{};
+
+    try {
+      selectedDate ??= DateTime.now();
+      final dateRanges = _calculateDateRanges(filterType, selectedDate);
+      final currentStart = dateRanges['currentStart']!;
+      final currentEnd = dateRanges['currentEnd']!;
+
+      // Fetch orders for the SPECIFIC period (not just 200 recent)
+      Query ordersQuery = _firestore.collectionGroup('order');
+      if (filterType != DateFilterType.all) {
+        ordersQuery = ordersQuery
+            .where('orderDate', isGreaterThanOrEqualTo: Timestamp.fromDate(currentStart))
+            .where('orderDate', isLessThan: Timestamp.fromDate(currentEnd));
+      }
+
+      final ordersSnapshot = await ordersQuery.get();
+      final periodOrders = ordersSnapshot.docs
+          .where((doc) => doc.data() != null)
+          .map((doc) => OrdersModel.fromJson(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+
+      if (periodOrders.isEmpty) {
+        return {
+          'avgProcessingHours': 'No data',
+          'avgShippingHours': 'No data',
+          'fulfillmentRate': 'No data',
+          'avgCompletionHours': 'No data',
+          'processingEfficiency': 'No data',
+          'cancellationRate': 'No data',
+        };
+      }
+
+      // Calculate average processing time
+      double totalProcessingHours = 0;
+      int processedOrdersCount = 0;
+
+      for (final order in periodOrders) {
+        if (order.toShipDate != null) {
+          final processingTime = order.toShipDate!.difference(order.orderDate).inHours;
+          if (processingTime >= 0) {
+            totalProcessingHours += processingTime;
+            processedOrdersCount++;
+          }
+        }
+      }
+
+      metrics['avgProcessingHours'] = processedOrdersCount > 0
+          ? (totalProcessingHours / processedOrdersCount).round()
+          : 0;
+
+      // Calculate average shipping time
+      double totalShippingHours = 0;
+      int shippedOrdersCount = 0;
+
+      for (final order in periodOrders) {
+        DateTime? shippingStartDate;
+        DateTime? deliveryDate;
+
+        if (order.toReceiveDate != null) {
+          shippingStartDate = order.toReceiveDate;
+        } else if (order.toShipDate != null) {
+          shippingStartDate = order.toShipDate;
+        }
+
+        if (order.completedDate != null) {
+          deliveryDate = order.completedDate;
+        }
+
+        if (shippingStartDate != null && deliveryDate != null) {
+          final shippingTime = deliveryDate.difference(shippingStartDate).inHours;
+          if (shippingTime >= 0) {
+            totalShippingHours += shippingTime;
+            shippedOrdersCount++;
+          }
+        }
+      }
+
+      metrics['avgShippingHours'] = shippedOrdersCount > 0
+          ? (totalShippingHours / shippedOrdersCount).round()
+          : 'No data';
+
+      // Calculate average completion time
+      double totalCompletionHours = 0;
+      int completedOrdersForTime = 0;
+
+      for (final order in periodOrders) {
+        if (order.orderStatus == 'completed' && order.completedDate != null) {
+          final completionTime = order.completedDate!.difference(order.orderDate).inHours;
+          if (completionTime >= 0) {
+            totalCompletionHours += completionTime;
+            completedOrdersForTime++;
+          }
+        }
+      }
+
+      metrics['avgCompletionHours'] = completedOrdersForTime > 0
+          ? (totalCompletionHours / completedOrdersForTime).round()
+          : 'No data';
+
+      // Calculate fulfillment rate
+      final completedOrdersCount = periodOrders
+          .where((order) => order.orderStatus == 'completed')
+          .length;
+
+      final nonCancelledOrdersCount = periodOrders
+          .where((order) => order.orderStatus != 'cancelled')
+          .length;
+
+      metrics['fulfillmentRate'] = nonCancelledOrdersCount > 0
+          ? ((completedOrdersCount / nonCancelledOrdersCount) * 100).round()
+          : 'No data';
+
+      // Calculate processing efficiency
+      final ordersProcessedWithin24h = periodOrders.where((order) {
+        if (order.toShipDate == null) return false;
+        final processingTime = order.toShipDate!.difference(order.orderDate).inHours;
+        return processingTime <= 24 && processingTime >= 0;
+      }).length;
+
+      final totalProcessableOrders = periodOrders
+          .where((order) => order.toShipDate != null || order.orderStatus == 'to_ship')
+          .length;
+
+      metrics['processingEfficiency'] = totalProcessableOrders > 0
+          ? ((ordersProcessedWithin24h / totalProcessableOrders) * 100).round()
+          : 'No data';  // Changed from 0 to 'No data'
+
+      // Calculate cancellation rate
+      final cancelledOrdersCount = periodOrders
+          .where((order) => order.orderStatus == 'cancelled')
+          .length;
+
+      metrics['cancellationRate'] = periodOrders.isNotEmpty
+          ? ((cancelledOrdersCount / periodOrders.length) * 100).round()
+          : 'No data';
+
+    } catch (e) {
+      print('Error calculating performance metrics for period: $e');
+      return {
+        'avgProcessingHours': 'No data',
+        'avgShippingHours': 'No data',
+        'fulfillmentRate': 'No data',
+        'avgCompletionHours': 'No data',
+        'processingEfficiency': 'No data',
+        'cancellationRate': 'No data',
+      };
+    }
+
+    return metrics;
+  }
+
+  Future<Map<String, dynamic>> fetchPerformanceMetricsForPeriod({
+    DateFilterType filterType = DateFilterType.month,
+    DateTime? selectedDate,
+  }) async {
+    selectedDate ??= DateTime.now();
+
+    // Calculate current period metrics
+    final currentMetrics = await calculatePerformanceMetricsForPeriod(
+      filterType: filterType,
+      selectedDate: selectedDate,
+    );
+
+    // Calculate previous period metrics for comparison
+    DateTime previousDate;
+    switch (filterType) {
+      case DateFilterType.day:
+        previousDate = selectedDate.subtract(const Duration(days: 1));
+        break;
+      case DateFilterType.month:
+        previousDate = DateTime(
+          selectedDate.month == 1 ? selectedDate.year - 1 : selectedDate.year,
+          selectedDate.month == 1 ? 12 : selectedDate.month - 1,
+          selectedDate.day,
+        );
+        break;
+      case DateFilterType.year:
+        previousDate = DateTime(selectedDate.year - 1, selectedDate.month, selectedDate.day);
+        break;
+      case DateFilterType.all:
+      // No comparison for 'all time'
+        return currentMetrics;
+    }
+
+    final previousMetrics = await calculatePerformanceMetricsForPeriod(
+      filterType: filterType,
+      selectedDate: previousDate,
+    );
+
+    // Calculate changes for metrics that have numeric values
+    final result = Map<String, dynamic>.from(currentMetrics);
+
+    // Add change calculations
+    result['avgProcessingHoursChange'] = _calculateMetricChange(
+        currentMetrics['avgProcessingHours'],
+        previousMetrics['avgProcessingHours']
+    );
+
+    result['avgShippingHoursChange'] = _calculateMetricChange(
+        currentMetrics['avgShippingHours'],
+        previousMetrics['avgShippingHours']
+    );
+
+    result['avgCompletionHoursChange'] = _calculateMetricChange(
+        currentMetrics['avgCompletionHours'],
+        previousMetrics['avgCompletionHours']
+    );
+
+    result['fulfillmentRateChange'] = _calculateMetricChange(
+        currentMetrics['fulfillmentRate'],
+        previousMetrics['fulfillmentRate']
+    );
+
+    result['processingEfficiencyChange'] = _calculateMetricChange(
+        currentMetrics['processingEfficiency'],
+        previousMetrics['processingEfficiency']
+    );
+
+    result['cancellationRateChange'] = _calculateMetricChange(
+        currentMetrics['cancellationRate'],
+        previousMetrics['cancellationRate']
+    );
+
+    return result;
+  }
+
+  int? _calculateMetricChange(dynamic currentValue, dynamic previousValue) {
+    // Return null if either value is 'No data'
+    if (currentValue is String || previousValue is String) return null;
+    if (currentValue == 0 && previousValue == 0) return null;
+
+    if (previousValue == 0) {
+      return currentValue > 0 ? 100 : 0;
+    }
+
+    double change = ((currentValue - previousValue) / previousValue) * 100;
+    return change.round();
+  }
 }

@@ -427,9 +427,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildActivityMetric({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildActivityDashboard() {
     return Container(
-      height: 600,
+      height: 650, // Increased height to accommodate more metrics
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -489,77 +525,75 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
           // Performance Metrics
           const Text(
-            'Performance Metrics',
+            'Performance Metrics (Based on 200 Most Recent Orders)',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
 
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildPerformanceRow(
-                  icon: Icons.speed,
-                  label: 'Average Processing Time',
-                  value: _formatHoursToReadable(data!.performanceMetrics['avgProcessingHours'] ?? 0),
-                  benchmark: 'Target: < 24 hours',
-                  isGood: (data!.performanceMetrics['avgProcessingHours'] ?? 0) <= 24,
-                ),
-                _buildPerformanceRow(
-                  icon: Icons.local_shipping,
-                  label: 'Average Delivery Time',
-                  value: _formatHoursToReadable(data!.performanceMetrics['avgShippingHours'] ?? 0),
-                  benchmark: 'Target: < 3 days',
-                  isGood: (data!.performanceMetrics['avgShippingHours'] ?? 0) <= 72,
-                ),
-                _buildPerformanceRow(
-                  icon: Icons.star,
-                  label: 'Order Fulfillment Rate',
-                  value: '${data!.performanceMetrics['fulfillmentRate'] ?? 0}%',
-                  benchmark: 'Target: > 95%',
-                  isGood: (data!.performanceMetrics['fulfillmentRate'] ?? 0) >= 95,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildPerformanceRow(
+                    icon: Icons.speed,
+                    label: 'Avg Processing Time',
+                    value: _formatHoursToReadable(data!.performanceMetrics['avgProcessingHours'] ?? 0),
+                    benchmark: 'Target: < 24 hours',
+                    isGood: (data!.performanceMetrics['avgProcessingHours'] ?? 0) <= 24,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildPerformanceRow(
+                    icon: Icons.local_shipping,
+                    label: 'Avg Shipping Time',
+                    value: _formatMetricValue(data!.performanceMetrics['avgShippingHours']),
+                    benchmark: 'Target: < 72 hours',
+                    isGood: _isMetricGood('avgShippingHours', data!.performanceMetrics['avgShippingHours']),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildPerformanceRow(
+                    icon: Icons.schedule,
+                    label: 'Avg Completion Time',
+                    value: _formatMetricValue(data!.performanceMetrics['avgCompletionHours']),
+                    benchmark: 'Target: < 5 days',
+                    isGood: _isMetricGood('avgCompletionHours', data!.performanceMetrics['avgCompletionHours']),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildPerformanceRow(
+                    icon: Icons.star,
+                    label: 'Fulfillment Rate',
+                    value: _formatMetricValue(data!.performanceMetrics['fulfillmentRate'], isPercentage: true),
+                    benchmark: 'Target: > 95%',
+                    isGood: _isMetricGood('fulfillmentRate', data!.performanceMetrics['fulfillmentRate']),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildPerformanceRow(
+                    icon: Icons.flash_on,
+                    label: 'Processing Efficiency',
+                    value: '${data!.performanceMetrics['processingEfficiency'] ?? 0}%',
+                    benchmark: 'Orders processed in 24h',
+                    isGood: (data!.performanceMetrics['processingEfficiency'] ?? 0) >= 80,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildPerformanceRow(
+                    icon: Icons.cancel_outlined,
+                    label: 'Cancellation Rate',
+                    value: '${data!.performanceMetrics['cancellationRate'] ?? 0}%',
+                    benchmark: 'Target: < 5%',
+                    isGood: (data!.performanceMetrics['cancellationRate'] ?? 0) <= 5,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildActivityMetric({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-          ),
-        ),
-      ],
     );
   }
 
@@ -570,40 +604,71 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String benchmark,
     required bool isGood,
   }) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey[600], size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: isGood ? Colors.green[50] : Colors.orange[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isGood ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isGood ? Colors.green[100] : Colors.orange[100],
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+                icon,
+                color: isGood ? Colors.green[700] : Colors.orange[700],
+                size: 16
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    label,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500
+                    )
+                ),
+                Text(
+                  benchmark,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[600]
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
             children: [
-              Text(label, style: const TextStyle(fontSize: 14)),
               Text(
-                benchmark,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isGood ? Colors.green[700] : Colors.orange[700],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                isGood ? Icons.check_circle : Icons.warning,
+                color: isGood ? Colors.green[600] : Colors.orange[600],
+                size: 14,
               ),
             ],
           ),
-        ),
-        Row(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              isGood ? Icons.check_circle : Icons.warning,
-              color: isGood ? Colors.green : Colors.orange,
-              size: 16,
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -951,13 +1016,103 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   String _formatHoursToReadable(int hours) {
-    if (hours < 24) {
-      return '$hours hours';
+    if (hours == 0) {
+      return 'No data';
+    } else if (hours < 1) {
+      return '< 1 hour';
+    } else if (hours < 24) {
+      return '$hours hour${hours == 1 ? '' : 's'}';
     } else if (hours < 48) {
-      return '1 day';
+      final remainingHours = hours % 24;
+      if (remainingHours == 0) {
+        return '1 day';
+      } else {
+        return '1 day ${remainingHours}h';
+      }
     } else {
-      final days = (hours / 24).round();
-      return '$days days';
+      final days = hours ~/ 24;
+      final remainingHours = hours % 24;
+      if (remainingHours == 0) {
+        return '$days days';
+      } else {
+        return '$days days ${remainingHours}h';
+      }
+    }
+  }
+
+  String _formatMetricValue(dynamic value, {bool isPercentage = false}) {
+    if (value is String) {
+      return value; // Return 'No data' as is
+    } else if (value is int) {
+      if (isPercentage) {
+        return '$value%';
+      } else {
+        return _formatHoursToReadable(value);
+      }
+    }
+    return 'No data';
+  }
+
+  bool _isMetricGood(String metricType, dynamic value) {
+    if (value is String) {
+      return false; // 'No data' is neutral
+    } else if (value is int) {
+      switch (metricType) {
+        case 'avgShippingHours':
+          return value <= 72;
+        case 'avgCompletionHours':
+          return value <= 120;
+        case 'fulfillmentRate':
+          return value >= 95;
+        default:
+          return false;
+      }
+    }
+    return false;
+  }
+
+// Additional helper method for performance status
+  String _getPerformanceStatus(String metric, dynamic value) {
+    switch (metric) {
+      case 'avgProcessingHours':
+        final hours = value as int;
+        if (hours == 0) return 'No data';
+        if (hours <= 12) return 'Excellent';
+        if (hours <= 24) return 'Good';
+        if (hours <= 48) return 'Fair';
+        return 'Needs improvement';
+
+      case 'avgShippingHours':
+        final hours = value as int;
+        if (hours == 0) return 'No data';
+        if (hours <= 24) return 'Excellent';
+        if (hours <= 72) return 'Good';
+        if (hours <= 120) return 'Fair';
+        return 'Needs improvement';
+
+      case 'fulfillmentRate':
+        final rate = value as int;
+        if (rate >= 98) return 'Excellent';
+        if (rate >= 95) return 'Good';
+        if (rate >= 90) return 'Fair';
+        return 'Needs improvement';
+
+      case 'processingEfficiency':
+        final efficiency = value as int;
+        if (efficiency >= 90) return 'Excellent';
+        if (efficiency >= 80) return 'Good';
+        if (efficiency >= 70) return 'Fair';
+        return 'Needs improvement';
+
+      case 'cancellationRate':
+        final rate = value as int;
+        if (rate <= 2) return 'Excellent';
+        if (rate <= 5) return 'Good';
+        if (rate <= 10) return 'Fair';
+        return 'Needs improvement';
+
+      default:
+        return 'Unknown';
     }
   }
 
