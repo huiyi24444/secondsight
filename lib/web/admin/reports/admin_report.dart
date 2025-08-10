@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
+import '../login/activity_logger_mixin.dart';
 import '../widget/topbar.dart';
 import 'monthly_sales_report.dart';
 import 'daily_sales_report.dart';
@@ -11,7 +12,7 @@ class AdminReportPage extends StatefulWidget {
   _AdminReportPageState createState() => _AdminReportPageState();
 }
 
-class _AdminReportPageState extends State<AdminReportPage> {
+class _AdminReportPageState extends State<AdminReportPage> with ActivityLoggerMixin{
   DateTime selectedMonth = DateTime.now();
   DateTime selectedDate = DateTime.now();
   bool isGenerating = false;
@@ -451,28 +452,219 @@ class _AdminReportPageState extends State<AdminReportPage> {
         break;
     }
   }
-
   Future<void> _generateMonthlySalesReport() async {
-    await _monthlySalesReport.generateMonthlySalesReport(
-      context,
-      selectedMonth,
-          (isGenerating) => setState(() => this.isGenerating = isGenerating),
-    );
+    final String reportId = 'monthly_sales_${DateTime.now().millisecondsSinceEpoch}';
+    final String reportName = 'Monthly Sales Report - ${DateFormat('MMMM yyyy').format(selectedMonth)}';
+
+    try {
+      // Log the start of report generation
+      await logCrud(
+        operation: 'create',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'reportType': 'monthly_sales',
+          'period': DateFormat('yyyy-MM').format(selectedMonth),
+          'format': 'PDF',
+          'status': 'generating'
+        },
+        isSuccessful: true,
+      );
+
+      await _monthlySalesReport.generateMonthlySalesReport(
+        context,
+        selectedMonth,
+            (isGenerating) => setState(() => this.isGenerating = isGenerating),
+      );
+
+      // Log successful report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'completed',
+          'completedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: true,
+      );
+
+    } catch (error) {
+      // Log failed report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'failed',
+          'failedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to generate monthly sales report: ${error.toString()}',
+      );
+
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate monthly sales report'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _generateDailySalesReport() async {
-    await _dailySalesReport.generateDailySalesReport(
-      context,
-      selectedDate,
-          (isGenerating) => setState(() => this.isGenerating = isGenerating),
-    );
+    final String reportId = 'daily_sales_${DateTime.now().millisecondsSinceEpoch}';
+    final String reportName = 'Daily Sales Report - ${DateFormat('dd MMMM yyyy').format(selectedDate)}';
+
+    try {
+      // Log the start of report generation
+      await logCrud(
+        operation: 'create',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'reportType': 'daily_sales',
+          'date': DateFormat('yyyy-MM-dd').format(selectedDate),
+          'format': 'PDF',
+          'status': 'generating'
+        },
+        isSuccessful: true,
+      );
+
+      await _dailySalesReport.generateDailySalesReport(
+        context,
+        selectedDate,
+            (isGenerating) => setState(() => this.isGenerating = isGenerating),
+      );
+
+      // Log successful report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'completed',
+          'completedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: true,
+      );
+
+    } catch (error) {
+      // Log failed report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'failed',
+          'failedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to generate daily sales report: ${error.toString()}',
+      );
+
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate daily sales report'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _generateMonthlyReturnReport() async {
-    await _monthlyReturnReport.generateMonthlyReturnReport(
-      context,
-      selectedMonth,
-          (isGenerating) => setState(() => this.isGenerating = isGenerating),
-    );
+    final String reportId = 'monthly_returns_${DateTime.now().millisecondsSinceEpoch}';
+    final String reportName = 'Monthly Return Report - ${DateFormat('MMMM yyyy').format(selectedMonth)}';
+
+    try {
+      // Log the start of report generation
+      await logCrud(
+        operation: 'create',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'reportType': 'monthly_returns',
+          'period': DateFormat('yyyy-MM').format(selectedMonth),
+          'format': 'PDF',
+          'status': 'generating'
+        },
+        isSuccessful: true,
+      );
+
+      await _monthlyReturnReport.generateMonthlyReturnReport(
+        context,
+        selectedMonth,
+            (isGenerating) => setState(() => this.isGenerating = isGenerating),
+      );
+
+      // Log successful report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'completed',
+          'completedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: true,
+      );
+
+    } catch (error) {
+      // Log failed report generation
+      await logCrud(
+        operation: 'update',
+        targetType: 'report',
+        targetId: reportId,
+        targetName: reportName,
+        changes: {
+          'status': 'failed',
+          'failedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: {
+          'status': 'generating',
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to generate monthly return report: ${error.toString()}',
+      );
+
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to generate monthly return report'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

@@ -6,6 +6,7 @@ import 'package:secondsight/model/product_model.dart';
 import 'package:secondsight/model/product_measurements_model.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 
+import '../login/activity_logger_mixin.dart';
 import 'admin_product_image.dart';
 import 'measurements_widget.dart';
 
@@ -24,7 +25,7 @@ class ProductEditDialog extends StatefulWidget {
   State<ProductEditDialog> createState() => _ProductEditDialogState();
 }
 
-class _ProductEditDialogState extends State<ProductEditDialog> {
+class _ProductEditDialogState extends State<ProductEditDialog> with ActivityLoggerMixin{
   final _formKey = GlobalKey<FormState>();
 
   // Basic info controllers
@@ -209,6 +210,14 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
       setState(() => _isLoading = true);
 
       try {
+        // FIRST: Get the current product data for logging
+        final productDoc = await FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.product.id)
+            .get();
+
+        final previousData = productDoc.data() ?? {};
+
         // Prepare measurements data
         final measurements = ProductMeasurements(
           bust: _bustController.text.isNotEmpty ? double.parse(_bustController.text) : null,
@@ -229,11 +238,8 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
           'enabled': _tryOnEnabled,
         };
 
-        // Update the product with all values
-        await FirebaseFirestore.instance
-            .collection('products')
-            .doc(widget.product.id)
-            .update({
+        // Prepare the update data
+        final updateData = {
           'productName': _nameController.text.trim(),
           'productPrice': double.parse(_priceController.text.trim()),
           'productOriPrice': double.parse(_oriPriceController.text.trim()),
@@ -247,7 +253,65 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
           'virtualTryOn': virtualTryOn,
           'tags': _tags,
           'updatedAt': FieldValue.serverTimestamp(),
-        });
+        };
+
+        // Update the product
+        await FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.product.id)
+            .update(updateData);
+
+        // Calculate what changed for logging
+        final changes = <String, dynamic>{};
+
+        // Check each field for changes
+        if (previousData['productName'] != _nameController.text.trim()) {
+          changes['productName'] = {
+            'old': previousData['productName'],
+            'new': _nameController.text.trim()
+          };
+        }
+
+        final newPrice = double.parse(_priceController.text.trim());
+        if (previousData['productPrice'] != newPrice) {
+          changes['productPrice'] = {
+            'old': previousData['productPrice'],
+            'new': newPrice
+          };
+        }
+
+        final newOriPrice = double.parse(_oriPriceController.text.trim());
+        if (previousData['productOriPrice'] != newOriPrice) {
+          changes['productOriPrice'] = {
+            'old': previousData['productOriPrice'],
+            'new': newOriPrice
+          };
+        }
+
+        if (previousData['productStatus'] != _selectedStatus) {
+          changes['productStatus'] = {
+            'old': previousData['productStatus'],
+            'new': _selectedStatus
+          };
+        }
+
+        final newStock = int.parse(_stockQuantityController.text.trim());
+        if (previousData['stockQuantity'] != newStock) {
+          changes['stockQuantity'] = {
+            'old': previousData['stockQuantity'],
+            'new': newStock
+          };
+        }
+
+        // LOG SUCCESSFUL UPDATE
+        await logCrud(
+          operation: 'update',
+          targetType: 'product',
+          targetId: widget.product.id,
+          targetName: _nameController.text.trim(),
+          changes: changes,
+          previousData: previousData,
+        );
 
         if (mounted) {
           Navigator.of(context).pop();
@@ -260,6 +324,16 @@ class _ProductEditDialogState extends State<ProductEditDialog> {
           );
         }
       } catch (e) {
+        // LOG FAILED UPDATE
+        await logCrud(
+          operation: 'update',
+          targetType: 'product',
+          targetId: widget.product.id,
+          targetName: widget.product.name,
+          isSuccessful: false,
+          errorMessage: e.toString(),
+        );
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -76,12 +76,67 @@ class ProductManagementController {
     onUpdate();
   }
 
-  Future<void> deleteProduct(String productId, VoidCallback onUpdate) async {
+  Future<bool> isProductInOrders(String productId) async {
     try {
+      final productRef = firestore.collection('products').doc(productId);
+
+      // Use a collectionGroup query to search across all orderProducts subcollections
+      final orderProductsSnapshot = await firestore
+          .collectionGroup('orderProducts')
+          .where('productID', isEqualTo: productRef)
+          .limit(1) // We only need to know if at least one exists
+          .get();
+
+      return orderProductsSnapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('❌ Error checking product in orders: $e');
+      return true; // Assume it's in use to be safe
+    }
+  }
+
+// Update the deleteProduct method
+  Future<void> deleteProduct(String productId, VoidCallback onUpdate, {required BuildContext context}) async {
+    try {
+      // First check if product is in any orders
+      final isInOrders = await isProductInOrders(productId);
+
+      if (isInOrders) {
+        // Show error message and prevent deletion
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot delete product: This product is associated with existing orders'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      // If not in orders, proceed with deletion
       await firestore.collection('products').doc(productId).delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Product deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
       await loadProducts(onUpdate);
     } catch (e) {
       print('❌ Error deleting product: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting product: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

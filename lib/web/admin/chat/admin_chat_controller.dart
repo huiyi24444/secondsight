@@ -5,8 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../model/conversation_model.dart';
 import '../../../model/order_model.dart';
 import '../../../view/widgets/user_utils.dart';
+import '../login/activity_logger_mixin.dart';
 
-class AdminChatController extends ChangeNotifier {
+class AdminChatController extends ChangeNotifier with ActivityLoggerMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final BuildContext context;
 
@@ -35,12 +36,37 @@ class AdminChatController extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Error loading conversations: $e');
+
+      // Log failed operation
+      await logCrud(
+        operation: 'read',
+        targetType: 'conversation',
+        targetId: 'all',
+        targetName: 'Load All Conversations',
+        isSuccessful: false,
+        errorMessage: 'Failed to load conversations: ${e.toString()}',
+      );
     }
   }
 
   void selectConversation(ConversationModel conversation) {
     _selectedConversation = conversation;
     notifyListeners();
+
+    // Log conversation selection (not a CRUD operation, but useful for audit)
+    logCrud(
+      operation: 'read',
+      targetType: 'conversation',
+      targetId: conversation.id,
+      targetName: 'Conversation with User ${conversation.userId} - Order ${conversation.orderId}',
+      changes: {
+        'selectedAt': DateTime.now().toIso8601String(),
+        'userId': conversation.userId,
+        'orderId': conversation.orderId,
+        'status': conversation.status,
+      },
+      isSuccessful: true,
+    );
   }
 
   void setFilterStatus(String status) {
@@ -96,6 +122,9 @@ class AdminChatController extends ChangeNotifier {
   Future<void> sendMessage(String message) async {
     if (_selectedConversation == null || message.trim().isEmpty) return;
 
+    final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
+    final conversationName = 'Conversation with User ${_selectedConversation!.userId} - Order ${_selectedConversation!.orderId}';
+
     try {
       final messageModel = MessageModel(
         id: '',
@@ -121,10 +150,47 @@ class AdminChatController extends ChangeNotifier {
         'lastMessageAt': FieldValue.serverTimestamp(),
       });
 
+      // Log successful message creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'message',
+        targetId: messageId,
+        targetName: 'Admin Message in $conversationName',
+        changes: {
+          'conversationId': _selectedConversation!.id,
+          'message': message.length > 50 ? '${message.substring(0, 50)}...' : message,
+          'messageLength': message.length,
+          'senderId': 'admin',
+          'senderName': 'Customer Service',
+          'isAdmin': true,
+          'sentAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: true,
+      );
+
       // Send notification to user if implemented
       _sendNotificationToUser(_selectedConversation!.userId, message);
 
     } catch (e) {
+      // Log failed message creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'message',
+        targetId: messageId,
+        targetName: 'Admin Message in $conversationName',
+        changes: {
+          'conversationId': _selectedConversation!.id,
+          'message': message.length > 50 ? '${message.substring(0, 50)}...' : message,
+          'messageLength': message.length,
+          'senderId': 'admin',
+          'senderName': 'Customer Service',
+          'isAdmin': true,
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to send admin message: ${e.toString()}',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to send message')),
       );
@@ -133,6 +199,13 @@ class AdminChatController extends ChangeNotifier {
 
   Future<void> endConversation() async {
     if (_selectedConversation == null) return;
+
+    final conversationName = 'Conversation with User ${_selectedConversation!.userId} - Order ${_selectedConversation!.orderId}';
+    final previousData = {
+      'status': _selectedConversation!.status,
+      'endedAt': null,
+      'endedBy': null,
+    };
 
     try {
       // Send system message first
@@ -162,6 +235,22 @@ class AdminChatController extends ChangeNotifier {
         'endedBy': 'admin',
       });
 
+      // Log successful conversation termination
+      await logCrud(
+        operation: 'update',
+        targetType: 'conversation',
+        targetId: _selectedConversation!.id,
+        targetName: conversationName,
+        changes: {
+          'status': 'ended',
+          'endedAt': DateTime.now().toIso8601String(),
+          'endedBy': 'admin',
+          'systemMessageSent': true,
+        },
+        previousData: previousData,
+        isSuccessful: true,
+      );
+
       // Update local model
       _selectedConversation = ConversationModel(
         id: _selectedConversation!.id,
@@ -179,6 +268,23 @@ class AdminChatController extends ChangeNotifier {
         const SnackBar(content: Text('Conversation ended')),
       );
     } catch (e) {
+      // Log failed conversation termination
+      await logCrud(
+        operation: 'update',
+        targetType: 'conversation',
+        targetId: _selectedConversation!.id,
+        targetName: conversationName,
+        changes: {
+          'status': 'ended',
+          'endedAt': DateTime.now().toIso8601String(),
+          'endedBy': 'admin',
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        previousData: previousData,
+        isSuccessful: false,
+        errorMessage: 'Failed to end conversation: ${e.toString()}',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to end conversation')),
       );
@@ -189,6 +295,9 @@ class AdminChatController extends ChangeNotifier {
     required String userId,
     required String orderId,
   }) async {
+    final conversationId = 'conv_${DateTime.now().millisecondsSinceEpoch}';
+    final conversationName = 'New Conversation with User $userId - Order $orderId';
+
     try {
       // Check for existing active conversation
       final existing = await _firestore
@@ -200,6 +309,22 @@ class AdminChatController extends ChangeNotifier {
           .get();
 
       if (existing.docs.isNotEmpty) {
+        // Log attempt to create duplicate conversation
+        await logCrud(
+          operation: 'create',
+          targetType: 'conversation',
+          targetId: conversationId,
+          targetName: conversationName,
+          changes: {
+            'userId': userId,
+            'orderId': orderId,
+            'status': 'active',
+            'attemptedAt': DateTime.now().toIso8601String(),
+          },
+          isSuccessful: false,
+          errorMessage: 'Conversation creation failed: Active conversation already exists for this order',
+        );
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('An active conversation already exists for this order'),
@@ -239,6 +364,23 @@ class AdminChatController extends ChangeNotifier {
           .collection('messages')
           .add(initialMessage.toMap());
 
+      // Log successful conversation creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'conversation',
+        targetId: docRef.id,
+        targetName: conversationName,
+        changes: {
+          'userId': userId,
+          'orderId': orderId,
+          'status': 'active',
+          'createdAt': DateTime.now().toIso8601String(),
+          'createdBy': 'admin',
+          'initialMessageSent': true,
+        },
+        isSuccessful: true,
+      );
+
       // Select the new conversation
       final newConversation = ConversationModel(
         id: docRef.id,
@@ -255,6 +397,23 @@ class AdminChatController extends ChangeNotifier {
         const SnackBar(content: Text('New conversation created')),
       );
     } catch (e) {
+      // Log failed conversation creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'conversation',
+        targetId: conversationId,
+        targetName: conversationName,
+        changes: {
+          'userId': userId,
+          'orderId': orderId,
+          'status': 'active',
+          'attemptedAt': DateTime.now().toIso8601String(),
+          'createdBy': 'admin',
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to create conversation: ${e.toString()}',
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to create conversation')),
       );
@@ -306,6 +465,17 @@ class AdminChatController extends ChangeNotifier {
       };
     } catch (e) {
       print('Error getting conversation details: $e');
+
+      // Log failed operation
+      await logCrud(
+        operation: 'read',
+        targetType: 'conversation',
+        targetId: conversation.id,
+        targetName: 'Conversation Details - User ${conversation.userId}',
+        isSuccessful: false,
+        errorMessage: 'Failed to get conversation details: ${e.toString()}',
+      );
+
       return {
         'userName': 'Unknown User',
         'userEmail': '',
@@ -318,6 +488,8 @@ class AdminChatController extends ChangeNotifier {
   Future<void> markMessagesAsRead() async {
     if (_selectedConversation == null) return;
 
+    final conversationName = 'Conversation with User ${_selectedConversation!.userId} - Order ${_selectedConversation!.orderId}';
+
     try {
       // Get all unread messages not from admin
       final unreadMessages = await _firestore
@@ -328,14 +500,47 @@ class AdminChatController extends ChangeNotifier {
           .where('isRead', isEqualTo: false)
           .get();
 
+      if (unreadMessages.docs.isEmpty) return;
+
       // Batch update to mark as read
       final batch = _firestore.batch();
       for (final doc in unreadMessages.docs) {
         batch.update(doc.reference, {'isRead': true});
       }
       await batch.commit();
+
+      // Log successful bulk operation
+      await logBulk(
+        operation: 'update',
+        targetType: 'message',
+        count: unreadMessages.docs.length,
+        details: {
+          'action': 'mark_messages_as_read',
+          'conversationId': _selectedConversation!.id,
+          'conversationName': conversationName,
+          'messageIds': unreadMessages.docs.map((doc) => doc.id).toList(),
+          'markedReadAt': DateTime.now().toIso8601String(),
+          'markedReadBy': 'admin',
+        },
+      );
+
     } catch (e) {
       print('Error marking messages as read: $e');
+
+      // Log failed operation using logCrud with correct parameters
+      await logCrud(
+        operation: 'bulk_update',
+        targetType: 'message',
+        targetId: 'conversation_${_selectedConversation!.id}',
+        targetName: conversationName,
+        changes: {
+          'action': 'mark_messages_as_read',
+          'attemptedAt': DateTime.now().toIso8601String(),
+          'status': 'failed',
+        },
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
@@ -357,6 +562,22 @@ class AdminChatController extends ChangeNotifier {
           .toList();
     } catch (e) {
       print('Error getting user orders: $e');
+
+      // Log failed operation
+      await logCrud(
+        operation: 'read',
+        targetType: 'order',
+        targetId: 'user_orders_$userId',
+        targetName: 'User Orders for $userId',
+        changes: {
+          'userId': userId,
+          'limit': 10,
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to get user orders: ${e.toString()}',
+      );
+
       return [];
     }
   }
@@ -381,11 +602,40 @@ class AdminChatController extends ChangeNotifier {
         };
       }).toList();
 
-      // Could add more search logic here (by name, etc.)
+      // Log successful user search
+      await logCrud(
+        operation: 'read',
+        targetType: 'user',
+        targetId: 'search_$query',
+        targetName: 'User Search for "$query"',
+        changes: {
+          'searchQuery': query,
+          'searchType': 'email',
+          'resultsCount': users.length,
+          'searchedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: true,
+      );
 
       return users;
     } catch (e) {
       print('Error searching users: $e');
+
+      // Log failed user search
+      await logCrud(
+        operation: 'read',
+        targetType: 'user',
+        targetId: 'search_$query',
+        targetName: 'User Search for "$query"',
+        changes: {
+          'searchQuery': query,
+          'searchType': 'email',
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to search users: ${e.toString()}',
+      );
+
       return [];
     }
   }
@@ -445,6 +695,22 @@ class AdminChatController extends ChangeNotifier {
         }
       }
 
+      // Log successful stats retrieval
+      await logCrud(
+        operation: 'read',
+        targetType: 'conversation',
+        targetId: 'statistics',
+        targetName: 'Conversation Statistics',
+        changes: {
+          'activeCount': activeCount,
+          'endedCount': endedCount,
+          'todayCount': todayCount,
+          'totalCount': snapshot.docs.length,
+          'retrievedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: true,
+      );
+
       return {
         'active': activeCount,
         'ended': endedCount,
@@ -453,6 +719,20 @@ class AdminChatController extends ChangeNotifier {
       };
     } catch (e) {
       print('Error getting stats: $e');
+
+      // Log failed stats retrieval
+      await logCrud(
+        operation: 'read',
+        targetType: 'conversation',
+        targetId: 'statistics',
+        targetName: 'Conversation Statistics',
+        changes: {
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: 'Failed to get conversation statistics: ${e.toString()}',
+      );
+
       return {
         'active': 0,
         'ended': 0,

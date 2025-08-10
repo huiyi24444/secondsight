@@ -4,8 +4,9 @@ import 'package:secondsight/view/widgets/return_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/return_request_model.dart';
 import '../../../view/widgets/product_status_utils.dart';
+import '../login/activity_logger_mixin.dart';
 
-class ReturnManagementController extends ChangeNotifier {
+class ReturnManagementController extends ChangeNotifier with ActivityLoggerMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController searchController = TextEditingController();
 
@@ -180,32 +181,34 @@ class ReturnManagementController extends ChangeNotifier {
 
   Future<void> updateReturnStatus(BuildContext context, String userEmail, String returnId, String newStatus) async {
     try {
+      // Get current return status before updating
+      final currentReturnDoc = await _firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .get();
+
+      if (!currentReturnDoc.exists) {
+        throw Exception('Return request not found');
+      }
+
+      final currentReturnData = ReturnRequestModel.fromDocument(currentReturnDoc);
+      final oldStatus = currentReturnData.returnStatus;
+      final returnAmount = currentReturnData.returnPrice ?? 0.0;
+      final productName = currentReturnData.productName ?? 'Unknown Product';
+
       // Special handling for cancelled status transition
       if (newStatus == 'cancelled') {
-        // Get the return request details first
-        final returnDoc = await _firestore
-            .collection('returnRequests')
-            .doc(returnId)
-            .get();
-
-        if (!returnDoc.exists) {
-          throw Exception('Return request not found');
-        }
-
-        final returnData = ReturnRequestModel.fromDocument(returnDoc);
-
         // Create cancellation document reference
         final cancellationRef = _firestore.collection('cancellation').doc();
 
         // Prepare cancellation data using the enhanced CancellationModel structure
         final cancellationData = {
           'referenceID': returnId,
-          'cancellationType': 'return_request', // Specify this is a return request cancellation
+          'cancellationType': 'return_request',
           'cancelReason': 'Return request cancelled by admin',
           'cancelDate': FieldValue.serverTimestamp(),
           'cancelNote': null,
-          'cancelledBy': 'admin', // Since this is from admin panel
-          // Include legacy field for backward compatibility
+          'cancelledBy': 'admin',
           'returnRequestID': returnId,
         };
 
@@ -221,12 +224,30 @@ class ReturnManagementController extends ChangeNotifier {
           {
             'returnStatus': newStatus,
             '${newStatus}Date': FieldValue.serverTimestamp(),
-            'cancelID': cancellationRef.id, // Link to cancellation document
+            'cancelID': cancellationRef.id,
           },
         );
 
         // Commit batch
         await batch.commit();
+
+        // LOG CANCELLATION
+        await logCrud(
+          operation: 'update',
+          targetType: 'return_request',
+          targetId: returnId,
+          targetName: 'Return #${ReturnStatusUtils.shortReturnId(returnId)} - $productName',
+          changes: {
+            'status': {
+              'old': oldStatus,
+              'new': newStatus,
+            },
+            'cancellation': {
+              'reason': 'Return request cancelled by admin',
+              'cancellationId': cancellationRef.id,
+            },
+          },
+        );
       }
       // Special handling for refunded status transition
       else if (newStatus == 'refunded') {
@@ -265,11 +286,11 @@ class ReturnManagementController extends ChangeNotifier {
         final refundData = {
           'orderId': orderId,
           'returnRequestId': returnId,
-          'cancelId': null, // null for return refunds
+          'cancelId': null,
           'refundAmount': totalRefundAmount,
           'refundMethod': paymentMethod,
           'refundDate': FieldValue.serverTimestamp(),
-          'transactionId': payment, // Use 'payment' attribute as transactionId
+          'transactionId': payment,
           'customerId': userId,
           'refundType': 'return',
         };
@@ -283,7 +304,7 @@ class ReturnManagementController extends ChangeNotifier {
           {
             'returnStatus': newStatus,
             '${newStatus}Date': FieldValue.serverTimestamp(),
-            'refundID': refundRef.id, // Link to refund document
+            'refundID': refundRef.id,
           },
         );
 
@@ -302,6 +323,42 @@ class ReturnManagementController extends ChangeNotifier {
 
         // Commit batch
         await batch.commit();
+
+        // LOG REFUND
+        await logCrud(
+          operation: 'update',
+          targetType: 'return_request',
+          targetId: returnId,
+          targetName: 'Return #${ReturnStatusUtils.shortReturnId(returnId)} - $productName',
+          changes: {
+            'status': {
+              'old': oldStatus,
+              'new': newStatus,
+            },
+            'refund': {
+              'amount': totalRefundAmount,
+              'method': paymentMethod,
+              'refundId': refundRef.id,
+              'customerId': userId,
+              'customerEmail': userEmail,
+            },
+          },
+        );
+
+        // Also log the refund creation
+        await logCrud(
+          operation: 'create',
+          targetType: 'refund',
+          targetId: refundRef.id,
+          targetName: 'Refund for Return #${ReturnStatusUtils.shortReturnId(returnId)}',
+          changes: {
+            'amount': totalRefundAmount,
+            'method': paymentMethod,
+            'returnRequestId': returnId,
+            'orderId': orderId,
+            'customerId': userId,
+          },
+        );
       }
       else {
         // Standard status update for other statuses
@@ -310,6 +367,22 @@ class ReturnManagementController extends ChangeNotifier {
           'returnStatus': newStatus,
           '${newStatus}Date': FieldValue.serverTimestamp(),
         });
+
+        // LOG STANDARD STATUS UPDATE
+        await logCrud(
+          operation: 'update',
+          targetType: 'return_request',
+          targetId: returnId,
+          targetName: 'Return #${ReturnStatusUtils.shortReturnId(returnId)} - $productName',
+          changes: {
+            'status': {
+              'old': oldStatus,
+              'new': newStatus,
+            },
+            'updatedBy': 'admin',
+            'customerEmail': userEmail,
+          },
+        );
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -317,6 +390,16 @@ class ReturnManagementController extends ChangeNotifier {
       );
 
     } catch (e) {
+      // LOG FAILED UPDATE
+      await logCrud(
+        operation: 'update',
+        targetType: 'return_request',
+        targetId: returnId,
+        targetName: 'Return #${ReturnStatusUtils.shortReturnId(returnId)}',
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update return status: $e'),

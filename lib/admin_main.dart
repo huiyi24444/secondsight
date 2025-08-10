@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:secondsight/services/auth_provider.dart';
 import 'package:secondsight/services/auth_wrapper.dart';
+import 'package:secondsight/web/admin/admin_management/admin_setup.dart';
 import 'package:secondsight/web/admin/chat/admin_chat_view.dart';
 import 'package:secondsight/web/admin/login/admin_login_view.dart';
 import 'package:secondsight/web/admin/admin_management/admin_management_view.dart';
@@ -52,10 +53,40 @@ class AdminApp extends StatelessWidget {
             fallback: NoPermissionWidget(feature: 'Customer Support'), // ✅ FIXED HERE
           ),
         ),
+
+      },
+      onGenerateRoute: (settings) {
+        final uri = Uri.tryParse(settings.name ?? '');
+        if (uri == null) return null;
+
+        if (uri.path == '/admin-setup') {
+          final token = uri.queryParameters['token'];
+          final id = uri.queryParameters['id'];
+
+          if (token != null && id != null) {
+            return MaterialPageRoute(
+              builder: (_) => AdminSetupPage(token: token, adminId: id),
+            );
+          } else {
+            // Missing required query params
+            return MaterialPageRoute(
+              builder: (_) => const Scaffold(
+                body: Center(
+                  child: Text(
+                    'Missing token or admin ID in the URL.',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+
+        // Let Flutter handle unknown routes
+        return null;
       },
     );
   }
 }
-
 
 

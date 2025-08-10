@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../model/order_model.dart';
+import '../login/activity_logger_mixin.dart';
 import 'admin_chat_controller.dart';
 
 class CreateConversationDialog extends StatefulWidget {
@@ -17,7 +18,7 @@ class CreateConversationDialog extends StatefulWidget {
   State<CreateConversationDialog> createState() => _CreateConversationDialogState();
 }
 
-class _CreateConversationDialogState extends State<CreateConversationDialog> {
+class _CreateConversationDialogState extends State<CreateConversationDialog> with ActivityLoggerMixin{
   final TextEditingController _searchController = TextEditingController();
   String? _selectedUserId;
   String? _selectedUserName;
@@ -47,14 +48,54 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> {
       _isSearching = true;
     });
 
-    final results = await widget.controller.searchUsers(query);
+    try {
+      final results = await widget.controller.searchUsers(query);
 
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-    });
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+
+      // Log successful user search
+      await logCrud(
+        operation: 'search',
+        targetType: 'user',
+        targetId: 'user_search',
+        targetName: 'User Search: "$query"',
+        changes: {
+          'searchQuery': query,
+          'resultsCount': results.length,
+          'searchedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: true,
+      );
+
+    } catch (e) {
+      setState(() {
+        _isSearching = false;
+      });
+
+      // Log failed user search
+      await logCrud(
+        operation: 'search',
+        targetType: 'user',
+        targetId: 'user_search_failed',
+        targetName: 'Failed User Search: "$query"',
+        changes: {
+          'searchQuery': query,
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error searching users: $e')),
+        );
+      }
+    }
   }
-
   Future<void> _selectUser(Map<String, dynamic> user) async {
     setState(() {
       _selectedUserId = user['id'];
@@ -64,21 +105,67 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> {
       _isLoadingOrders = true;
     });
 
-    // Load user's orders
-    final orders = await widget.controller.getUserOrders(user['id']);
+    try {
+      // Load user's orders
+      final orders = await widget.controller.getUserOrders(user['id']);
 
-    setState(() {
-      _userOrders = orders;
-      _isLoadingOrders = false;
-      // Auto-select general inquiry if no orders
-      if (orders.isEmpty) {
-        _isGeneralInquiry = true;
-        _selectedOrderId = 'general';
+      setState(() {
+        _userOrders = orders;
+        _isLoadingOrders = false;
+        // Auto-select general inquiry if no orders
+        if (orders.isEmpty) {
+          _isGeneralInquiry = true;
+          _selectedOrderId = 'general';
+        }
+      });
+
+      // Log successful user selection and order loading
+      await logCrud(
+        operation: 'read',
+        targetType: 'user_orders',
+        targetId: user['id'],
+        targetName: 'Load Orders for ${user['name']} (${user['email']})',
+        changes: {
+          'userId': user['id'],
+          'userName': user['name'],
+          'userEmail': user['email'],
+          'ordersCount': orders.length,
+          'loadedAt': DateTime.now().toIso8601String(),
+          'autoSelectedGeneral': orders.isEmpty,
+        },
+        isSuccessful: true,
+      );
+
+    } catch (e) {
+      setState(() {
+        _isLoadingOrders = false;
+      });
+
+      // Log failed order loading
+      await logCrud(
+        operation: 'read',
+        targetType: 'user_orders',
+        targetId: user['id'],
+        targetName: 'Failed to Load Orders for ${user['name']} (${user['email']})',
+        changes: {
+          'userId': user['id'],
+          'userName': user['name'],
+          'userEmail': user['email'],
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading user orders: $e')),
+        );
       }
-    });
+    }
   }
 
-  void _createConversation() {
+  Future<void> _createConversation() async {
     if (_selectedUserId == null || _selectedOrderId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a user and order')),
@@ -86,12 +173,66 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> {
       return;
     }
 
-    widget.controller.createNewConversation(
-      userId: _selectedUserId!,
-      orderId: _selectedOrderId!,
-    );
+    try {
+      await widget.controller.createNewConversation(
+        userId: _selectedUserId!,
+        orderId: _selectedOrderId!,
+      );
 
-    Navigator.of(context).pop();
+      // Log successful conversation creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'conversation',
+        targetId: '${_selectedUserId!}_${_selectedOrderId!}',
+        targetName: 'Conversation with $_selectedUserName (Order: ${_selectedOrderId == 'general' ? 'General Inquiry' : _selectedOrderId!})',
+        changes: {
+          'userId': _selectedUserId!,
+          'userName': _selectedUserName ?? 'Unknown',
+          'orderId': _selectedOrderId!,
+          'isGeneralInquiry': _isGeneralInquiry,
+          'createdAt': DateTime.now().toIso8601String(),
+          'createdBy': 'admin',
+        },
+        isSuccessful: true,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conversation created successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Log failed conversation creation
+      await logCrud(
+        operation: 'create',
+        targetType: 'conversation',
+        targetId: '${_selectedUserId!}_${_selectedOrderId!}',
+        targetName: 'Failed Conversation Creation with $_selectedUserName',
+        changes: {
+          'userId': _selectedUserId!,
+          'userName': _selectedUserName ?? 'Unknown',
+          'orderId': _selectedOrderId!,
+          'isGeneralInquiry': _isGeneralInquiry,
+          'attemptedAt': DateTime.now().toIso8601String(),
+        },
+        isSuccessful: false,
+        errorMessage: e.toString(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating conversation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override

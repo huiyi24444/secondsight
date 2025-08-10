@@ -20,11 +20,24 @@ class ProductImageEditor extends StatefulWidget {
 class _ProductImageEditorState extends State<ProductImageEditor> {
   late List<String> images;
   bool isUploading = false;
+  bool _isLoadingImages = true;
 
   @override
   void initState() {
     super.initState();
-    images = List.from(widget.initialImages);
+    _loadInitialImages();
+  }
+
+  Future<void> _loadInitialImages() async {
+    setState(() => _isLoadingImages = true);
+
+    // Simulate loading time for initial images
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    setState(() {
+      images = List.from(widget.initialImages);
+      _isLoadingImages = false;
+    });
   }
 
   void _removeImage(int index) {
@@ -143,6 +156,40 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
 
   @override
   Widget build(BuildContext context) {
+
+    // Show loading indicator while images are being retrieved
+    if (_isLoadingImages) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF7C3AED),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Loading images...',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       height: 100,
@@ -179,13 +226,26 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
-                return const Center(
-                  child: CircularProgressIndicator(),
+
+                return Container(
+                  color: Colors.grey[50],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Color(0xFF7C3AED),
+                    ),
+                  ),
                 );
               },
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.broken_image,
-                color: Colors.grey,
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey[100],
+                child: const Center(
+                  child: Icon(
+                    Icons.broken_image,
+                    color: Colors.grey,
+                    size: 30,
+                  ),
+                ),
               ),
             ),
           ),

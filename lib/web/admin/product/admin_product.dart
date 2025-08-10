@@ -592,16 +592,48 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                                 context: context,
                                                 builder: (context) => AlertDialog(
                                                   title: const Text('Delete Product'),
-                                                  content: const Text('Are you sure you want to delete this product?'),
+                                                  content: const Text(
+                                                    'Are you sure you want to delete this product? '
+                                                        'Products associated with orders cannot be deleted.',
+                                                  ),
                                                   actions: [
                                                     TextButton(
                                                       onPressed: () => Navigator.pop(context),
                                                       child: const Text('Cancel'),
                                                     ),
                                                     ElevatedButton(
-                                                      onPressed: () {
+                                                      onPressed: () async {
                                                         Navigator.pop(context);
-                                                        controller.deleteProduct(product.id, () => setState(() {}));
+
+                                                        // Show loading indicator
+                                                        showDialog(
+                                                          context: context,
+                                                          barrierDismissible: false,
+                                                          builder: (context) => const AlertDialog(
+                                                            content: Row(
+                                                              children: [
+                                                                CircularProgressIndicator(
+                                                                  strokeWidth: 2,
+                                                                  color: Color(0xFF7C3AED),
+                                                                ),
+                                                                SizedBox(width: 20),
+                                                                Text('Checking product usage...'),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        );
+
+                                                        // Check and delete using optimized method
+                                                        await controller.deleteProduct(
+                                                          product.id,
+                                                              () => setState(() {}),
+                                                          context: context,
+                                                        );
+
+                                                        // Close loading dialog
+                                                        if (context.mounted) {
+                                                          Navigator.pop(context);
+                                                        }
                                                       },
                                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                                                       child: const Text('Delete'),
