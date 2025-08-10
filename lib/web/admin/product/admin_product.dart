@@ -33,6 +33,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   final controller = ProductManagementController();
 
+  String selectedSortOption = 'newest';
+  String selectedCategory = 'All Categories';
+  String selectedCondition = 'All Conditions';
+  bool showAdvancedFilters = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,22 +45,67 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     controller.loadCategories(() => setState(() {}));
   }
 
+  void _applyAdvancedFilters() {
+    List<Product> filtered = List.from(controller.allProducts);
 
+    // Apply search filter
+    if (controller.searchQuery.isNotEmpty) {
+      filtered = filtered.where((product) =>
+      product.name.toLowerCase().contains(controller.searchQuery.toLowerCase()) ||
+          ProductStatusUtils.shortProductId(product.id).toLowerCase().contains(controller.searchQuery.toLowerCase())
+      ).toList();
+    }
+
+    // Apply status filter
+    if (controller.selectedStatus != 'All Products') {
+      filtered = filtered.where((product) =>
+      product.status.toLowerCase() == controller.selectedStatus.toLowerCase()
+      ).toList();
+    }
+
+    // Apply category filter
+    if (selectedCategory != 'All Categories') {
+      filtered = filtered.where((product) =>
+      controller.getCategoryName(product.category.id) == selectedCategory
+      ).toList();
+    }
+
+    // Apply condition filter
+    if (selectedCondition != 'All Conditions') {
+      filtered = filtered.where((product) =>
+      product.condition.toLowerCase() == selectedCondition.toLowerCase()
+      ).toList();
+    }
+
+    // Apply sorting
+    switch (selectedSortOption) {
+      case 'newest':
+        filtered.sort((a, b) => (b.createdAt?.compareTo(a.createdAt ?? Timestamp.now()) ?? 0));
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => (a.createdAt?.compareTo(b.createdAt ?? Timestamp.now()) ?? 0));
+        break;
+      case 'name_asc':
+        filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case 'name_desc':
+        filtered.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      case 'price_low_high':
+        filtered.sort((a, b) => a.price.compareTo(b.price));
+        break;
+      case 'price_high_low':
+        filtered.sort((a, b) => b.price.compareTo(a.price));
+        break;
+    }
+
+    // Update the controller's filtered products and reset to page 1
+    controller.filteredProducts = filtered;
+    controller.currentPage = 1;
+  }
 
   @override
   Widget build(BuildContext context) {
-    List<Product> paginatedProducts = filteredProducts
-        .skip((currentPage - 1) * itemsPerPage)
-        .take(itemsPerPage)
-        .toList();
-
-    final totalPages = (filteredProducts.length / itemsPerPage).ceil();
-    final startIndex = (currentPage - 1) * itemsPerPage;
-    final endIndex = startIndex + itemsPerPage;
-    final currentProducts = filteredProducts.sublist(
-      startIndex,
-      endIndex > filteredProducts.length ? filteredProducts.length : endIndex,
-    );
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -89,47 +139,245 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         // Header with search and add button
                         Container(
                           padding: EdgeInsets.all(20),
-                          child: Row(
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Search products...',
-                                    prefixIcon: Icon(Icons.search),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(color: Colors.grey[300]!),
+                              // Search bar and Add button row
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      decoration: InputDecoration(
+                                        hintText: 'Search products by name or SKU...',
+                                        prefixIcon: Icon(Icons.search),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: BorderSide(color: Colors.grey[300]!),
+                                        ),
+                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      onChanged: (query) {
+                                        controller.searchQuery = query;
+                                        _applyAdvancedFilters();
+                                        setState(() {});
+                                      },
                                     ),
-                                    contentPadding: EdgeInsets.symmetric(vertical: 12),
                                   ),
-                                  onChanged: (query) {
-                                    controller.searchQuery = query;
-                                    controller.filterProducts(() => setState(() {}));
-                                  },
-
-
-                                ),
-                              ),
-                              SizedBox(width: 20),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ProductAdditionPage(),
+                                  SizedBox(width: 15),
+                                  // Advanced Filters Toggle Button
+                                  IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        showAdvancedFilters = !showAdvancedFilters;
+                                      });
+                                    },
+                                    icon: Icon(
+                                      showAdvancedFilters ? Icons.filter_list_off : Icons.filter_list,
+                                      color: showAdvancedFilters ? Color(0xFF7C3AED) : Colors.grey[600],
                                     ),
-                                  ).then((_) => controller.loadProducts(() => setState(() {})));
-
-                                },
-                                icon: Icon(Icons.add),
-                                label: Text('Add Product'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF7C3AED),
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                ),
+                                    tooltip: 'Advanced Filters',
+                                  ),
+                                  SizedBox(width: 5),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ProductAdditionPage(),
+                                        ),
+                                      ).then((_) => controller.loadProducts(() => setState(() {})));
+                                    },
+                                    icon: Icon(Icons.add),
+                                    label: Text('Add Product'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Color(0xFF7C3AED),
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    ),
+                                  ),
+                                ],
                               ),
+
+                              // Advanced Filters Panel
+                              if (showAdvancedFilters) ...[
+                                SizedBox(height: 15),
+                                Container(
+                                  padding: EdgeInsets.all(15),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey[200]!),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Advanced Filters',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Color(0xFF7C3AED),
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          // Sort by dropdown
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Sort by',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey[700],
+                                                  ),
+                                                ),
+                                                SizedBox(height: 5),
+                                                DropdownButtonFormField<String>(
+                                                  value: selectedSortOption,
+                                                  decoration: InputDecoration(
+                                                    border: OutlineInputBorder(
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                    isDense: true,
+                                                  ),
+                                                  items: [
+                                                    DropdownMenuItem(value: 'newest', child: Text('Most Recent')),
+                                                    DropdownMenuItem(value: 'oldest', child: Text('Oldest First')),
+                                                    DropdownMenuItem(value: 'name_asc', child: Text('Name (A-Z)')),
+                                                    DropdownMenuItem(value: 'name_desc', child: Text('Name (Z-A)')),
+                                                    DropdownMenuItem(value: 'price_low_high', child: Text('Price (Low to High)')),
+                                                    DropdownMenuItem(value: 'price_high_low', child: Text('Price (High to Low)')),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      selectedSortOption = value!;
+                                                    });
+                                                    _applyAdvancedFilters();
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(width: 15),
+
+                                          // Category filter
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Category',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey[700],
+                                                  ),
+                                                ),
+                                                SizedBox(height: 5),
+                                                DropdownButtonFormField<String>(
+                                                  value: selectedCategory,
+                                                  decoration: InputDecoration(
+                                                    border: OutlineInputBorder(
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                    isDense: true,
+                                                  ),
+                                                  items: [
+                                                    DropdownMenuItem(value: 'All Categories', child: Text('All Categories')),
+                                                    ...controller.categories.map((cat) {
+                                                      final data = cat.data() as Map<String, dynamic>;
+                                                      final catName = data['catName'] as String? ?? data['name'] as String? ?? 'Unknown';
+                                                      return DropdownMenuItem(value: catName, child: Text(catName));
+                                                    }),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      selectedCategory = value!;
+                                                    });
+                                                    _applyAdvancedFilters();
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(width: 15),
+
+                                          // Condition filter
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Condition',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey[700],
+                                                  ),
+                                                ),
+                                                SizedBox(height: 5),
+                                                DropdownButtonFormField<String>(
+                                                  value: selectedCondition,
+                                                  decoration: InputDecoration(
+                                                    border: OutlineInputBorder(
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                    isDense: true,
+                                                  ),
+                                                  items: [
+                                                    DropdownMenuItem(value: 'All Conditions', child: Text('All Conditions')),
+                                                    DropdownMenuItem(value: 'new', child: Text('New')),
+                                                    DropdownMenuItem(value: 'like_new', child: Text('Like New')),
+                                                    DropdownMenuItem(value: 'good', child: Text('Good')),
+                                                    DropdownMenuItem(value: 'fair', child: Text('Fair')),
+                                                    DropdownMenuItem(value: 'poor', child: Text('Poor')),
+                                                  ],
+                                                  onChanged: (value) {
+                                                    setState(() {
+                                                      selectedCondition = value!;
+                                                    });
+                                                    _applyAdvancedFilters();
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 10),
+
+                                      // Clear filters button
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              setState(() {
+                                                selectedSortOption = 'newest';
+                                                selectedCategory = 'All Categories';
+                                                selectedCondition = 'All Conditions';
+                                                controller.selectedStatus = 'All Products';
+                                                controller.searchQuery = '';
+                                                _searchController.clear();
+                                              });
+                                              _applyAdvancedFilters();
+                                            },
+                                            icon: Icon(Icons.clear, size: 16),
+                                            label: Text('Clear All Filters'),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -143,7 +391,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 controller.selectedStatus == 'All Products',
                                     () {
                                   controller.selectedStatus = 'All Products';
-                                  controller.filterProducts(() => setState(() {}));
+                                  _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
+                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -152,7 +401,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 controller.selectedStatus == 'Available',
                                     () {
                                   controller.selectedStatus = 'Available';
-                                  controller.filterProducts(() => setState(() {}));
+                                  _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
+                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -161,7 +411,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 controller.selectedStatus == 'Sold',
                                     () {
                                   controller.selectedStatus = 'Sold';
-                                  controller.filterProducts(() => setState(() {}));
+                                  _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
+                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -170,11 +421,29 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                 controller.selectedStatus == 'Inactive',
                                     () {
                                   controller.selectedStatus = 'Inactive';
-                                  controller.filterProducts(() => setState(() {}));
+                                  _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
+                                  setState(() {});
                                 },
                               ),
-                            ],
 
+                              // Add results counter at the end
+                              Spacer(),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF7C3AED).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${controller.filteredProducts.length} results',
+                                  style: TextStyle(
+                                    color: Color(0xFF7C3AED),
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         SizedBox(height: 20),

@@ -133,5 +133,15 @@ class ProductManagementController {
     return categoryNames[categoryId] ?? 'Unknown';
   }
 
+  List<Map<String, dynamic>> get categoriesForDropdown {
+    return categories.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      return {
+        'id': doc.id,
+        'name': data['catName'] as String? ?? data['name'] as String? ?? 'Unknown'
+      };
+    }).toList();
+  }
+
 
 }
