@@ -154,6 +154,139 @@ class AdminDetailsController extends ChangeNotifier {
     return groupedPermissions;
   }
 
+  DateTime? get lastLoginDate {
+    if (_admin?.lastLogin != null) {
+      return _admin!.lastLogin;
+    }
+
+    // Fallback: Find most recent login from activity logs
+    final loginLogs = _activityLogs
+        .where((log) => log.action.toLowerCase().contains('login'))
+        .toList();
+
+    if (loginLogs.isNotEmpty) {
+      loginLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return loginLogs.first.timestamp;
+    }
+
+    return null;
+  }
+
+
+  int get totalLoginsThisMonth {
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+
+    return _activityLogs
+        .where((log) =>
+    log.action.toLowerCase().contains('login') &&
+        log.timestamp.isAfter(startOfMonth))
+        .length;
+  }
+
+// Failed login tracking
+  int get failedLoginAttempts {
+    final now = DateTime.now();
+    final last7Days = now.subtract(const Duration(days: 7));
+
+    return _activityLogs
+        .where((log) =>
+    (log.action.toLowerCase().contains('failed') &&
+        log.action.toLowerCase().contains('login')) ||
+        log.timestamp.isAfter(last7Days))
+        .length;
+  }
+
+  int get sessionsToday {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    // Count login actions for today
+    return _activityLogs
+        .where((log) =>
+    log.action.toLowerCase().contains('login') &&
+        log.timestamp.isAfter(startOfDay))
+        .length;
+  }
+
+  // Additional activity summary methods
+  int get totalActivitiesToday {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    return _activityLogs
+        .where((log) => log.timestamp.isAfter(startOfDay))
+        .length;
+  }
+
+  int get totalActivitiesThisWeek {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekMidnight = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
+    return _activityLogs
+        .where((log) => log.timestamp.isAfter(startOfWeekMidnight))
+        .length;
+  }
+
+  String get mostCommonActionThisWeek {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekMidnight = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
+    final weeklyLogs = _activityLogs
+        .where((log) => log.timestamp.isAfter(startOfWeekMidnight))
+        .toList();
+
+    if (weeklyLogs.isEmpty) return 'No activity';
+
+    // Group by action type and count
+    final actionCounts = <String, int>{};
+    for (final log in weeklyLogs) {
+      final actionType = _getActionCategory(log.action);
+      actionCounts[actionType] = (actionCounts[actionType] ?? 0) + 1;
+    }
+
+    if (actionCounts.isEmpty) return 'No activity';
+
+    // Find most common action
+    var maxCount = 0;
+    var mostCommon = 'Various';
+    actionCounts.forEach((action, count) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommon = action;
+      }
+    });
+
+    return mostCommon;
+  }
+
+  String _getActionCategory(String action) {
+    final lowerAction = action.toLowerCase();
+    if (lowerAction.contains('login') || lowerAction.contains('logout')) {
+      return 'Authentication';
+    } else if (lowerAction.contains('create') || lowerAction.contains('add')) {
+      return 'Create';
+    } else if (lowerAction.contains('update') || lowerAction.contains('edit') || lowerAction.contains('modify')) {
+      return 'Update';
+    } else if (lowerAction.contains('delete') || lowerAction.contains('remove')) {
+      return 'Delete';
+    } else if (lowerAction.contains('view') || lowerAction.contains('read')) {
+      return 'View';
+    } else if (lowerAction.contains('settings') || lowerAction.contains('config')) {
+      return 'Settings';
+    } else {
+      return 'Other';
+    }
+  }
+
+  Duration? get averageSessionDuration {
+    // This would require login/logout pairs to calculate
+    // For now, return null as we'd need more sophisticated tracking
+    return null;
+  }
+
   IconData getLogIcon(String action) {
     if (action.contains('login')) return Icons.login;
     if (action.contains('logout')) return Icons.logout;
@@ -234,5 +367,13 @@ class AdminDetailsController extends ChangeNotifier {
     } else {
       return 'Just now';
     }
+  }
+
+  // Helper method to format numbers for display
+  String formatCount(int count) {
+    if (count == 0) return '0';
+    if (count < 1000) return count.toString();
+    if (count < 1000000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return '${(count / 1000000).toStringAsFixed(1)}M';
   }
 }

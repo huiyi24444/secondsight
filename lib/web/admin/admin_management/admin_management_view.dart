@@ -329,29 +329,68 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                         ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
-                          onSelected: (value) {
+                          onSelected: (value) async {
                             if (value == 'edit') {
-                              _showEditAdminDialog(context, admin);
-                            } else if (value == 'delete') {
-                              _showDeleteConfirmation(context, admin);
+                              await _showEditAdminDialog(context, admin); // Add await here
                             } else if (value == 'toggle_status') {
-                              setState(() {
-                                admin['isActive'] = !admin['isActive'];
-                              });
+                              // Use the new toggle function
+                              final success = await _controller.toggleAdminStatus(
+                                  admin['id'],
+                                  admin['isActive'],
+                                  context
+                              );
+
+                              if (success) {
+                                // Refresh the table
+                                setState(() {});
+                              }
+                            } else if (value == 'deactivate') {
+                              // Use the dedicated deactivate function
+                              final success = await _controller.deactivateAdmin(admin['id'], context);
+
+                              if (success) {
+                                // Refresh the table
+                                setState(() {});
+                              }
+                            } else if (value == 'activate') {
+                              // Use the dedicated activate function
+                              final success = await _controller.activateAdmin(admin['id'], context);
+
+                              if (success) {
+                                // Refresh the table
+                                setState(() {});
+                              }
                             }
                           },
                           itemBuilder: (_) => [
                             const PopupMenuItem(
                               value: 'edit',
-                              child: Text('Edit Admin'),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Edit Admin'),
+                                ],
+                              ),
                             ),
                             PopupMenuItem(
-                              value: 'toggle_status',
-                              child: Text(admin['isActive'] ? 'Deactivate' : 'Activate'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete Admin', style: TextStyle(color: Colors.red)),
+                              value: admin['isActive'] ? 'deactivate' : 'activate',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    admin['isActive'] ? Icons.block : Icons.check_circle,
+                                    size: 16,
+                                    color: admin['isActive'] ? Colors.orange : Colors.green,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    admin['isActive'] ? 'Deactivate' : 'Activate',
+                                    style: TextStyle(
+                                      color: admin['isActive'] ? Colors.orange : Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -490,38 +529,21 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     );
   }
 
-  void _showEditAdminDialog(BuildContext context, Map<String, dynamic> admin) {
-    showDialog(
+  Future<void> _showEditAdminDialog(BuildContext context, Map<String, dynamic> admin) async {
+    final result = await showDialog<bool>(
       context: context,
-      builder: (context) => EditAdminDialog(admin: admin),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context, Map<String, dynamic> admin) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Admin'),
-        content: Text('Are you sure you want to delete ${admin['name']}? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // Implement delete logic
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${admin['name']} has been deleted')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
+      builder: (context) => EditAdminDialog(
+        admin: admin,
+        controller: _controller,
       ),
     );
+
+    // If the dialog returned true (indicating successful update), refresh the page
+    if (result == true) {
+      setState(() {
+        // This will trigger a rebuild and refresh the admin table
+      });
+    }
   }
 
   @override

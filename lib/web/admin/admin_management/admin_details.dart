@@ -418,7 +418,7 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Created Date',
-                 DateFormatter.formatDateTime(admin.createdAt),
+                  DateFormatter.formatDateTime(admin.createdAt),
                   Icons.calendar_today,
                   Colors.orange,
                 ),
@@ -427,98 +427,211 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
               Expanded(
                 child: _buildInfoCard(
                   'Verification Status',
-                  admin.isVerified
-                      ? 'Verified'
-                      : 'Pending',
-                  admin.isVerified
-                      ? Icons.verified_user
-                      : Icons.pending,
-                  admin.isVerified
-                      ? Colors.green
-                      : Colors.amber,
+                  admin.isVerified ? 'Verified' : 'Pending',
+                  admin.isVerified ? Icons.verified_user : Icons.pending,
+                  admin.isVerified ? Colors.green : Colors.amber,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // Contact Information
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Contact Information',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+          // Contact Information and Recent Activity Summary - Side by Side
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Contact Information - Left Side
+              Expanded(
+                flex: 1,
+                child: Container(
+                  height: 320, // Increased height to accommodate more content
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header with icon
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.contact_mail,
+                              color: Colors.blue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Contact Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Contact details
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _buildDetailRow('Email', admin.email, Icons.email),
+                            const SizedBox(height: 20),
+                            _buildDetailRow(
+                                'Phone',
+                                (admin.phone != null && admin.phone!.isNotEmpty) ? admin.phone! : 'Not provided',
+                                Icons.phone
+                            ),
+                            const SizedBox(height: 20),
+                            _buildDetailRow(
+                                'Department',
+                                (admin.department != null && admin.department!.isNotEmpty) ? admin.department! : 'Not assigned',
+                                Icons.business
+                            ),
+                            const SizedBox(height: 20),
+                            _buildDetailRow('Location', 'Headquarters', Icons.location_on),
+                            const SizedBox(height: 20),
+                            _buildDetailRow(
+                                'Role',
+                                _controller.formatRole(admin.role),
+                                Icons.admin_panel_settings
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                _buildDetailRow('Email', admin.email, Icons.email),
-                const Divider(height: 24),
-                _buildDetailRow('Phone','Not provided', Icons.phone), // admin.phone ??
-                const Divider(height: 24),
-                _buildDetailRow('Department', 'Not assigned', Icons.business),  //admin.department ??
-              ],
-            ),
+              ),
+              const SizedBox(width: 20),
+
+              // Recent Activity Summary - Right Side
+              Expanded(
+                flex: 1,
+                child: Container(
+                  height: 320, // Increased height to accommodate more content
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header with icon
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.analytics,
+                              color: Colors.green,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Activity Summary',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Activity details - Now using dynamic data
+                      Expanded(
+                        child: Consumer<AdminDetailsController>(
+                          builder: (context, controller, child) {
+                            if (controller.isLoadingLogs) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            return Column(
+                              children: [
+                                _buildActivitySummaryItem(
+                                  'Last Login',
+                                  controller.lastLoginDate != null
+                                      ? controller.formatDateTime(controller.lastLoginDate!)
+                                      : 'Never',
+                                  Icons.login,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildActivitySummaryItem(
+                                  'Logins This Month',
+                                  controller.formatCount(controller.totalLoginsThisMonth),
+                                  Icons.timeline,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildActivitySummaryItem(
+                                  'Failed Login Attempts',
+                                  controller.formatCount(controller.failedLoginAttempts),
+                                  Icons.error_outline,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildActivitySummaryItem(
+                                  'Sessions Today',
+                                  controller.formatCount(controller.sessionsToday),
+                                  Icons.today,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildActivitySummaryItem(
+                                  'Activities Today',
+                                  controller.formatCount(controller.totalActivitiesToday),
+                                  Icons.local_activity,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+
           const SizedBox(height: 20),
 
-          // Recent Activity Summary
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Recent Activity Summary',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildActivitySummaryItem(
-                  'Last Login',
-                  '${DateFormatter.formatDateTime(admin.lastLogin)} (${_controller.formatDateTime(admin.lastLogin)})',
-                  Icons.login,
-                ),
-
-                const SizedBox(height: 12),
-                _buildActivitySummaryItem('Total Logins This Month', '45', Icons.timeline),
-                const SizedBox(height: 12),
-                _buildActivitySummaryItem('Failed Login Attempts', '2', Icons.error_outline),
-              ],
-            ),
-          ),
+          // Additional Activity Insights Row
         ],
       ),
     );
   }
+
+
 
   Widget _buildPermissionsTab(AdminModel admin) {
     final groupedPermissions = _controller.getGroupedPermissions();
@@ -998,6 +1111,21 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
     );
   }
 
+  String _calculateAccountAge(DateTime createdAt) {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt);
+
+    if (difference.inDays >= 365) {
+      final years = (difference.inDays / 365).floor();
+      return '$years year${years > 1 ? 's' : ''}';
+    } else if (difference.inDays >= 30) {
+      final months = (difference.inDays / 30).floor();
+      return '$months month${months > 1 ? 's' : ''}';
+    } else {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
+    }
+  }
+
 // Method to select a log and show details panel
   void _selectLog(AdminActivityLog log) {
     setState(() {
@@ -1238,29 +1366,86 @@ class _AdminDetailsPageState extends State<AdminDetailsPage> with SingleTickerPr
   }
 
   Widget _buildActivitySummaryItem(String label, String value, IconData icon) {
+    // Determine text color based on value content
+    Color valueColor = Colors.black87;
+    Color iconColor = Colors.grey[600]!;
+
+    // Apply conditional styling based on content
+    if (label.toLowerCase().contains('failed') && value != '0') {
+      valueColor = Colors.red[600]!;
+      iconColor = Colors.red[600]!;
+    } else if (label.toLowerCase().contains('login') ||
+        label.toLowerCase().contains('session')) {
+      if (value == '0' || value.toLowerCase().contains('never')) {
+        valueColor = Colors.orange[600]!;
+        iconColor = Colors.orange[600]!;
+      } else {
+        valueColor = Colors.green[600]!;
+        iconColor = Colors.green[600]!;
+      }
+    } else if (label.toLowerCase().contains('activities') && value != '0') {
+      valueColor = Colors.blue[600]!;
+      iconColor = Colors.blue[600]!;
+    } else if (label.toLowerCase().contains('status')) {
+      if (value.toLowerCase().contains('active') ||
+          value.toLowerCase().contains('verified')) {
+        valueColor = Colors.green[600]!;
+        iconColor = Colors.green[600]!;
+      } else if (value.toLowerCase().contains('inactive') ||
+          value.toLowerCase().contains('pending')) {
+        valueColor = Colors.orange[600]!;
+        iconColor = Colors.orange[600]!;
+      }
+    } else if (label.toLowerCase().contains('age') ||
+        label.toLowerCase().contains('time') ||
+        label.toLowerCase().contains('ago')) {
+      valueColor = Colors.indigo[600]!;
+      iconColor = Colors.indigo[600]!;
+    }
+
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.grey[600]),
-        const SizedBox(width: 12),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: iconColor,
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: valueColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
           ),
         ),
       ],
     );
   }
-
 
   void _showEditDialog() {
     // Implement edit dialog

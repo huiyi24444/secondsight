@@ -8,6 +8,8 @@ class AdminModel {
   final bool isEnabled;
   final String name;
   final String role;
+  final String? phone;
+  final String? department;
   final List<String> permissions;
   final DateTime createdAt;
   final DateTime? lastLogin;
@@ -22,6 +24,8 @@ class AdminModel {
     required this.isEnabled,
     required this.name,
     required this.role,
+    this.phone,
+    this.department,
     required this.permissions,
     required this.createdAt,
     this.lastLogin,
@@ -40,6 +44,8 @@ class AdminModel {
       isEnabled: data['isEnabled'] ?? false,
       name: data['name'] ?? '',
       role: data['role'] ?? '',
+      phone: data['phone'] ?? '',
+      department: data['department'] ?? '',
       permissions: List<String>.from(data['permissions'] ?? []),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       lastLogin: data['lastLogin'] != null ? (data['lastLogin'] as Timestamp).toDate() : null,
@@ -56,6 +62,8 @@ class AdminModel {
       'isEnabled': isEnabled,
       'name': name,
       'role': role,
+      'phone': phone,
+      'department': department,
       'permissions': permissions,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLogin': lastLogin != null ? Timestamp.fromDate(lastLogin!) : null,
