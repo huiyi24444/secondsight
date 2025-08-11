@@ -58,15 +58,30 @@ class _ProductViewState extends State<ProductView> {
     }
   }
 
-  Future<List<Product>> _fetchRankedRecommendedProducts(String userId) async {
+  Future<List<Product>> _fetchRankedRecommendedProducts(String? userId) async {
     try {
-      // First, try to get personalized recommendations (remove the limit to get all recommendations)
+      // If user is not logged in, go directly to viewCount ranking
+      if (userId == null || userId.isEmpty) {
+        print('User not logged in, showing products by viewCount');
+
+        final fallbackDocs = await FirebaseFirestore.instance
+            .collection('products')
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
+            .orderBy('viewCount', descending: true)
+            .get();
+
+        return fallbackDocs.docs
+            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
+            .toList();
+      }
+
+      // For logged-in users, try to get personalized recommendations first
       final recommendationDocs = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('recommendations')
           .orderBy('rank')
-      // Removed .limit(20) to get all available recommendations
           .get();
 
       final rankedProductIds = recommendationDocs.docs
@@ -111,8 +126,8 @@ class _ProductViewState extends State<ProductView> {
             .collection('products')
             .where('productStatus', whereNotIn: ['sold', 'inactive'])
             .where('stockQuantity', isGreaterThan: 0)
-            .orderBy('viewCount', descending: true) // Order by viewCount in descending order
-            .get(); // No limit to get all available products
+            .orderBy('viewCount', descending: true)
+            .get();
 
         recommendedProducts = fallbackDocs.docs
             .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))

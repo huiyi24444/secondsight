@@ -5,12 +5,12 @@ import 'package:secondsight/view/widgets/product_card.dart';
 import 'package:secondsight/view/widgets/product_small_card.dart';
 
 class RecommendationsSection extends StatefulWidget {
-  final String userId;
+  final String? userId;
   final bool showDebugInfo; // Add this parameter to control debug visibility
 
   const RecommendationsSection({
     Key? key,
-    required this.userId,
+    this.userId,
     this.showDebugInfo = true, // Default to false in production
   }) : super(key: key);
 
@@ -27,38 +27,6 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
     super.initState();
     _currentUserId = widget.userId;
   }
-
-  Future<List<String>> _getRecommendedProductIds() async {
-    print('Fetching recommendation IDs for user: ${widget.userId}');
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('recommendations')
-          .orderBy('rank')
-          .limit(10)
-          .get();
-
-      print('Found ${snapshot.docs.length} recommendation docs');
-
-      for (final doc in snapshot.docs) {
-        print('Rec doc: ${doc.id} → ${doc.data()}');
-      }
-
-      final productIds = snapshot.docs
-          .map((doc) => doc.data()['productId'] as String?)
-          .where((id) => id != null && id!.isNotEmpty)
-          .map((id) => id!)
-          .toList();
-
-      print('Extracted product IDs: $productIds');
-      return productIds;
-    } catch (e) {
-      print('Error fetching recommendation IDs: $e');
-      return [];
-    }
-  }
-
 
   Future<List<Product>> _getRecommendedProducts() async {
     final rankedIdsSnapshot = await FirebaseFirestore.instance

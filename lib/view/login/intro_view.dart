@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +12,34 @@ class IntroScreen extends StatefulWidget {
 class _IntroScreenState extends State<IntroScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _imagesPreloaded = false;
+
+  static const String image1 = 'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/intro%2Feco-friendly-clothing-brand-recycling-tag-plastic-free-apparel-ecological-garment-female-fashion-woman-buying-natural-material-clothes.png?alt=media&token=66bc599e-16c9-46fe-a5e6-7d5cf4ad713c';
+  static const String image2 = 'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/intro%2Fvtooo.png?alt=media&token=fa7aba66-7bbd-481f-a8c0-6ffcff8de5e2';
+  static const String image3 = 'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/intro%2Fpersonal-stylist-abstract-concept-vector-illustration-shopping-consultant-beauty-blogger-business-clothes-tailor-workspace-fashion-man-woman-style-dressing-room-abstract-metaphor.png?alt=media&token=3a87354b-891e-4beb-b7ec-58747dd438fe';
+
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Preload images only once when dependencies are ready
+    if (!_imagesPreloaded) {
+      _preloadImages();
+      _imagesPreloaded = true;
+    }
+  }
+
+  void _preloadImages() {
+    precacheImage(NetworkImage(image1), context);
+    precacheImage(NetworkImage(image2), context);
+    precacheImage(NetworkImage(image3), context);
+  }
+
 
   void _onIntroFinished(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
@@ -117,6 +146,44 @@ class _IntroScreenState extends State<IntroScreen> {
     );
   }
 
+  Widget _buildOptimizedImage(String imageUrl, double height) {
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      height: height,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF8B5CF6),
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.error_outline,
+          color: Colors.grey[600],
+          size: 50,
+        ),
+      ),
+      // Enable memory and disk caching
+      memCacheHeight: 500,
+      memCacheWidth: 500,
+      maxHeightDiskCache: 1000,
+      maxWidthDiskCache: 1000,
+    );
+  }
+
   Widget _buildPage1(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -141,11 +208,7 @@ class _IntroScreenState extends State<IntroScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Image.network(
-                      'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/intro%2Feco-friendly-clothing-brand-recycling-tag-plastic-free-apparel-ecological-garment-female-fashion-woman-buying-natural-material-clothes.png?alt=media&token=66bc599e-16c9-46fe-a5e6-7d5cf4ad713c',
-                      height: 500,
-                      fit: BoxFit.cover,
-                    ),
+                    _buildOptimizedImage(image1, 500),
                   ],
                 ),
               ),
@@ -199,11 +262,7 @@ class _IntroScreenState extends State<IntroScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Image.network(
-                   'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/intro%2Fvtooo.png?alt=media&token=0be04fc6-14b6-4191-b781-68c5071e8e59',
-                      height: 500,
-                      fit: BoxFit.cover,
-                    ),
+                    _buildOptimizedImage(image3, 400),
                   ],
                 ),
               ),

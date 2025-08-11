@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _user;
+  String? _userId;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -20,11 +21,14 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   bool get isEmailVerified => _user?.emailVerified ?? false;
+  bool get isLoggedIn => _user != null;
+
 
   AuthProvider() {
     // Listen to auth state changes
     _auth.authStateChanges().listen((User? user) {
       _user = user;
+      _userId = user?.uid;
       notifyListeners();
     });
   }

@@ -1,11 +1,11 @@
 import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:secondsight/services/auth_provider.dart';
-import 'package:secondsight/services/auth_wrapper.dart';
+// Remove auth_wrapper import as it's no longer needed
+import 'package:secondsight/view/checkout/cart_view.dart';
 import 'package:secondsight/view/checkout/order_success_view.dart';
 import 'package:secondsight/admin_main.dart';
 import 'package:secondsight/view/login/forgot_password_view.dart';
@@ -14,6 +14,7 @@ import 'package:secondsight/view/login/login_view.dart';
 import 'package:secondsight/view/login/register_view.dart';
 import 'package:secondsight/view/login/splash_screen.dart';
 import 'package:secondsight/view/login/verification_view.dart';
+import 'package:secondsight/view/settings/profile_view.dart';
 import 'view/products/homepage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -90,15 +91,17 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Gabarito',
         useMaterial3: true,
       ),
-      home: const SplashScreen(),  // ← now shows intro only once
+      home: const SplashScreen(),  // Keep this as is
       debugShowCheckedModeBanner: false,
-
       routes: {
         '/intro': (context) => const IntroDecisionScreen(),
         '/login': (context) => const LoginView(),
         '/register': (context) => const RegisterView(),
-        '/home': (context) => const MyHomePage(),
+        '/home': (context) => const MyHomePage(),  // This goes directly to MyHomePage
         '/forgot-password': (context) => const ForgotPasswordView(),
+        '/profile': (context) => const ProfileView(),
+        '/cart': (context) => const CartView(userId: '',),
+        // Add other routes as needed
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/email-verification') {
@@ -109,93 +112,6 @@ class MyApp extends StatelessWidget {
         }
         return null;
       },
-    );
-  }
-}
-
-// Example Home Screen - Replace with your actual home screen
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authProvider.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacementNamed('/login');
-              }
-            },
-          ),
-        ],
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.check_circle_outline,
-                size: 80,
-                color: Colors.green,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Welcome!',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                user?.email ?? 'User',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'User ID: ${user?.uid ?? 'N/A'}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (user != null && !user.emailVerified) ...[
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      const Text('Email not verified'),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pushNamed(
-                            '/email-verification',
-                            arguments: user.email ?? '',
-                          );
-                        },
-                        child: const Text('Verify now'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

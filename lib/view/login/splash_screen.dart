@@ -1,8 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-
-import 'intro_decision_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -12,132 +10,139 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    // Initialize fade animation
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    // Animation controller
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeIn,
-    ));
-
-    // Start the fade animation
-    _fadeController.forward();
-
-    // Navigate to intro screen after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      _navigateToIntroScreen();
-    });
-  }
-
-  void _navigateToIntroScreen() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const IntroDecisionScreen(),
+    // Fade animation
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
       ),
     );
+
+    // Scale animation
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
+      ),
+    );
+
+    _controller.forward();
+    _navigateToNext();
+  }
+
+  Future<void> _navigateToNext() async {
+    await Future.delayed(const Duration(seconds: 3));
+
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstTime = prefs.getBool('first_time') ?? true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (isFirstTime) {
+        await prefs.setBool('first_time', false);
+        if (mounted) Navigator.of(context).pushReplacementNamed('/intro');
+      } else {
+        if (mounted) Navigator.of(context).pushReplacementNamed('/home');
+      }
+    });
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Top padding
-              const SizedBox(height: 80),
+      backgroundColor: Colors.white, // same as first code
+      body: Center(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 80),
 
-              // Logo section
-              Center(
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  child: Image.asset(
-                    'assets/images/secondsight_logo.png',
-                    fit: BoxFit.contain,
-                  ),
+                    // Logo
+                    SizedBox(
+                      width: 200,
+                      height: 200,
+                      child: Image.asset(
+                        'assets/images/secondsight_logo.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // Slogan
+                    const Text(
+                      'Where Style Finds a Second Life',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xFF8E6CEF),
+                        fontFamily: 'Gabarito',
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // Lottie or fallback
+                    SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: _buildAnimationWidget(),
+                    ),
+
+                    const SizedBox(height: 80),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 5),
-
-              // Slogan
-              Center(
-                child: const Text(
-                  'Where Style Finds a Second Life',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF8E6CEF),
-                    fontFamily: 'Gabarito',
-                    letterSpacing: 0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 5),
-
-              // Animation section
-              Center(
-                child: SizedBox(
-                  width: 220,
-                  height: 220,
-                  child: _buildAnimationWidget(),
-                ),
-              ),
-
-              // Bottom padding
-              const SizedBox(height: 80),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  // Move these methods INSIDE the class
   Widget _buildAnimationWidget() {
     return FutureBuilder(
       future: _checkAssetExists(),
       builder: (context, snapshot) {
         if (snapshot.hasData && snapshot.data == true) {
-          // Asset exists, load Lottie animation
           return Lottie.asset(
             'assets/animations/loading.json',
             repeat: true,
             animate: true,
             errorBuilder: (context, error, stackTrace) {
-              print('Lottie error: $error');
               return _buildFallbackAnimation();
             },
           );
         } else {
-          // Asset doesn't exist or error, show fallback
           return _buildFallbackAnimation();
         }
       },
@@ -149,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
       width: 100,
       height: 100,
       decoration: BoxDecoration(
-        color: const Color(0xFF8E6CEF).withOpacity(0.2), // Use your app's color
+        color: const Color(0xFF8E6CEF).withOpacity(0.2),
         borderRadius: BorderRadius.circular(50),
       ),
       child: const Center(
@@ -163,10 +168,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<bool> _checkAssetExists() async {
     try {
-      await DefaultAssetBundle.of(context).loadString('assets/animations/loading.json');
+      await DefaultAssetBundle.of(context)
+          .loadString('assets/animations/loading.json');
       return true;
-    } catch (e) {
-      print('Asset loading error: $e');
+    } catch (_) {
       return false;
     }
   }
