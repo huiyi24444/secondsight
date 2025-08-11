@@ -552,24 +552,18 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
+
+        CameraPreview(widget.cameraController),
+
         // Camera preview with repaint boundary
-        RepaintBoundary(
-          key: _repaintBoundaryKey,
-          child: Stack(
-            children: [
-              CameraPreview(widget.cameraController),
-              // Clothing overlay
-              SizedBox.expand(
-                child: CustomPaint(
-                  painter: ClothingOverlayPainter(
-                    pose: _currentPose,
-                    clothingImage: _clothingImage,
-                    cameraSize: widget.cameraSize,
-                    clothingType: widget.clothingType,
-                  ),
-                ),
-              ),
-            ],
+        SizedBox.expand(
+          child: CustomPaint(
+            painter: ClothingOverlayPainter(
+              pose: _currentPose,
+              clothingImage: _clothingImage,
+              cameraSize: widget.cameraSize,
+              clothingType: widget.clothingType,
+            ),
           ),
         ),
 

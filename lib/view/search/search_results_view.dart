@@ -65,6 +65,9 @@ class _SearchResultsViewState extends State<SearchResultsView> {
 
       List<String> filters = [];
 
+      filters.add('NOT productStatus:sold AND NOT productStatus:inactive');
+
+
       if (minPrice != null) filters.add('productPrice >= $minPrice');
       if (maxPrice != null) filters.add('productPrice <= $maxPrice');
       if (selectedSizes.isNotEmpty) {

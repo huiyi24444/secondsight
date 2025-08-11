@@ -52,7 +52,7 @@ class ClothingOverlayPainter extends CustomPainter {
   });
 
   Offset transformLandmarkForDisplay(double x, double y, Size size) {
-    final verticalOffset = size.height * 0.12;  // adjust height of pose landmark
+    final verticalOffset = size.height * 0.16;  // adjust height of pose landmark
     return Offset(
         (1.0 - y) * size.width,
         (1.0 - x) * size.height - verticalOffset
