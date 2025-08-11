@@ -43,50 +43,61 @@ class AdminApp extends StatelessWidget {
       theme: ThemeData(primaryColor: Color(0xFF7C3AED), fontFamily: 'Inter'),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
-      routes: {
-        '/' : (context) => AdminAuthWrapper(authenticatedWidget: AdminNavigator()),
-        '/admin/login': (context) => AdminLoginView(),
-        '/conversations': (context) => AdminAuthWrapper(
-          authenticatedWidget: PermissionGuard(
-            requiredPermissions: [AdminPermissions.viewConversations],
-            child: const AdminChatView(),
-            fallback: NoPermissionWidget(feature: 'Customer Support'), // ✅ FIXED HERE
-          ),
-        ),
-
-      },
       onGenerateRoute: (settings) {
-        final uri = Uri.tryParse(settings.name ?? '');
-        if (uri == null) return null;
+        // Get the current URL from browser
+        final uri = Uri.base;
+        print('🔍 Browser URL: ${uri.toString()}');
+        print('🔍 URI path: ${uri.path}');
+        print('🔍 URI query: ${uri.queryParameters}');
 
-        if (uri.path == '/admin-setup') {
+        // Check if this is a setup route from the URL
+        if (uri.path == '/admin-setup' || uri.fragment.contains('admin-setup')) {
+          print('🚀 Setup route detected in URL');
           final token = uri.queryParameters['token'];
           final id = uri.queryParameters['id'];
+
+          if (token != null && id != null) {
+            print('✅ Valid setup parameters from URL');
+            return MaterialPageRoute(
+              builder: (_) => AdminSetupPage(token: token, adminId: id),
+            );
+          }
+        }
+
+        // Original routing logic for settings.name
+        final routeUri = Uri.tryParse(settings.name ?? '');
+
+        if (routeUri?.path == '/admin-setup') {
+          final token = routeUri?.queryParameters['token'];
+          final id = routeUri?.queryParameters['id'];
 
           if (token != null && id != null) {
             return MaterialPageRoute(
               builder: (_) => AdminSetupPage(token: token, adminId: id),
             );
-          } else {
-            // Missing required query params
-            return MaterialPageRoute(
-              builder: (_) => const Scaffold(
-                body: Center(
-                  child: Text(
-                    'Missing token or admin ID in the URL.',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            );
           }
         }
 
-        // Let Flutter handle unknown routes
-        return null;
+        // Default routes
+        switch (settings.name) {
+          case '/admin/login':
+            return MaterialPageRoute(builder: (_) => AdminLoginView());
+          case '/conversations':
+            return MaterialPageRoute(
+              builder: (_) => AdminAuthWrapper(
+                authenticatedWidget: PermissionGuard(
+                  requiredPermissions: [AdminPermissions.viewConversations],
+                  child: const AdminChatView(),
+                  fallback: NoPermissionWidget(feature: 'Customer Support'),
+                ),
+              ),
+            );
+          default:
+            return MaterialPageRoute(
+              builder: (_) => AdminAuthWrapper(authenticatedWidget: AdminNavigator()),
+            );
+        }
       },
     );
   }
 }
-
-

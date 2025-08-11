@@ -120,8 +120,56 @@ class _CustomTopBarState extends State<CustomTopBar> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await adminProvider.signOut();
-              Navigator.of(context).pushReplacementNamed('/admin');
+              // Add confirmation dialog
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Confirm Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                try {
+                  print('🚪 Starting logout process...');
+                  await adminProvider.signOut();
+                  print('✅ Logout successful');
+
+                  if (mounted) {
+                    // FIXED: Use the correct route
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/admin/login', // Changed from '/admin' to '/admin/login'
+                          (route) => false, // Clear all routes
+                    );
+                  }
+                } catch (e) {
+                  print('❌ Logout error: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Logout failed: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
             },
             tooltip: 'Logout',
           ),

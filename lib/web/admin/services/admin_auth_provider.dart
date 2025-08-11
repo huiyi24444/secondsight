@@ -35,20 +35,31 @@ class AdminAuthProvider with ChangeNotifier {
   AdminAuthProvider() {
     // Listen to auth state changes
     _auth.authStateChanges().listen((User? user) async {
+      print('🔍 [AdminAuthProvider] Auth state changed: ${user?.email ?? 'null'}');
+
+      // IMPORTANT: Don't override manual state clearing
+      if (user == null && _user == null) {
+        // This is expected during logout - don't do anything
+        print('👤 [AdminAuthProvider] Expected null state during logout');
+        return;
+      }
+
       _user = user;
 
       if (user != null) {
-        // Check if user is admin whenever auth state changes
+        print('👤 [AdminAuthProvider] User found, checking admin status...');
         await _checkAdminStatus();
       } else {
+        print('👤 [AdminAuthProvider] No user, clearing admin state...');
         _isAdmin = false;
         _adminData = null;
         _isFirestoreVerified = false;
       }
+
+      print('📢 [AdminAuthProvider] Notifying listeners - authenticated: ${_user != null && _isAdmin}');
       notifyListeners();
     });
   }
-
 
 
   // Clear error message
@@ -67,20 +78,52 @@ class AdminAuthProvider with ChangeNotifier {
     }
 
     try {
-      final adminDoc = await _firestore
+      // First try to find admin document by Firebase UID (document ID)
+      DocumentSnapshot adminDoc = await _firestore
           .collection('admins')
           .doc(_user!.uid)
           .get();
 
+      // If not found by document ID, search by firebaseUid field
+      if (!adminDoc.exists) {
+        final querySnapshot = await _firestore
+            .collection('admins')
+            .where('firebaseUid', isEqualTo: _user!.uid)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          adminDoc = querySnapshot.docs.first;
+        }
+      }
+
+      // If still not found, search by email as fallback
+      if (!adminDoc.exists) {
+        final querySnapshot = await _firestore
+            .collection('admins')
+            .where('email', isEqualTo: _user!.email)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          adminDoc = querySnapshot.docs.first;
+
+          // Update this document with the Firebase UID for future lookups
+          await adminDoc.reference.update({
+            'firebaseUid': _user!.uid,
+          });
+        }
+      }
+
       if (adminDoc.exists) {
         _isAdmin = true;
-        _adminData = adminDoc.data();
+        _adminData = adminDoc.data() as Map<String, dynamic>;
         _isFirestoreVerified = _adminData?['isVerified'] ?? false;
 
-        // SET UP ADMIN SESSION for logging
+        // Set up admin session for logging...
         AdminSessionService.instance.setCurrentAdmin(
           AdminModel(
-            id: _user!.uid,
+            id: adminDoc.id, // Use Firestore document ID
             email: _adminData?['email'] ?? _user!.email ?? '',
             name: _adminData?['name'] ?? _user!.displayName ?? '',
             role: _adminData?['role'] ?? 'viewer',
@@ -92,12 +135,8 @@ class AdminAuthProvider with ChangeNotifier {
           ),
         );
 
-
         // Update last login timestamp
-        await _firestore
-            .collection('admins')
-            .doc(_user!.uid)
-            .update({
+        await adminDoc.reference.update({
           'lastLogin': FieldValue.serverTimestamp(),
         });
       } else {
@@ -310,45 +349,94 @@ class AdminAuthProvider with ChangeNotifier {
   // Sign out
   Future<void> signOut() async {
     try {
+      print('🚪 [AdminAuthProvider] Starting signOut process...');
       _isLoading = true;
       notifyListeners();
 
-      // LOG LOGOUT before clearing session
-      if (_user != null && _isAdmin && _adminData != null) {
-        await AdminActivityLogger.log(
-          adminId: _user!.uid,
-          adminEmail: _adminData?['email'] ?? _user!.email ?? '',
-          adminName: _adminData?['name'] ?? _user!.displayName ?? '',
-          adminRole: _adminData?['role'] ?? 'viewer',
-          action: 'logout',
-          actionType: 'auth',
-          targetType: 'session',
-        );
+      // Store admin info before clearing
+      final currentAdminId = _user?.uid;
+      final currentAdminData = _adminData;
+      final currentUser = _user;
 
-        // Update last logout timestamp
-        await _firestore
-            .collection('admins')
-            .doc(_user!.uid)
-            .update({
-          'lastLogout': FieldValue.serverTimestamp(),
-        });
+      // LOG LOGOUT before clearing session
+      if (currentUser != null && _isAdmin && currentAdminData != null) {
+        print('📝 [AdminAuthProvider] Logging logout activity...');
+        try {
+          await AdminActivityLogger.log(
+            adminId: currentUser.uid,
+            adminEmail: currentAdminData['email'] ?? currentUser.email ?? '',
+            adminName: currentAdminData['name'] ?? currentUser.displayName ?? '',
+            adminRole: currentAdminData['role'] ?? 'viewer',
+            action: 'logout',
+            actionType: 'auth',
+            targetType: 'session',
+          );
+
+          // FIXED: Find the correct admin document to update
+          DocumentSnapshot? adminDocToUpdate;
+
+          // Try to find by Firebase UID first
+          final adminDoc = await _firestore.collection('admins').doc(currentUser.uid).get();
+          if (adminDoc.exists) {
+            adminDocToUpdate = adminDoc;
+          } else {
+            // Search by firebaseUid field
+            final querySnapshot = await _firestore
+                .collection('admins')
+                .where('firebaseUid', isEqualTo: currentUser.uid)
+                .limit(1)
+                .get();
+
+            if (querySnapshot.docs.isNotEmpty) {
+              adminDocToUpdate = querySnapshot.docs.first;
+            }
+          }
+
+          // Update last logout timestamp on the correct document
+          if (adminDocToUpdate != null) {
+            await adminDocToUpdate.reference.update({
+              'lastLogout': FieldValue.serverTimestamp(),
+            });
+            print('✅ [AdminAuthProvider] Updated logout timestamp');
+          } else {
+            print('⚠️ [AdminAuthProvider] Could not find admin document to update logout timestamp');
+          }
+        } catch (logError) {
+          print('⚠️ [AdminAuthProvider] Error during logout logging: $logError');
+          // Continue with logout even if logging fails
+        }
       }
 
+      print('🔥 [AdminAuthProvider] Signing out from Firebase Auth...');
       await _auth.signOut();
 
+      print('🧹 [AdminAuthProvider] Clearing admin session and state...');
       // Clear admin session
       AdminSessionService.instance.clearSession();
 
+      // CRITICAL: Clear all state immediately and notify
+      _user = null;
+      _isAdmin = false;
+      _adminData = null;
+      _isFirestoreVerified = false;
+      _errorMessage = null;
+      _isLoading = false;
+
+      print('✅ [AdminAuthProvider] SignOut completed. All state cleared.');
+      print('📢 [AdminAuthProvider] Notifying listeners - authenticated: ${_user != null && _isAdmin}');
+      notifyListeners();
+
+    } catch (e) {
+      print('❌ [AdminAuthProvider] SignOut error: $e');
+      _isLoading = false;
+      _errorMessage = 'Failed to sign out. Please try again.';
+
+      // Force clear state even on error
       _user = null;
       _isAdmin = false;
       _adminData = null;
       _isFirestoreVerified = false;
 
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _isLoading = false;
-      _errorMessage = 'Failed to sign out. Please try again.';
       notifyListeners();
     }
   }

@@ -47,42 +47,54 @@ class AdminSidebar extends StatelessWidget {
           if (adminPermissions.contains('view_dashboard'))
             _buildMenuItem(Icons.dashboard, 'Dashboard', 'dashboard', currentPage == 'dashboard'),
 
-          _buildMenuItem(
-            Icons.shopping_cart,
-            'Product Management',
-            'products',
-            currentPage == 'products',
-          ),
-          _buildMenuItem(
-            Icons.list_alt,
-            'Order Management',
-            'orders',
-            currentPage == 'orders',
-          ),
-          _buildMenuItem(
-            Icons.assignment_return,
-            'Return Management',
-            'returns',
-            currentPage == 'returns',
-          ),
-          _buildMenuItem(
-            Icons.people,
-            'Customer Management',
-            'customers',
-            currentPage == 'customers',
-          ),
-          _buildMenuItem(
-            Icons.report,
-            'Reports',
-            'reports',
-            currentPage == 'reports',
-          ),
-          _buildMenuItem(
-            Icons.chat,
-            'Chat Support',
-            'chat',
-            currentPage == 'chat',
-          ),
+          if (adminPermissions.contains('view_products'))
+            _buildMenuItem(
+              Icons.shopping_cart,
+              'Product Management',
+              'products',
+              currentPage == 'products',
+            ),
+
+          if (adminPermissions.contains('view_orders'))
+            _buildMenuItem(
+              Icons.list_alt,
+              'Order Management',
+              'orders',
+              currentPage == 'orders',
+            ),
+
+          if (adminPermissions.contains('view_returns'))
+            _buildMenuItem(
+              Icons.assignment_return,
+              'Return Management',
+              'returns',
+              currentPage == 'returns',
+            ),
+
+          if (adminPermissions.contains('view_users'))
+            _buildMenuItem(
+              Icons.people,
+              'Customer Management',
+              'customers',
+              currentPage == 'customers',
+            ),
+
+          if (adminPermissions.contains('export_reports'))
+            _buildMenuItem(
+              Icons.report,
+              'Reports',
+              'reports',
+              currentPage == 'reports',
+            ),
+
+          if (adminPermissions.contains('view_conversations'))
+            _buildMenuItem(
+              Icons.chat,
+              'Chat Support',
+              'chat',
+              currentPage == 'chat',
+            ),
+
           if (adminPermissions.contains('view_admins'))
             _buildMenuItem(Icons.admin_panel_settings, 'Admins', 'admins', currentPage == 'admins'),
         ],

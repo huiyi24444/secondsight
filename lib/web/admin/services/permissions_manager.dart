@@ -129,6 +129,7 @@ class AdminRoles {
         AdminPermissions.processOrders,
         AdminPermissions.viewCategories,
         AdminPermissions.viewAnalytics,
+        AdminPermissions.viewDashboard,
       ],
     ),
     'support': AdminRole(
@@ -140,6 +141,7 @@ class AdminRoles {
         AdminPermissions.viewOrders,
         AdminPermissions.cancelOrders,
         AdminPermissions.viewConversations,
+        AdminPermissions.viewDashboard,
       ],
     ),
     'viewer': AdminRole(
@@ -149,8 +151,10 @@ class AdminRoles {
         AdminPermissions.viewUsers,
         AdminPermissions.viewProducts,
         AdminPermissions.viewOrders,
+        AdminPermissions.viewReturns,
         AdminPermissions.viewCategories,
         AdminPermissions.viewAnalytics,
+        AdminPermissions.viewDashboard,
       ],
     ),
   };
