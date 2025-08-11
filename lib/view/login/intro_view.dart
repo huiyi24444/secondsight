@@ -262,7 +262,7 @@ class _IntroScreenState extends State<IntroScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    _buildOptimizedImage(image3, 400),
+                    _buildOptimizedImage(image2, 400),
                   ],
                 ),
               ),

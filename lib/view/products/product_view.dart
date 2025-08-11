@@ -31,8 +31,9 @@ class _ProductViewState extends State<ProductView> {
   void initState() {
     super.initState();
 
-    if (widget.isRecommendations && widget.userId != null) {
-      _recommendedProductsFuture = _fetchRankedRecommendedProducts(widget.userId!);
+    if (widget.isRecommendations) {
+      // Always initialize _recommendedProductsFuture for recommendations, regardless of userId
+      _recommendedProductsFuture = _fetchRankedRecommendedProducts(widget.userId);
     } else {
       if (widget.isNewIn) {
         _productStream = FirebaseFirestore.instance
@@ -63,17 +64,7 @@ class _ProductViewState extends State<ProductView> {
       // If user is not logged in, go directly to viewCount ranking
       if (userId == null || userId.isEmpty) {
         print('User not logged in, showing products by viewCount');
-
-        final fallbackDocs = await FirebaseFirestore.instance
-            .collection('products')
-            .where('productStatus', whereNotIn: ['sold', 'inactive'])
-            .where('stockQuantity', isGreaterThan: 0)
-            .orderBy('viewCount', descending: true)
-            .get();
-
-        return fallbackDocs.docs
-            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
-            .toList();
+        return await _getPopularProducts();
       }
 
       // For logged-in users, try to get personalized recommendations first
@@ -93,6 +84,8 @@ class _ProductViewState extends State<ProductView> {
       List<Product> recommendedProducts = [];
 
       if (rankedProductIds.isNotEmpty) {
+        print('Found ${rankedProductIds.length} personalized recommendations');
+
         // Fetch products in batches (Firestore 'whereIn' has a limit of 10 items)
         for (int i = 0; i < rankedProductIds.length; i += 10) {
           final batch = rankedProductIds.skip(i).take(10).toList();
@@ -120,36 +113,66 @@ class _ProductViewState extends State<ProductView> {
 
       // If no personalized recommendations found, fallback to products ordered by viewCount
       if (recommendedProducts.isEmpty) {
-        print('No personalized recommendations found, falling back to viewCount ranking');
-
-        final fallbackDocs = await FirebaseFirestore.instance
-            .collection('products')
-            .where('productStatus', whereNotIn: ['sold', 'inactive'])
-            .where('stockQuantity', isGreaterThan: 0)
-            .orderBy('viewCount', descending: true)
-            .get();
-
-        recommendedProducts = fallbackDocs.docs
-            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
-            .toList();
+        print('No personalized recommendations found for user $userId, falling back to viewCount ranking');
+        recommendedProducts = await _getPopularProducts();
       }
 
       return recommendedProducts;
 
     } catch (e) {
       print('Error fetching recommendations: $e');
-
       // If there's any error, fallback to viewCount ranking
-      final fallbackDocs = await FirebaseFirestore.instance
+      return await _getPopularProducts();
+    }
+  }
+
+  Future<List<Product>> _getPopularProducts() async {
+    try {
+      // Try to get products ordered by viewCount first
+      var productDocs = await FirebaseFirestore.instance
           .collection('products')
           .where('productStatus', whereNotIn: ['sold', 'inactive'])
           .where('stockQuantity', isGreaterThan: 0)
           .orderBy('viewCount', descending: true)
           .get();
 
-      return fallbackDocs.docs
+      if (productDocs.docs.isNotEmpty) {
+        print('Found ${productDocs.docs.length} products ordered by viewCount');
+        return productDocs.docs
+            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
+            .toList();
+      }
+
+      // If no products with viewCount, fallback to recent products
+      print('No products with viewCount found, falling back to recent products');
+      productDocs = await FirebaseFirestore.instance
+          .collection('products')
+          .where('productStatus', whereNotIn: ['sold', 'inactive'])
+          .where('stockQuantity', isGreaterThan: 0)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      if (productDocs.docs.isNotEmpty) {
+        return productDocs.docs
+            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
+            .toList();
+      }
+
+      // Last resort: get any active products
+      print('No recent products found, getting any available products');
+      productDocs = await FirebaseFirestore.instance
+          .collection('products')
+          .where('productStatus', whereNotIn: ['sold', 'inactive'])
+          .where('stockQuantity', isGreaterThan: 0)
+          .get();
+
+      return productDocs.docs
           .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
+
+    } catch (e) {
+      print('Error loading popular products: $e');
+      return [];
     }
   }
 
@@ -175,11 +198,11 @@ class _ProductViewState extends State<ProductView> {
           children: [
             // Titles
             if (widget.isRecommendations)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  'Recommended for You',
-                  style: TextStyle(
+                  widget.userId != null ? 'Recommended for You' : 'Popular Products',
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -236,18 +259,55 @@ class _ProductViewState extends State<ProductView> {
                   ? FutureBuilder<List<Product>>(
                 future: _recommendedProductsFuture,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  final products = snapshot.data!;
-                  if (products.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No products found',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                  if (snapshot.hasError) {
+                    print('Error in FutureBuilder: ${snapshot.error}');
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'Error loading products',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Please try again later',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
                       ),
                     );
                   }
 
+                  final products = snapshot.data ?? [];
+                  if (products.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No products available',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Check back later for new products',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  print('Displaying ${products.length} products in ProductView');
                   return GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -269,9 +329,27 @@ class _ProductViewState extends State<ProductView> {
                   : StreamBuilder<QuerySnapshot>(
                 stream: _productStream,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  final docs = snapshot.data!.docs;
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'Error loading products',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
                   if (docs.isEmpty) {
                     return const Center(
                       child: Text(

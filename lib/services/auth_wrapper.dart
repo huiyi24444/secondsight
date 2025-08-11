@@ -6,10 +6,12 @@ import 'auth_provider.dart';
 
 class AuthWrapper extends StatelessWidget {
   final Widget authenticatedWidget;
+  final bool requireAuth;
 
   const AuthWrapper({
     Key? key,
     required this.authenticatedWidget,
+    this.requireAuth = false,
   }) : super(key: key);
 
   @override
@@ -27,29 +29,34 @@ class AuthWrapper extends StatelessWidget {
             'loading=${authState.isLoading}, '
             'authenticated=${authState.isAuthenticated}, '
             'verified=${authState.isEmailVerified}, '
-            'email=${authState.userEmail}');
+            'email=${authState.userEmail}'
+            'requireAuth=$requireAuth');
 
-        // 1. Show loading
-        if (authState.isLoading) {
+        // 1. Show loading only if we're checking authentication
+        if (authState.isLoading && requireAuth) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // 2. Unverified but authenticated
-        if (authState.isAuthenticated && !authState.isEmailVerified) {
+        // 2. If authentication is required and user is authenticated but unverified
+        if (requireAuth && authState.isAuthenticated && !authState.isEmailVerified) {
           return EmailVerificationView(
             email: authState.userEmail ?? '',
           );
         }
 
-        // 3. Verified & authenticated
-        if (authState.isAuthenticated) {
-          return authenticatedWidget;
+        // 3. If authentication is required but user is not authenticated
+        if (requireAuth && !authState.isAuthenticated) {
+          return const LoginView();
         }
 
-        // 4. Not authenticated
-        return const LoginView();
+        // 4. All other cases: show the authenticated widget
+        // This includes:
+        // - Authenticated & verified users
+        // - Non-authenticated users (when requireAuth = false)
+        // - During loading (when requireAuth = false)
+        return authenticatedWidget;
       },
     );
   }

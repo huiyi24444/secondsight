@@ -176,6 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final userId = authProvider.userId;
     final bool isLoggedIn = authProvider.isLoggedIn;
 
+
     // Only create profile future if user is logged in
     if (isLoggedIn && _currentUserId != userId && userId != null) {
       _currentUserId = userId;
@@ -405,7 +406,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isLoggedIn ? 'Recommended For You' : 'Popular Products',
+                      isLoggedIn ? 'Recommended For You' : 'Recommended For You',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
