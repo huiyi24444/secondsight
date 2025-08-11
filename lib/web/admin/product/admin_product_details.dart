@@ -113,21 +113,84 @@ class _ProductEditDialogState extends State<ProductEditDialog> with ActivityLogg
 
   Future<void> _uploadTryOnImage() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.custom,
+      allowedExtensions: ['png'], // Only allow PNG files
       allowMultiple: false,
       withData: true,
     );
 
     if (result != null && result.files.single.bytes != null) {
-      final bytes = result.files.single.bytes!;
-      final fileName =
-          'tryon_${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
+      final file = result.files.single;
+      final bytes = file.bytes!;
+      final fileName = file.name;
 
-      final ref = FirebaseStorage.instance.ref().child('virtual_try_on/$fileName');
+      // Double-check file extension (case-insensitive)
+      if (!fileName.toLowerCase().endsWith('.png')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Only PNG images are allowed for virtual try-on'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
-      final metadata = SettableMetadata(contentType: 'image/png');
+      // Validate file size (e.g., max 10MB for try-on images)
+      const maxSizeInBytes = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSizeInBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size too large. Maximum 10MB allowed for PNG images'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Generate filename with PNG extension
+      final uniqueFileName = 'tryon_${DateTime.now().millisecondsSinceEpoch}.png';
+      final ref = FirebaseStorage.instance.ref().child('virtual_try_on/$uniqueFileName');
+
+      // Set PNG-specific metadata
+      final metadata = SettableMetadata(
+        contentType: 'image/png',
+        cacheControl: 'max-age=31536000', // 1 year cache
+        customMetadata: {
+          'originalName': fileName,
+          'uploadedAt': DateTime.now().toIso8601String(),
+          'fileType': 'png',
+        },
+      );
 
       try {
+        // Show uploading state
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Uploading PNG image...'),
+                ],
+              ),
+              duration: Duration(seconds: 2),
+              backgroundColor: Color(0xFF7C3AED),
+            ),
+          );
+        }
+
         final task = await ref.putData(bytes, metadata);
         final downloadUrl = await task.ref.getDownloadURL();
 
@@ -149,18 +212,37 @@ class _ProductEditDialogState extends State<ProductEditDialog> with ActivityLogg
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Try-on image uploaded successfully')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PNG try-on image uploaded successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } catch (e) {
-        print('Upload failed: $e');
+        print('PNG upload failed: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload PNG image: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else {
+      // User cancelled or no PNG file selected
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload image')),
+          const SnackBar(
+            content: Text('No PNG image selected'),
+            backgroundColor: Colors.grey,
+          ),
         );
       }
     }
   }
-
 
   Future<void> _loadCategories() async {
     try {

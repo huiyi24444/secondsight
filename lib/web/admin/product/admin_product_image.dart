@@ -154,9 +154,27 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
     }
   }
 
+  // Method to show the image viewer dialog
+  void _showImageViewer(int currentIndex) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (BuildContext context) {
+        return ImageViewerDialog(
+          images: images,
+          initialIndex: currentIndex,
+          onDelete: (int index) {
+            Navigator.of(context).pop();
+            _removeImage(index);
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-
     // Show loading indicator while images are being retrieved
     if (_isLoadingImages) {
       return Container(
@@ -189,7 +207,6 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
       );
     }
 
-
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       height: 100,
@@ -212,40 +229,77 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
   Widget _buildImageItem(int index) {
     return Stack(
       children: [
-        Container(
-          margin: const EdgeInsets.only(right: 10),
-          width: 100,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              images[index],
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
+        GestureDetector(
+          onTap: () => _showImageViewer(index),
+          child: Container(
+            margin: const EdgeInsets.only(right: 10),
+            width: 100,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+              // Add subtle hover effect
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                children: [
+                  Image.network(
+                    images[index],
+                    fit: BoxFit.cover,
+                    width: 100,
+                    height: 100,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
 
-                return Container(
-                  color: Colors.grey[50],
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: Color(0xFF7C3AED),
+                      return Container(
+                        color: Colors.grey[50],
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Color(0xFF7C3AED),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey[100],
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.grey,
+                          size: 30,
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey[100],
-                child: const Center(
-                  child: Icon(
-                    Icons.broken_image,
-                    color: Colors.grey,
-                    size: 30,
+                  // Overlay to indicate clickable
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.black.withOpacity(0.0),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.zoom_in,
+                        color: Colors.white,
+                        size: 24,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -316,7 +370,309 @@ class _ProductImageEditorState extends State<ProductImageEditor> {
       ),
     );
   }
-
-
 }
 
+// Image Viewer Dialog Widget
+class ImageViewerDialog extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+  final Function(int index)? onDelete;
+
+  const ImageViewerDialog({
+    super.key,
+    required this.images,
+    required this.initialIndex,
+    this.onDelete,
+  });
+
+  @override
+  State<ImageViewerDialog> createState() => _ImageViewerDialogState();
+}
+
+class _ImageViewerDialogState extends State<ImageViewerDialog> {
+  late PageController _pageController;
+  late int _currentIndex;
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+  }
+
+  void _previousImage() {
+    if (_currentIndex > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _nextImage() {
+    if (_currentIndex < widget.images.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black.withOpacity(0.01),
+      child: GestureDetector(
+        // Make the entire background clickable to close the dialog
+        onTap: () => Navigator.of(context).pop(),
+        child: Container(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              // Image Viewer
+              Center(
+                child: GestureDetector(
+                  // Prevent closing when tapping on the image itself
+                  onTap: _toggleControls,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                    },
+                    itemCount: widget.images.length,
+                    itemBuilder: (context, index) {
+                      return InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 4.0,
+                        child: Center(
+                          child: Image.network(
+                            widget.images[index],
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                          : null,
+                                      color: const Color(0xFF7C3AED),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Loading image...',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: Colors.white,
+                                      size: 64,
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'Failed to load image',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // Controls Overlay
+              if (_showControls) ...[
+                // Top Bar
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: SafeArea(
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              '${_currentIndex + 1} / ${widget.images.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (widget.onDelete != null)
+                            IconButton(
+                              onPressed: () {
+                                _showDeleteConfirmation();
+                              },
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 28,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Navigation Arrows
+                if (widget.images.length > 1) ...[
+                  // Left Arrow
+                  if (_currentIndex > 0)
+                    Positioned(
+                      left: 16,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            onPressed: _previousImage,
+                            icon: const Icon(
+                              Icons.chevron_left,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Right Arrow
+                  if (_currentIndex < widget.images.length - 1)
+                    Positioned(
+                      right: 16,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            onPressed: _nextImage,
+                            icon: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text(
+            'Delete Image',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Are you sure you want to delete this image? This action cannot be undone.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onDelete?.call(_currentIndex);
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
