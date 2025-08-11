@@ -55,46 +55,87 @@ class _ProductViewState extends State<ProductView> {
             .where('stockQuantity', isGreaterThan: 0)
             .snapshots();
       }
-
     }
   }
 
   Future<List<Product>> _fetchRankedRecommendedProducts(String userId) async {
-    final recommendationDocs = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('recommendations')
-        .orderBy('rank')
-        .limit(20)
-        .get();
+    try {
+      // First, try to get personalized recommendations (remove the limit to get all recommendations)
+      final recommendationDocs = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('recommendations')
+          .orderBy('rank')
+      // Removed .limit(20) to get all available recommendations
+          .get();
 
-    final rankedProductIds = recommendationDocs.docs
-        .map((doc) => doc.data()['productId'] as String?)
-        .where((id) => id != null && id!.isNotEmpty)
-        .map((id) => id!)
-        .toList();
+      final rankedProductIds = recommendationDocs.docs
+          .map((doc) => doc.data()['productId'] as String?)
+          .where((id) => id != null && id!.isNotEmpty)
+          .map((id) => id!)
+          .toList();
 
-    if (rankedProductIds.isEmpty) return [];
+      List<Product> recommendedProducts = [];
 
-    final productDocs = await FirebaseFirestore.instance
-        .collection('products')
-        .where(FieldPath.documentId, whereIn: rankedProductIds)
-        .get();
+      if (rankedProductIds.isNotEmpty) {
+        // Fetch products in batches (Firestore 'whereIn' has a limit of 10 items)
+        for (int i = 0; i < rankedProductIds.length; i += 10) {
+          final batch = rankedProductIds.skip(i).take(10).toList();
 
-    final productMap = {
-      for (var doc in productDocs.docs)
-        doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id)
+          final productDocs = await FirebaseFirestore.instance
+              .collection('products')
+              .where(FieldPath.documentId, whereIn: batch)
+              .get();
 
-    };
-    final filteredMap = Map.fromEntries(productMap.entries.where((entry) {
-      final p = entry.value;
-      return (p.status != 'sold' && p.status != 'inactive' && p.stockQuantity > 0);
-    }));
+          final productMap = {
+            for (var doc in productDocs.docs)
+              doc.id: Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id)
+          };
 
-    return rankedProductIds
-        .where((id) => filteredMap.containsKey(id))
-        .map((id) => filteredMap[id]!)
-        .toList();
+          // Filter out sold/inactive products and maintain order
+          final batchProducts = batch
+              .where((id) => productMap.containsKey(id))
+              .map((id) => productMap[id]!)
+              .where((p) => p.status != 'sold' && p.status != 'inactive' && p.stockQuantity > 0)
+              .toList();
+
+          recommendedProducts.addAll(batchProducts);
+        }
+      }
+
+      // If no personalized recommendations found, fallback to products ordered by viewCount
+      if (recommendedProducts.isEmpty) {
+        print('No personalized recommendations found, falling back to viewCount ranking');
+
+        final fallbackDocs = await FirebaseFirestore.instance
+            .collection('products')
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
+            .orderBy('viewCount', descending: true) // Order by viewCount in descending order
+            .get(); // No limit to get all available products
+
+        recommendedProducts = fallbackDocs.docs
+            .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
+            .toList();
+      }
+
+      return recommendedProducts;
+
+    } catch (e) {
+      print('Error fetching recommendations: $e');
+
+      // If there's any error, fallback to viewCount ranking
+      final fallbackDocs = await FirebaseFirestore.instance
+          .collection('products')
+          .where('productStatus', whereNotIn: ['sold', 'inactive'])
+          .where('stockQuantity', isGreaterThan: 0)
+          .orderBy('viewCount', descending: true)
+          .get();
+
+      return fallbackDocs.docs
+          .map((doc) => Product.fromDocument(doc.data() as Map<String, dynamic>, doc.id))
+          .toList();
+    }
   }
 
   @override
@@ -106,7 +147,6 @@ class _ProductViewState extends State<ProductView> {
         elevation: 0,
         leading: const CustomBackButton(),
         surfaceTintColor: Colors.transparent,
-
       ),
       body: Padding(
         padding: const EdgeInsets.only(
@@ -187,7 +227,7 @@ class _ProductViewState extends State<ProductView> {
                   if (products.isEmpty) {
                     return const Center(
                       child: Text(
-                        'No recommended products found',
+                        'No products found',
                         style: TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     );
