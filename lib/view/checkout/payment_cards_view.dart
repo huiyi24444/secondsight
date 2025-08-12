@@ -8,8 +8,14 @@ import '../widgets/format_card.dart'; // Adjust path if needed
 class PaymentCardSheet extends StatefulWidget {
   final Function(PaymentCard) onPaymentCardSelected;
   final String userId;
+  final String? currentlySelectedCardId; // Add this parameter
 
-  const PaymentCardSheet({super.key, required this.onPaymentCardSelected, required this.userId});
+  const PaymentCardSheet({
+    super.key,
+    required this.onPaymentCardSelected,
+    required this.userId,
+    this.currentlySelectedCardId, // Add this parameter
+  });
 
   @override
   State<PaymentCardSheet> createState() => _PaymentCardSheetState();
@@ -23,6 +29,7 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
   @override
   void initState() {
     super.initState();
+    print('PaymentCardSheet opened with currentlySelectedCardId: ${widget.currentlySelectedCardId}');
     _fetchPaymentCards();
   }
 
@@ -41,10 +48,26 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
 
       setState(() {
         paymentCards = fetched;
-        final defaultCard = fetched.where((card) => card.isDefault).toList();
-        selectedCardId = defaultCard.isNotEmpty
-            ? defaultCard.first.id
-            : (fetched.isNotEmpty ? fetched.first.id : null);
+
+        // Priority order: current selection -> default -> first available
+        String? cardToSelect;
+
+        // 1. Try to use the currently selected card if it exists in the list
+        if (widget.currentlySelectedCardId != null &&
+            fetched.any((card) => card.id == widget.currentlySelectedCardId)) {
+          cardToSelect = widget.currentlySelectedCardId;
+        }
+        // 2. If no current selection or it doesn't exist, try default
+        else {
+          final defaultCard = fetched.where((card) => card.isDefault).firstOrNull;
+          cardToSelect = defaultCard?.id;
+        }
+        // 3. If no default, use first available
+        if (cardToSelect == null && fetched.isNotEmpty) {
+          cardToSelect = fetched.first.id;
+        }
+
+        selectedCardId = cardToSelect;
         isLoading = false;
       });
     } catch (e) {
@@ -96,8 +119,8 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
                     setState(() {
                       selectedCardId = card.id;
                     });
-                    widget.onPaymentCardSelected(card); // Pass the whole card
-                    Navigator.pop(context);
+                    widget.onPaymentCardSelected(card);
+                    // Don't close the sheet - let user see the selection change
                   },
                 );
               },
@@ -105,44 +128,40 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddCardView(userId: widget.userId),
-                  ),
-                );
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddCardView(userId: widget.userId),
+                    ),
+                  );
 
-                if (mounted) {
-                  setState(() async {
+                  if (mounted) {
                     await _fetchPaymentCards();
-                  });
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8E6CEF),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: const BorderSide(color: Color(0xFF8E6CEF)),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.add, size: 20),
-              label: const Text(
-                'Add Card',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                icon: const Icon(Icons.add, size: 20, color: Color(0xFF8E6CEF)),
+                label: const Text(
+                  'Add New Card',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8E6CEF),
+                  ),
                 ),
               ),
             ),
           ),
-          SizedBox(height: 10)
         ],
       ),
     );
@@ -165,9 +184,14 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
         leading: _buildCardBrandBadge(card.brand),
         title: Row(
           children: [
-            Text(formatCardNumber(card.lastFour)),
-            const SizedBox(width: 12),
-            if (card.isDefault)
+            Flexible(
+              child: Text(
+                formatCardNumber(card.lastFour),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (card.isDefault) ...[
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -183,6 +207,7 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
         trailing: isSelected
@@ -192,7 +217,6 @@ class _PaymentCardSheetState extends State<PaymentCardSheet> {
       ),
     );
   }
-
 
   Widget _buildCardBrandBadge(String brand) {
     return Container(

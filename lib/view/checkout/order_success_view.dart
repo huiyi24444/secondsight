@@ -54,7 +54,7 @@ class OrderSuccessScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          'You will receive an email confirmation shortly.',
+                          'Thank you so much for your support.',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],

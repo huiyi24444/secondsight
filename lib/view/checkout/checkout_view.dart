@@ -278,6 +278,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       backgroundColor: Colors.transparent,
       builder: (context) => PaymentCardSheet(
         userId: userId,
+        currentlySelectedCardId: selectedPaymentCard?.id, // Pass the current selection
         onPaymentCardSelected: (PaymentCard card) {
           setState(() {
             selectedPaymentCard = card;

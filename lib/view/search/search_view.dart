@@ -400,188 +400,211 @@ class _SearchViewState extends State<SearchView> {
           backgroundColor: Colors.white,
           leading: const CustomBackButton()
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomSearchBar(
-              controller: _searchController,
-              focusNode: _focusNode,
-              readOnly: false,
-              onSearchSubmitted: _submitSearch,
+            // Search bar with padding
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CustomSearchBar(
+                controller: _searchController,
+                focusNode: _focusNode,
+                readOnly: false,
+                onSearchSubmitted: _submitSearch,
+              ),
             ),
 
-            // Show dynamic suggestions when typing
-            if (_showSuggestions && _searchController.text.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: _isSearching
-                    ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text('Finding suggestions...'),
-                    ],
-                  ),
-                )
-                    : _searchSuggestions.isEmpty
-                    ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'No suggestions found',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-                    : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    ...(_searchSuggestions.map((term) {
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(
-                          Icons.search,
-                          size: 20,
-                          color: Colors.grey,
-                        ),
-                        title: RichText(
-                          text: TextSpan(
-                            style: const TextStyle(color: Colors.black),
-                            children: _highlightSearchTerm(term, _searchController.text),
-                          ),
-                        ),
-                        trailing: const Icon(
-                          Icons.north_west,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
-                        onTap: () => _selectSuggestion(term),
-                      );
-                    }).toList()),
-                  ],
-                ),
-              ),
-            ]
-
-            // Show recent searches and popular categories when not typing
-            else ...[
-              const SizedBox(height: 20),
-
-              // Popular categories section
-              const Text(
-                'Popular Categories',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _popularCategories.map((category) {
-                  return GestureDetector(
-                    onTap: () => _selectSuggestion(category),
-                    child: Chip(
-                      avatar: const Icon(Icons.trending_up, size: 16),
-                      label: Text(category),
-                      backgroundColor: Colors.deepPurple.shade50,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                'Recent Searches',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 10),
-
-              Expanded(
-                child: _recentSearches.isEmpty
-                    ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search, size: 48, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'No recent searches',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Try searching for clothing items above',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                )
-                    : SingleChildScrollView(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _recentSearches.map((term) {
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _searchController.text = term;
-                          });
-                          _submitSearch(term);
-                        },
-                        child: Chip(
-                          avatar: const Icon(Icons.history, size: 16, color: Colors.white),
-                          label: Text(
-                            term,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          deleteIcon: const Icon(Icons.close, color: Colors.white, size: 16),
-                          onDeleted: () {
-                            setState(() {
-                              _recentSearches.remove(term);
-                            });
-                            SharedPreferences.getInstance().then((prefs) {
-                              prefs.setStringList('recentSearches', _recentSearches);
-                            });
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ],
+            // Main content area
+            Expanded(
+              child: _showSuggestions && _searchController.text.isNotEmpty
+                  ? _buildSuggestionsView()
+                  : _buildDefaultView(),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSuggestionsView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: _isSearching
+                  ? const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Finding suggestions...'),
+                  ],
+                ),
+              )
+                  : _searchSuggestions.isEmpty
+                  ? const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'No suggestions found',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+                  : ListView.builder(
+                shrinkWrap: true,
+                physics: const ClampingScrollPhysics(),
+                itemCount: _searchSuggestions.length,
+                itemBuilder: (context, index) {
+                  final term = _searchSuggestions[index];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.search,
+                      size: 20,
+                      color: Colors.grey,
+                    ),
+                    title: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(color: Colors.black),
+                        children: _highlightSearchTerm(term, _searchController.text),
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.north_west,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                    onTap: () => _selectSuggestion(term),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDefaultView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Popular categories section
+          const Text(
+            'Popular Categories',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _popularCategories.map((category) {
+              return GestureDetector(
+                onTap: () => _selectSuggestion(category),
+                child: Chip(
+                  avatar: const Icon(Icons.trending_up, size: 16),
+                  label: Text(category),
+                  backgroundColor: Colors.deepPurple.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            'Recent Searches',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+
+          _recentSearches.isEmpty
+              ? Container(
+            height: 200,
+            alignment: Alignment.center,
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.search, size: 48, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No recent searches',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Try searching for clothing items above',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+          )
+              : Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _recentSearches.map((term) {
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _searchController.text = term;
+                  });
+                  _submitSearch(term);
+                },
+                child: Chip(
+                  avatar: const Icon(Icons.history, size: 16, color: Colors.white),
+                  label: Text(
+                    term,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  deleteIcon: const Icon(Icons.close, color: Colors.white, size: 16),
+                  onDeleted: () {
+                    setState(() {
+                      _recentSearches.remove(term);
+                    });
+                    SharedPreferences.getInstance().then((prefs) {
+                      prefs.setStringList('recentSearches', _recentSearches);
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
