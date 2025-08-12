@@ -66,6 +66,7 @@ class _ProfileViewState extends State<ProfileView> {
       return Scaffold(
         backgroundColor: const Color(0xFFFAFAFA),
         appBar: AppBar(
+          leading: CustomBackButton(),
           title: const Text(
             "Settings",
             style: TextStyle(

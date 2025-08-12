@@ -71,5 +71,20 @@ class CartController {
     }
   }
 
+  Future<void> clearCart(String userId) async {
+    try {
+      final cartRef = _db.collection('users').doc(userId).collection('cart');
+      final snapshot = await cartRef.get();
+
+      // Delete all documents in the cart collection
+      for (final doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
+    } catch (e) {
+      print('Error clearing cart: $e');
+      rethrow;
+    }
+  }
+
 
 }

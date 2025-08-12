@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
@@ -196,11 +198,14 @@ class _CartViewState extends State<CartView> {
                                               BlendMode.multiply,
                                             ),
                                             child: item.product.images.isNotEmpty
-                                                ? Image.network(
-                                              item.product.images.first,
-                                              width: 80,
-                                              height: 80,
-                                              fit: BoxFit.cover,
+                                                ? Transform.rotate(
+                                              angle: math.pi, // 180 degrees rotation
+                                              child: Image.network(
+                                                item.product.images.first,
+                                                width: 80,
+                                                height: 80,
+                                                fit: BoxFit.cover,
+                                              ),
                                             )
                                                 : Container(
                                               width: 80,

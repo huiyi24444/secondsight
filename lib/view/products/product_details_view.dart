@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:secondsight/view/products/product_view.dart';
 import 'package:secondsight/view/products/similiar_section.dart';
+import 'package:secondsight/view/widgets/dateTime_utils.dart';
 import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../model/category_model.dart';
 import '../../model/product_measurements_model.dart';
@@ -22,6 +23,7 @@ import '../widgets/string_extensions.dart';
 class ProductDetailsView extends StatefulWidget {
   final String productId;
 
+
   const ProductDetailsView({super.key, required this.productId});
 
   @override
@@ -33,6 +35,7 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
   int _currentImageIndex = 0;
   Category? _category;
   bool _isValid(num? value) => value != null && value != 0;
+
 
 
 
@@ -94,6 +97,9 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
 
 
         print('Measurements in Product model: ${product.measurements}');
+        final createdAt = product.createdAt is Timestamp
+            ? (product.createdAt as Timestamp).toDate()
+            : product.createdAt as DateTime?;
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -434,6 +440,30 @@ class _ProductDetailsViewState extends State<ProductDetailsView> {
                                       const SizedBox(height: 8),
                                       Text(
                                         product.description,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 24),
+
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Upload Date',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        DateFormatter.formatDateTime(createdAt),
                                         style: const TextStyle(
                                           fontSize: 14,
                                           color: Colors.black87,

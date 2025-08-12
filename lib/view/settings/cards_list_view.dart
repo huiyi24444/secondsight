@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../controller/settings/cards_list_controller.dart';
 import '../../model/payment_cards_model.dart';
-import '../../services/stripe_service.dart';
-import '../widgets/format_card.dart'; // Import your StripeService
+import '../widgets/format_card.dart';
 
 class CardListView extends StatefulWidget {
   final String userId;
@@ -26,43 +25,22 @@ class _CardListViewState extends State<CardListView> {
     controller = CardListController(userId: widget.userId);
   }
 
-  // Add payment method using Stripe Setup Intent
+  // Add payment method using controller
   Future<void> _addPaymentMethod() async {
     setState(() {
       isAddingCard = true;
     });
 
     try {
-      // Get or create Stripe customer
-      final customerId = await _getOrCreateStripeCustomer();
+      final result = await controller.addPaymentMethod();
 
-      // Use StripeService to save payment method
-      final result = await StripeService.savePaymentMethod(
-        userId: widget.userId,
-        customerId: customerId,
-      );
-
-      if (result.success && result.paymentMethodDetails != null) {
-        // Save payment method reference to Firestore
-        await _savePaymentMethodToFirestore(result.paymentMethodDetails!);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Payment method added successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted && result.message.toLowerCase() != 'setup cancelled') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.message),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: result['success'] ? Colors.green : Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -82,84 +60,75 @@ class _CardListViewState extends State<CardListView> {
     }
   }
 
-  // Get or create Stripe customer
-  Future<String> _getOrCreateStripeCustomer() async {
+  // Set card as default using controller
+  Future<void> _setCardAsDefault(PaymentCard card) async {
     try {
-      // Check if user already has a Stripe customer ID
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .get();
+      await controller.setCardAsDefault(card.id);
 
-      if (userDoc.exists && userDoc.data()?['stripeCustomerId'] != null) {
-        return userDoc.data()!['stripeCustomerId'];
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Default card updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-
-      // Create new Stripe customer using StripeService
-      final customerId = await StripeService.createCustomer(
-        userId: widget.userId,
-        email: userDoc.data()?['email'] ?? '',
-        name: userDoc.data()?['name'] ?? '',
-      );
-
-      // Save customer ID to Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .update({'stripeCustomerId': customerId});
-
-      return customerId;
     } catch (e) {
-      throw Exception('Error with Stripe customer: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating default card: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  // Save payment method reference to Firestore
-  Future<void> _savePaymentMethodToFirestore(Map<String, dynamic> paymentMethodData) async {
+  // Delete card using controller
+  Future<void> _deleteCard(PaymentCard card) async {
     try {
-      // Check if this should be the first/default card
-      final existingCards = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('paymentCards')
-          .get();
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Card'),
+          content: const Text('Are you sure you want to delete this payment card?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
 
-      final isFirstCard = existingCards.docs.isEmpty;
+      if (confirmed == true) {
+        await controller.deleteCardById(card.id, card.stripePaymentMethodId);
 
-      if (isFirstCard) {
-        // If this is the first card, make it default
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .collection('paymentCards')
-            .add({
-          'stripePaymentMethodId': paymentMethodData['id'],
-          'lastFour': paymentMethodData['card']['last4'],
-          'brand': paymentMethodData['card']['brand'],
-          'expMonth': paymentMethodData['card']['exp_month'],
-          'expYear': paymentMethodData['card']['exp_year'],
-          'isDefault': true,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Just add the payment method as non-default
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .collection('paymentCards')
-            .add({
-          'stripePaymentMethodId': paymentMethodData['id'],
-          'lastFour': paymentMethodData['card']['last4'],
-          'brand': paymentMethodData['card']['brand'],
-          'expMonth': paymentMethodData['card']['exp_month'],
-          'expYear': paymentMethodData['card']['exp_year'],
-          'isDefault': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Card deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error saving payment method to Firestore: $e');
-      rethrow;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting card: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -246,10 +215,6 @@ class _CardListViewState extends State<CardListView> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
-
-                  const SizedBox(height: 16),
-
                   ElevatedButton.icon(
                     onPressed: isAddingCard ? null : _addPaymentMethod,
                     style: ElevatedButton.styleFrom(
@@ -282,9 +247,6 @@ class _CardListViewState extends State<CardListView> {
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
                 ],
               ),
             );
@@ -337,23 +299,26 @@ class _CardListViewState extends State<CardListView> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 8),
+                                      // Fixed the overflow issue by using Flexible and proper wrapping
                                       Row(
                                         children: [
-                                          Text(
-                                            formatCardNumber(card.lastFour),
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                              letterSpacing: 0.5,
-                                              fontFamily: 'monospace',
+                                          Flexible(
+                                            child: Text(
+                                              formatCardNumber(card.lastFour),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[700],
+                                                letterSpacing: 0.5,
+                                                fontFamily: 'monospace',
+                                              ),
                                             ),
                                           ),
                                           if (card.isDefault) ...[
-                                            const SizedBox(width: 18),
+                                            const SizedBox(width: 8),
                                             Container(
                                               padding: const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 4,
+                                                horizontal: 8,
+                                                vertical: 3,
                                               ),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFF8E6CEF),
@@ -363,7 +328,7 @@ class _CardListViewState extends State<CardListView> {
                                                 'Default',
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 11,
+                                                  fontSize: 10,
                                                   fontWeight: FontWeight.w600,
                                                   letterSpacing: -0.2,
                                                 ),
@@ -385,10 +350,32 @@ class _CardListViewState extends State<CardListView> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   elevation: 2,
-                                  onSelected: (value) {
-                                    // Handle menu actions
+                                  onSelected: (value) async {
+                                    if (value == 'delete') {
+                                      await _deleteCard(card);
+                                    } else if (value == 'setDefault') {
+                                      await _setCardAsDefault(card);
+                                    }
                                   },
                                   itemBuilder: (context) => [
+                                    if (!card.isDefault)
+                                      const PopupMenuItem(
+                                        value: 'setDefault',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.star_outline,
+                                              size: 18,
+                                              color: Color(0xFF8E6CEF),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Set as Default',
+                                              style: TextStyle(color: Color(0xFF8E6CEF)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     if (!card.isDefault)
                                       const PopupMenuItem(
                                         value: 'delete',
@@ -409,7 +396,6 @@ class _CardListViewState extends State<CardListView> {
                                       ),
                                   ],
                                 ),
-
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -532,7 +518,7 @@ class _CardListViewState extends State<CardListView> {
       child: Icon(
         iconData,
         color: iconColor,
-        size: 20,
+        size: 15,
       ),
     );
   }
