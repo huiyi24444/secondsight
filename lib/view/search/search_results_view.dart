@@ -59,17 +59,39 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         return;
       }
 
+      // First determine which index to use based on sort option
+      String indexName = 'products';
+      switch (sortOption) {
+        case 'newest':
+          indexName = 'products_newest';
+          break;
+        case 'low_to_high':
+          indexName = 'products_price_asc';
+          break;
+        case 'high_to_low':
+          indexName = 'products_price_desc';
+          break;
+      }
+
       AlgoliaQuery query = AlgoliaService.algolia
-          .index('products')
+          .index(indexName)
           .query(widget.keyword);
 
+      // Build filters array
       List<String> filters = [];
 
-      filters.add('NOT productStatus:sold AND NOT productStatus:inactive');
+      // Status filter (always applied)
+      filters.add('(NOT productStatus:sold) AND (NOT productStatus:inactive)');
 
+      // Price filters
+      if (minPrice != null && minPrice! > 0) {
+        filters.add('productPrice >= $minPrice');
+      }
+      if (maxPrice != null && maxPrice! > 0) {
+        filters.add('productPrice <= $maxPrice');
+      }
 
-      if (minPrice != null) filters.add('productPrice >= $minPrice');
-      if (maxPrice != null) filters.add('productPrice <= $maxPrice');
+      // Size filter with proper formatting
       if (selectedSizes.isNotEmpty) {
         final sizeFilter = selectedSizes
             .map((size) => 'productSize:"$size"')
@@ -77,35 +99,20 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         filters.add('($sizeFilter)');
       }
 
+      // Apply all filters if any exist
       if (filters.isNotEmpty) {
-        query = query.setFilters(filters.join(' AND '));
+        final filterString = filters.join(' AND ');
+        print('DEBUG: Applying filters: $filterString'); // Debug log
+        query = query.setFilters(filterString);
       }
 
-      // Sorting via replica index
-      switch (sortOption) {
-        case 'newest':
-          query = AlgoliaService.algolia
-              .index('products_newest')
-              .query(widget.keyword);
-          break;
-        case 'low_to_high':
-          query = AlgoliaService.algolia
-              .index('products_price_asc')
-              .query(widget.keyword);
-          break;
-        case 'high_to_low':
-          query = AlgoliaService.algolia
-              .index('products_price_desc')
-              .query(widget.keyword);
-          break;
-      }
-
-      // Re-apply filters for sorted queries
-      if (filters.isNotEmpty && sortOption != 'recommended') {
-        query = query.setFilters(filters.join(' AND '));
-      }
+      // Set reasonable hits per page
+      query = query.setHitsPerPage(50);
 
       final AlgoliaQuerySnapshot snap = await query.getObjects();
+
+      print('DEBUG: Query returned ${snap.hits.length} results'); // Debug log
+
       final results = snap.hits
           .map((hit) => Product.fromAlgolia(hit.data, hit.objectID))
           .toList();
@@ -116,12 +123,41 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       });
 
     } catch (e) {
+      print('DEBUG: Search error: $e'); // Debug log
       setState(() {
         _isLoading = false;
         _errorMessage = 'Unable to search at the moment. Please try again.';
         _results.clear();
       });
     }
+  }
+
+  // Clear all filters
+  void _clearAllFilters() {
+    setState(() {
+      minPrice = null;
+      maxPrice = null;
+      selectedSizes.clear();
+      sortOption = 'recommended';
+    });
+    _performSearch();
+  }
+
+  // Check if any filters are applied
+  bool get hasActiveFilters {
+    return minPrice != null ||
+        maxPrice != null ||
+        selectedSizes.isNotEmpty ||
+        sortOption != 'recommended';
+  }
+
+  // Get count of active filters
+  int get activeFilterCount {
+    int count = 0;
+    if (minPrice != null || maxPrice != null) count++;
+    if (selectedSizes.isNotEmpty) count++;
+    if (sortOption != 'recommended') count++;
+    return count;
   }
 
   // Move _navigateToSearchView() method HERE - before build method
@@ -190,13 +226,26 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      setState(() {}); // Update main UI too
-                      _performSearch();
-                    },
-                    child: const Text('Apply'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            selectedSizes.clear();
+                          });
+                        },
+                        child: const Text('Clear'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {}); // Update main UI too
+                          _performSearch();
+                        },
+                        child: const Text('Apply'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -275,12 +324,28 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                 },
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _performSearch();
-                },
-                child: const Text('Apply'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        minPrice = null;
+                        maxPrice = null;
+                      });
+                      Navigator.pop(context);
+                      _performSearch();
+                    },
+                    child: const Text('Clear'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _performSearch();
+                    },
+                    child: const Text('Apply'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -315,41 +380,155 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     );
   }
 
-  Widget _buildPriceInputBox({
-    required TextEditingController controller,
-    required String hint,
+  Widget _buildChip({
+    required String label,
+    VoidCallback? onTap,
+    bool isActive = false,
+    VoidCallback? onDelete,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F4F4),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 25),
-      child: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: hint,
-          hintStyle: TextStyle(color: Color(0xFF737373)),
-          filled: true,
-          fillColor: Color(0xFFF4F4F4),
+    return GestureDetector(
+      onTap: onTap,
+      child: Chip(
+        label: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.black87,
+          ),
         ),
-        style: const TextStyle(fontSize: 16),
+        backgroundColor: isActive
+            ? Colors.deepPurple
+            : Colors.deepPurple.shade100,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        deleteIcon: isActive && onDelete != null
+            ? const Icon(Icons.close, size: 18, color: Colors.white)
+            : null,
+        onDeleted: onDelete,
       ),
     );
   }
 
-  Widget _buildChip({required String label, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Chip(
-        label: Text(label),
-        backgroundColor: Colors.deepPurple.shade100,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      ),
-    );
+  // Build active filters display
+  Widget _buildActiveFilters() {
+    List<Widget> filterChips = [];
+
+    // Price filter
+    if (minPrice != null || maxPrice != null) {
+      String priceLabel = '';
+      if (minPrice != null && maxPrice != null) {
+        priceLabel = '\RM${minPrice!.toInt()}-\RM${maxPrice!.toInt()}';
+      } else if (minPrice != null) {
+        priceLabel = 'From \$${minPrice!.toInt()}';
+      } else if (maxPrice != null) {
+        priceLabel = 'Up to \$${maxPrice!.toInt()}';
+      }
+
+      filterChips.add(
+        _buildChip(
+          label: priceLabel,
+          isActive: true,
+          onTap: _openPriceSheet,
+          onDelete: () {
+            setState(() {
+              minPrice = null;
+              maxPrice = null;
+            });
+            _performSearch();
+          },
+        ),
+      );
+    }
+
+    // Size filter
+    if (selectedSizes.isNotEmpty) {
+      filterChips.add(
+        _buildChip(
+          label: 'Size: ${selectedSizes.join(", ")}',
+          isActive: true,
+          onTap: _openSizeSheet,
+          onDelete: () {
+            setState(() {
+              selectedSizes.clear();
+            });
+            _performSearch();
+          },
+        ),
+      );
+    }
+
+    // Sort filter
+    if (sortOption != 'recommended') {
+      String sortLabel = '';
+      switch (sortOption) {
+        case 'newest':
+          sortLabel = 'Newest';
+          break;
+        case 'low_to_high':
+          sortLabel = 'Price: Low to High';
+          break;
+        case 'high_to_low':
+          sortLabel = 'Price: High to Low';
+          break;
+      }
+
+      filterChips.add(
+        _buildChip(
+          label: sortLabel,
+          isActive: true,
+          onTap: _openSortSheet,
+          onDelete: () {
+            setState(() {
+              sortOption = 'recommended';
+            });
+            _performSearch();
+          },
+        ),
+      );
+    }
+
+    if (filterChips.isNotEmpty) {
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        ...filterChips.map((chip) =>
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: chip,
+                            ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (activeFilterCount > 1)
+                  TextButton(
+                    onPressed: _clearAllFilters,
+                    child: const Text(
+                      'Clear All',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   @override
@@ -383,22 +562,47 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       body: Column(
         children: [
           // Filter chips
-          Padding(
+          Container(
             padding: const EdgeInsets.all(4),
-            child: Wrap(
-              spacing: 8,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 0,
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
               children: [
-                _buildChip(label: 'Price', onTap: _openPriceSheet),
-                _buildChip(label: 'Sort by', onTap: _openSortSheet),
-                _buildChip(
-                  label: selectedSizes.isNotEmpty
-                      ? 'Size: ${selectedSizes.join(", ")}'
-                      : 'Size',
-                  onTap: _openSizeSheet,
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _buildChip(
+                      label: 'Price',
+                      onTap: _openPriceSheet,
+                      isActive: minPrice != null || maxPrice != null,
+                    ),
+                    _buildChip(
+                      label: 'Sort by',
+                      onTap: _openSortSheet,
+                      isActive: sortOption != 'recommended',
+                    ),
+                    _buildChip(
+                      label: 'Size',
+                      onTap: _openSizeSheet,
+                      isActive: selectedSizes.isNotEmpty,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+
+          // Active filters display
+          _buildActiveFilters(),
 
           // Results area
           Expanded(
@@ -494,6 +698,23 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  if (hasActiveFilters)
+                    Column(
+                      children: [
+                        Text(
+                          'Try adjusting your filters',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _clearAllFilters,
+                          child: const Text('Clear all filters'),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             )
