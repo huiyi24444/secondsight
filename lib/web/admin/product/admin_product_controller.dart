@@ -5,7 +5,6 @@ import '../../../model/product_model.dart';
 
 class ProductManagementController {
 
-
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   final TextEditingController searchController = TextEditingController();
 
@@ -21,7 +20,9 @@ class ProductManagementController {
 
   int get totalPages => (filteredProducts.length / itemsPerPage).ceil();
   int get startIndex => (currentPage - 1) * itemsPerPage;
-  int get endIndex => startIndex + itemsPerPage;
+  int get endIndex => (startIndex + itemsPerPage) > filteredProducts.length
+      ? filteredProducts.length
+      : startIndex + itemsPerPage;
 
   List<QueryDocumentSnapshot> categories = [];
   Map<String, String> categoryNames = {};
@@ -46,11 +47,12 @@ class ProductManagementController {
         }
       }).whereType<Product>().toList();
 
+      // Initialize filteredProducts with all products
+      filteredProducts = List.from(allProducts);
+      currentPage = 1;
 
-      filterProducts(() {
-        isLoading = false;
-        onUpdate();
-      });
+      isLoading = false;
+      onUpdate();
     } catch (e) {
       print('❌ Error fetching products from Firestore: $e');
       isLoading = false;
@@ -58,20 +60,8 @@ class ProductManagementController {
     }
   }
 
-
-
   void filterProducts(VoidCallback onUpdate) {
-    filteredProducts = allProducts.where((product) {
-      final matchesStatus = selectedStatus.toLowerCase() == 'all products' ||
-          product.status.toLowerCase() == selectedStatus.toLowerCase();
-
-      final matchesQuery = searchQuery.isEmpty ||
-          product.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          product.id.toLowerCase().contains(searchQuery.toLowerCase());
-
-      return matchesStatus && matchesQuery;
-    }).toList();
-
+    // Reset to first page when filtering
     currentPage = 1;
     onUpdate();
   }
@@ -94,7 +84,7 @@ class ProductManagementController {
     }
   }
 
-// Update the deleteProduct method
+  // Update the deleteProduct method
   Future<void> deleteProduct(String productId, VoidCallback onUpdate, {required BuildContext context}) async {
     try {
       // First check if product is in any orders
@@ -141,8 +131,16 @@ class ProductManagementController {
   }
 
   List<Product> get paginatedProducts {
+    if (filteredProducts.isEmpty) return [];
+
     final startIndex = (currentPage - 1) * itemsPerPage;
     final endIndex = startIndex + itemsPerPage;
+
+    // Ensure we don't go beyond the list bounds
+    if (startIndex >= filteredProducts.length) {
+      return [];
+    }
+
     return filteredProducts.sublist(
       startIndex,
       endIndex > filteredProducts.length ? filteredProducts.length : endIndex,
@@ -197,6 +195,4 @@ class ProductManagementController {
       };
     }).toList();
   }
-
-
 }

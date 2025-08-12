@@ -99,9 +99,16 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         break;
     }
 
-    // Update the controller's filtered products and reset to page 1
+    // Update filtered products and reset pagination
     controller.filteredProducts = filtered;
     controller.currentPage = 1;
+
+    // Ensure we're on a valid page
+    if (controller.totalPages > 0 && controller.currentPage > controller.totalPages) {
+      controller.currentPage = controller.totalPages;
+    }
+
+    setState(() {});
   }
 
   @override
@@ -159,7 +166,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                       onChanged: (query) {
                                         controller.searchQuery = query;
                                         _applyAdvancedFilters();
-                                        setState(() {});
                                       },
                                     ),
                                   ),
@@ -211,15 +217,38 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'Advanced Filters',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Color(0xFF7C3AED),
-                                        ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Advanced Filters',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: Color(0xFF7C3AED),
+                                            ),
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () {
+                                              setState(() {
+                                                selectedSortOption = 'newest';
+                                                selectedCategory = 'All Categories';
+                                                selectedCondition = 'All Conditions';
+                                                controller.selectedStatus = 'All Products';
+                                                controller.searchQuery = '';
+                                                _searchController.clear();
+                                              });
+                                              _applyAdvancedFilters();
+                                            },
+                                            icon: Icon(Icons.clear, size: 16),
+                                            label: Text('Clear All Filters'),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      SizedBox(height: 12),
+                                      SizedBox(height: 2),
                                       Row(
                                         children: [
                                           // Sort by dropdown
@@ -348,32 +377,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                           ),
                                         ],
                                       ),
-                                      SizedBox(height: 10),
 
-                                      // Clear filters button
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: [
-                                          TextButton.icon(
-                                            onPressed: () {
-                                              setState(() {
-                                                selectedSortOption = 'newest';
-                                                selectedCategory = 'All Categories';
-                                                selectedCondition = 'All Conditions';
-                                                controller.selectedStatus = 'All Products';
-                                                controller.searchQuery = '';
-                                                _searchController.clear();
-                                              });
-                                              _applyAdvancedFilters();
-                                            },
-                                            icon: Icon(Icons.clear, size: 16),
-                                            label: Text('Clear All Filters'),
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      // Clear filters butto
                                     ],
                                   ),
                                 ),
@@ -383,7 +388,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         ),
                         // Filter tabs
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          padding: EdgeInsets.only(top: 1, left: 20, right: 20),
                           child: Row(
                             children: [
                               _buildFilterTab(
@@ -392,7 +397,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     () {
                                   controller.selectedStatus = 'All Products';
                                   _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
-                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -402,7 +406,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     () {
                                   controller.selectedStatus = 'Available';
                                   _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
-                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -412,7 +415,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     () {
                                   controller.selectedStatus = 'Sold';
                                   _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
-                                  setState(() {});
                                 },
                               ),
                               SizedBox(width: 20),
@@ -422,7 +424,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                     () {
                                   controller.selectedStatus = 'Inactive';
                                   _applyAdvancedFilters(); // CHANGED: Use _applyAdvancedFilters
-                                  setState(() {});
                                 },
                               ),
 
@@ -446,7 +447,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                             ],
                           ),
                         ),
-                        SizedBox(height: 20),
+                        //SizedBox(height: 20),
 
                         // Product table
                         Expanded(
