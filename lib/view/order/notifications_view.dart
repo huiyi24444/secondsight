@@ -46,6 +46,45 @@ class _NotificationsViewState extends State<NotificationsView> {
     }
   }
 
+  // Alternative implementation using Text.rich
+  Widget _buildMessageWithHighlightedOrderId(String message, bool isUnread) {
+    final RegExp orderIdRegex = RegExp(r'#[A-Za-z0-9]{6}');
+    final Match? match = orderIdRegex.firstMatch(message);
+
+    if (match != null) {
+      final String beforeOrderId = message.substring(0, match.start);
+      final String orderId = match.group(0)!;
+      final String afterOrderId = message.substring(match.end);
+
+      return Text.rich(
+        TextSpan(
+          style: TextStyle(
+            fontSize: 13,
+            color: isUnread ? Colors.black87 : Colors.grey[700],
+          ),
+          children: [
+            TextSpan(text: beforeOrderId),
+            TextSpan(
+              text: orderId,
+              style: const TextStyle(
+                color: Color(0xFF8E6CEF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextSpan(text: afterOrderId),
+          ],
+        ),
+      );
+    } else {
+      return Text(
+        message,
+        style: TextStyle(
+          fontSize: 13,
+          color: isUnread ? Colors.black87 : Colors.grey[700],
+        ),
+      );
+    }
+  }
   void _showClearAllDialog() {
     if (_controller == null) return;
 
@@ -283,25 +322,10 @@ class _NotificationsViewState extends State<NotificationsView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 4),
-                        Text(
+                        _buildMessageWithHighlightedOrderId(
                           notification.message,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isUnread ? Colors.black87 : Colors.grey[700],
-                          ),
+                          isUnread,
                         ),
-                        if (notification.orderId != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Order #${notification.shortOrderId}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: const Color(0xFF8E6CEF),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                     trailing: Column(

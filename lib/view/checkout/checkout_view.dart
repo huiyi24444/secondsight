@@ -5,6 +5,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:http/http.dart' as http;
 
 import '../../controller/checkout/cart_controller.dart';
+import '../../controller/order/notif_controller.dart';
 import '../../model/address_model.dart';
 import '../../model/cart_item_model.dart';
 import '../../model/order_model.dart';
@@ -363,6 +364,13 @@ class _CheckoutViewState extends State<CheckoutView> {
         });
       }
 
+      await NotificationController.createOrderConfirmationNotification(
+        userId: user.uid,
+        orderId: orderRef.id,
+        totalAmount: widget.total,
+        itemCount: widget.cartItems.length,
+      );
+
       final cartController = CartController();
       await cartController.clearCart(user.uid);
 
@@ -385,6 +393,7 @@ class _CheckoutViewState extends State<CheckoutView> {
       if (mounted) setState(() => _isProcessingPayment = false);
     }
   }
+
 
 
 }

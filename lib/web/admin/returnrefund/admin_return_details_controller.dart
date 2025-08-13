@@ -1,6 +1,7 @@
 // admin_return_details_controller.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/product_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../model/refund_model.dart';
@@ -200,35 +201,12 @@ class AdminReturnDetailsController extends ChangeNotifier {
     }
   }
 
-  /// Update return status WITH NOTIFICATIONS
-  Future<bool> updateReturnStatusWithNotification(String returnId, String newStatus) async {
-    try {
-      // First update the return status
-      final success = await updateReturnStatus(returnId, newStatus);
-
-      if (success) {
-        // Create notification for the customer
-        await _createReturnNotification(
-          returnId: returnId,
-          newStatus: newStatus,
-          userId: returnRequest.userID,
-          orderId: returnRequest.orderID,
-        );
-      }
-
-      return success;
-    } catch (e) {
-      debugPrint('Error updating return status with notification: $e');
-      return false;
-    }
-  }
-
   /// Create notification for return status update
-  Future<void> _createReturnNotification({
+  Future<void> createReturnNotification({
     required String returnId,
     required String newStatus,
     required String userId,
-    required String orderId,
+    required String productId,
   }) async {
     String title = '';
     String message = '';
@@ -236,35 +214,35 @@ class AdminReturnDetailsController extends ChangeNotifier {
     switch (newStatus.toLowerCase()) {
       case 'approved':
         title = 'Return Request Approved';
-        message = 'Your return request for order #${getShortOrderId()} has been approved. Please ship the items back using the provided instructions.';
+        message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been approved. Please ship the items back using the provided instructions.';
         break;
       case 'rejected':
         title = 'Return Request Rejected';
-        message = 'Your return request for order #${getShortOrderId()} has been rejected. Please contact support for more information.';
+        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been rejected. Please contact support for more information.';
         break;
       case 'pending_inspection':
         title = 'Items Received';
-        message = 'We have received your returned items from order #${getShortOrderId()}. Our team is now inspecting them.';
+        message = 'We have received your returned items from order #${ProductStatusUtils.shortProductId(productId)}. Our team is now inspecting them.';
         break;
       case 'completed_inspection':
         title = 'Inspection Completed';
-        message = 'Inspection completed for your return from order #${getShortOrderId()}. Processing your refund now.';
+        message = 'Inspection completed for your return from order #${ProductStatusUtils.shortProductId(productId)}. Processing your refund now.';
         break;
       case 'refunded':
         title = 'Refund Processed';
-        message = 'Your refund for order #${getShortOrderId()} has been processed. It should appear in your account within 3-5 business days.';
+        message = 'Your refund for order #${ProductStatusUtils.shortProductId(productId)} has been processed. It should appear in your account within 3-5 business days.';
         break;
       case 'completed':
         title = 'Return Completed';
-        message = 'Your return for order #${getShortOrderId()} has been completed successfully.';
+        message = 'Your return for order #${ProductStatusUtils.shortProductId(productId)} has been completed successfully.';
         break;
       case 'cancelled':
         title = 'Return Cancelled';
-        message = 'Your return request for order #${getShortOrderId()} has been cancelled.';
+        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been cancelled.';
         break;
       default:
         title = 'Return Update';
-        message = 'Your return request status has been updated to ${formatReturnStatus(newStatus)}.';
+        message = 'Your return request status has been updated to ${ProductStatusUtils.shortProductId(productId)}.';
     }
 
     await firestore.collection('notifications').add({
@@ -272,7 +250,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
       'title': title,
       'message': message,
       'type': 'order_status',
-      'orderId': orderId,
+      'productId': productId,
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
       'metadata': {
@@ -326,6 +304,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
 
         // Get order details for refund
         final userID = returnData['userID'];
+        final productID = returnData['productID'];
         final orderID = returnData['orderID'];
         final refundAmount = (returnData['returnPrice'] ?? 0.0) as double;
         final returnQuantity = returnData['returnQuantity'] ?? 1;
@@ -353,6 +332,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
         // Prepare refund data using the RefundModel structure
         final refundData = {
           'orderId': orderID,
+          'productID': productID,
           'returnRequestId': returnId,
           'cancelId': null,
           'refundAmount': totalRefundAmount,
@@ -362,6 +342,9 @@ class AdminReturnDetailsController extends ChangeNotifier {
           'customerId': userID,
           'refundType': 'return',
         };
+
+        createReturnNotification(returnId: returnId, newStatus: newStatus, userId: userID, productId: productID );
+
 
         // Use batch write for atomicity
         final batch = firestore.batch();

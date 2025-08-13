@@ -202,13 +202,13 @@ class NotificationController extends ChangeNotifier {
     String message = '';
 
     switch (orderStatus) {
-      case 'processing':
+      case 'to_ship':
         message = 'Your order #${orderId.substring(0, 6).toUpperCase()} is being processed';
         break;
-      case 'shipped':
+      case 'to_receive':
         message = 'Your order #${orderId.substring(0, 6).toUpperCase()} has been shipped';
         break;
-      case 'delivered':
+      case 'completed':
         message = 'Your order #${orderId.substring(0, 6).toUpperCase()} has been delivered';
         break;
       case 'cancelled':
@@ -231,6 +231,65 @@ class NotificationController extends ChangeNotifier {
       },
     });
   }
+
+
+  static Future<void> createOrderConfirmationNotification({
+    required String userId,
+    required String orderId,
+    required double totalAmount,
+    required int itemCount,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': userId,
+        'title': 'Order Confirmed',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} for ${itemCount} item${itemCount > 1 ? 's' : ''} (RM${totalAmount.toStringAsFixed(2)}) has been confirmed and is being prepared.',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': 'to_ship',
+          'totalAmount': totalAmount,
+          'itemCount': itemCount,
+        },
+      });
+    } catch (e) {
+      debugPrint('Error creating order confirmation notification: $e');
+      // Don't throw error here as it shouldn't prevent order completion
+    }
+  }
+
+  static Future<void> createOrderShipmentNotification({
+    required String userId,
+    required String orderId,
+    required double totalAmount,
+    required int itemCount,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': userId,
+        'title': 'Order Shipped',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} for ${itemCount} item${itemCount > 1 ? 's' : ''} (RM${totalAmount.toStringAsFixed(2)}) has been shipped.',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': 'to_receive',
+          'totalAmount': totalAmount,
+          'itemCount': itemCount,
+        },
+      });
+    } catch (e) {
+      debugPrint('Error creating order confirmation notification: $e');
+      // Don't throw error here as it shouldn't prevent order completion
+    }
+  }
+
+
+
+
 
   // Create chat message notification
   static Future<void> createChatNotification({
@@ -258,4 +317,7 @@ class NotificationController extends ChangeNotifier {
       },
     });
   }
+
+
+
 }
