@@ -1,3 +1,4 @@
+// admin_return_details_controller.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../model/order_model.dart';
@@ -38,7 +39,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
     await Future.wait([
       loadReturnData(),
       _loadCustomerDetails(returnRequest.userID),
-      loadOrderDetails(returnRequest.orderID, returnRequest.userID), // Add this line
+      loadOrderDetails(returnRequest.orderID, returnRequest.userID),
     ]);
 
     _isLoading = false;
@@ -84,7 +85,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
           orderDoc.data() as Map<String, dynamic>,
           orderDoc.id,
         );
-        notifyListeners(); // Notify listeners when order is loaded
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('Error loading order details: $e');
@@ -139,7 +140,6 @@ class AdminReturnDetailsController extends ChangeNotifier {
     }
   }
 
-  /// Load customer details from Firestore
   /// Load customer details from Firestore
   Future<void> _loadCustomerDetails(String? userID) async {
     if (userID == null || userID.isEmpty) {
@@ -200,8 +200,114 @@ class AdminReturnDetailsController extends ChangeNotifier {
     }
   }
 
+  /// Update return status WITH NOTIFICATIONS
+  Future<bool> updateReturnStatusWithNotification(String returnId, String newStatus) async {
+    try {
+      // First update the return status
+      final success = await updateReturnStatus(returnId, newStatus);
 
-  /// Update return status
+      if (success) {
+        // Create notification for the customer
+        await _createReturnNotification(
+          returnId: returnId,
+          newStatus: newStatus,
+          userId: returnRequest.userID,
+          orderId: returnRequest.orderID,
+        );
+      }
+
+      return success;
+    } catch (e) {
+      debugPrint('Error updating return status with notification: $e');
+      return false;
+    }
+  }
+
+  /// Create notification for return status update
+  Future<void> _createReturnNotification({
+    required String returnId,
+    required String newStatus,
+    required String userId,
+    required String orderId,
+  }) async {
+    String title = '';
+    String message = '';
+
+    switch (newStatus.toLowerCase()) {
+      case 'approved':
+        title = 'Return Request Approved';
+        message = 'Your return request for order #${getShortOrderId()} has been approved. Please ship the items back using the provided instructions.';
+        break;
+      case 'rejected':
+        title = 'Return Request Rejected';
+        message = 'Your return request for order #${getShortOrderId()} has been rejected. Please contact support for more information.';
+        break;
+      case 'pending_inspection':
+        title = 'Items Received';
+        message = 'We have received your returned items from order #${getShortOrderId()}. Our team is now inspecting them.';
+        break;
+      case 'completed_inspection':
+        title = 'Inspection Completed';
+        message = 'Inspection completed for your return from order #${getShortOrderId()}. Processing your refund now.';
+        break;
+      case 'refunded':
+        title = 'Refund Processed';
+        message = 'Your refund for order #${getShortOrderId()} has been processed. It should appear in your account within 3-5 business days.';
+        break;
+      case 'completed':
+        title = 'Return Completed';
+        message = 'Your return for order #${getShortOrderId()} has been completed successfully.';
+        break;
+      case 'cancelled':
+        title = 'Return Cancelled';
+        message = 'Your return request for order #${getShortOrderId()} has been cancelled.';
+        break;
+      default:
+        title = 'Return Update';
+        message = 'Your return request status has been updated to ${formatReturnStatus(newStatus)}.';
+    }
+
+    await firestore.collection('notifications').add({
+      'userId': userId,
+      'title': title,
+      'message': message,
+      'type': 'order_status',
+      'orderId': orderId,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'returnId': returnId,
+        'returnStatus': newStatus,
+        'productName': _productDetails?['productName'] ?? 'Product',
+      },
+    });
+  }
+
+  /// Format return status for display
+  String formatReturnStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Pending Review';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending_inspection':
+        return 'Pending Inspection';
+      case 'completed_inspection':
+        return 'Inspection Completed';
+      case 'refunded':
+        return 'Refunded';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status.substring(0, 1).toUpperCase() + status.substring(1);
+    }
+  }
+
+  /// Update return status (original method kept for backward compatibility)
   Future<bool> updateReturnStatus(String returnId, String newStatus) async {
     try {
       // Special handling for refunded status transition
@@ -248,11 +354,11 @@ class AdminReturnDetailsController extends ChangeNotifier {
         final refundData = {
           'orderId': orderID,
           'returnRequestId': returnId,
-          'cancelId': null, // null for return refunds
+          'cancelId': null,
           'refundAmount': totalRefundAmount,
           'refundMethod': paymentMethod,
           'refundDate': FieldValue.serverTimestamp(),
-          'transactionId': payment, // Use 'payment' attribute as transactionId
+          'transactionId': payment,
           'customerId': userID,
           'refundType': 'return',
         };
@@ -266,7 +372,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
           {
             'returnStatus': newStatus,
             '${newStatus}Date': FieldValue.serverTimestamp(),
-            'refundID': refundRef.id, // Link to refund document
+            'refundID': refundRef.id,
           },
         );
 
@@ -281,15 +387,14 @@ class AdminReturnDetailsController extends ChangeNotifier {
         // Create cancellation document reference
         final cancellationRef = firestore.collection('cancellation').doc();
 
-        // Prepare cancellation data using the enhanced CancellationModel structure
+        // Prepare cancellation data
         final cancellationData = {
           'referenceID': returnId,
-          'cancellationType': 'return_request', // Specify this is a return request cancellation
-          'cancelReason': 'Return request cancelled by admin', // Default reason, could be parameterized
+          'cancellationType': 'return_request',
+          'cancelReason': 'Return request cancelled by admin',
           'cancelDate': FieldValue.serverTimestamp(),
-          'cancelNote': null, // Could be added as parameter if needed
-          'cancelledBy': 'admin', // Since this is from admin panel
-          // Include legacy field for backward compatibility
+          'cancelNote': null,
+          'cancelledBy': 'admin',
           'returnRequestID': returnId,
         };
 
@@ -305,7 +410,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
           {
             'returnStatus': newStatus,
             '${newStatus}Date': FieldValue.serverTimestamp(),
-            'cancelID': cancellationRef.id, // Link to cancellation document
+            'cancelID': cancellationRef.id,
           },
         );
 
@@ -329,7 +434,37 @@ class AdminReturnDetailsController extends ChangeNotifier {
     }
   }
 
-  /// Delete return request
+  /// Delete return request with notification
+  Future<bool> deleteReturnRequestWithNotification(String returnId) async {
+    try {
+      // Create a deletion notification before deleting
+      await firestore.collection('notifications').add({
+        'userId': returnRequest.userID,
+        'title': 'Return Request Removed',
+        'message': 'Your return request for order #${getShortOrderId()} has been removed from our system.',
+        'type': 'order_status',
+        'orderId': returnRequest.orderID,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'returnId': returnId,
+          'action': 'deleted',
+        },
+      });
+
+      // Delete the return request
+      await firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .delete();
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Delete return request (original method kept for backward compatibility)
   Future<bool> deleteReturnRequest(String returnId) async {
     try {
       await firestore
@@ -346,9 +481,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   /// Get formatted customer name
   String getCustomerName() {
     if (_customerDetails == null) return 'N/A';
-
     final fullName = _customerDetails!['fullName'] ?? '';
-
     return '$fullName';
   }
 
@@ -357,11 +490,10 @@ class AdminReturnDetailsController extends ChangeNotifier {
     return _customerDetails?['phoneNum']?.toString() ?? 'N/A';
   }
 
-
   /// Get formatted order ID (shortened)
   String getShortOrderId() {
     final orderId = returnRequest.orderID;
-    return (orderId.length > 8 ? orderId.substring(0, 8) : orderId).toUpperCase();
+    return (orderId.length > 6 ? orderId.substring(0, 6) : orderId).toUpperCase();
   }
 
   /// Get return timeline data
@@ -423,6 +555,17 @@ class AdminReturnDetailsController extends ChangeNotifier {
       });
     }
 
+    // Add refunded step if applicable
+    if (returnRequest.refundID != null) {
+      timeline.add({
+        'title': 'Refund Processed',
+        'date': returnRequest.completedDate ?? DateTime.now(),
+        'icon': Icons.attach_money,
+        'color': Colors.green[700]!,
+        'isCompleted': true,
+      });
+    }
+
     // Add completed step if applicable
     if (returnRequest.completedDate != null) {
       timeline.add({
@@ -463,7 +606,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
 
   /// Check if refund is completed
   bool isRefundCompleted() {
-    return returnRequest.returnStatus == 'completed';
+    return returnRequest.returnStatus == 'refunded' || returnRequest.returnStatus == 'completed';
   }
 
   @override

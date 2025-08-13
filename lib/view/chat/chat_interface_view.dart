@@ -14,6 +14,7 @@ class ChatInterfaceWidget extends StatelessWidget {
   final ScrollController scrollController;
   final TextEditingController messageController;
 
+
   const ChatInterfaceWidget({
     Key? key,
     required this.controller,

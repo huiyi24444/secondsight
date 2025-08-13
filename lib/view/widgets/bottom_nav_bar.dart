@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../../controller/order/notif_controller.dart';
+import '../../services/auth_provider.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -13,6 +17,8 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -41,15 +47,30 @@ class BottomNavBar extends StatelessWidget {
                 isSelected: selectedIndex == 0,
                 onTap: () => onItemTapped(0),
               ),
-              _buildNavItem(
+              userId != null
+                  ? StreamBuilder<int>(
+                stream: NotificationController(userId: userId).getUnreadCountStream(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+                  return _buildNavItem(
+                    icon: Icons.notifications_outlined,
+                    activeIcon: Icons.notifications,
+                    label: 'Notifications',
+                    index: 1,
+                    isSelected: selectedIndex == 1,
+                    onTap: () => onItemTapped(1),
+                    showBadge: unreadCount > 0,
+                    badgeCount: unreadCount,
+                  );
+                },
+              )
+                  : _buildNavItem(
                 icon: Icons.notifications_outlined,
                 activeIcon: Icons.notifications,
                 label: 'Notifications',
                 index: 1,
                 isSelected: selectedIndex == 1,
                 onTap: () => onItemTapped(1),
-                showBadge: true,
-                badgeCount: 3,
               ),
               _buildNavItem(
                 icon: Icons.shopping_bag_outlined,

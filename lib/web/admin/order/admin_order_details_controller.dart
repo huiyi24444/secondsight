@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../controller/order/notif_controller.dart';
 import '../../../model/cancel_model.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
@@ -272,6 +273,276 @@ class OrderDetailsManagementController {
       throw Exception('Error updating tracking number: $e');
     }
   }
+
+  Future<void> updateOrderStatusWithNotification({
+    required String customerId,
+    required String orderId,
+    required String newStatus,
+    String? trackingNumber,
+  }) async {
+    try {
+      // Get the current order to check the old status
+      final orderDoc = await firestore
+          .collection('users')
+          .doc(customerId)
+          .collection('order')
+          .doc(orderId)
+          .get();
+
+      if (!orderDoc.exists) {
+        throw Exception('Order not found');
+      }
+
+      final currentStatus = orderDoc.data()?['orderStatus'] ?? '';
+
+      // Update the order status
+      await updateOrderStatus(
+        customerId: customerId,
+        orderId: orderId,
+        newStatus: newStatus,
+      );
+
+      // Create notification for status change
+      await NotificationController.createOrderStatusNotification(
+        userId: customerId,
+        orderId: orderId,
+        orderStatus: newStatus,
+      );
+
+      // If changing to "to_receive" (shipped), include tracking number in notification
+      if (newStatus == 'to_receive' && trackingNumber != null) {
+        await _createTrackingNotification(
+          customerId: customerId,
+          orderId: orderId,
+          trackingNumber: trackingNumber,
+        );
+      }
+
+      // If order is completed, create delivery notification
+      if (newStatus == 'completed') {
+        await updateOrderCompletion(
+          customerId: customerId,
+          orderId: orderId,
+        );
+        await _createDeliveryNotification(
+          customerId: customerId,
+          orderId: orderId,
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to update order status: $e');
+    }
+  }
+
+  /// Create tracking number notification
+  Future<void> _createTrackingNotification({
+    required String customerId,
+    required String orderId,
+    required String trackingNumber,
+  }) async {
+    await firestore.collection('notifications').add({
+      'userId': customerId,
+      'title': 'Tracking Number Available',
+      'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been shipped. Tracking: $trackingNumber',
+      'type': 'order_status',
+      'orderId': orderId,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'orderStatus': 'shipped',
+        'trackingNumber': trackingNumber,
+      },
+    });
+  }
+
+  /// Create delivery notification
+  Future<void> _createDeliveryNotification({
+    required String customerId,
+    required String orderId,
+  }) async {
+    await firestore.collection('notifications').add({
+      'userId': customerId,
+      'title': 'Order Delivered!',
+      'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been delivered. Thank you for shopping with us!',
+      'type': 'order_status',
+      'orderId': orderId,
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'orderStatus': 'delivered',
+        'showReview': true, // Can be used to show review prompt
+      },
+    });
+  }
+
+  /// Update tracking number with notification
+  Future<bool> updateTrackingNumberWithNotification({
+    required String customerId,
+    required String orderId,
+    required String trackingNumber,
+  }) async {
+    try {
+      // Update tracking number
+      bool updated = await updateTrackingNumber(
+        customerId: customerId,
+        orderId: orderId,
+        trackingNumber: trackingNumber,
+      );
+
+      if (updated) {
+        // Update order status to "to_receive" and send notification
+        await updateOrderStatusWithNotification(
+          customerId: customerId,
+          orderId: orderId,
+          newStatus: 'to_receive',
+          trackingNumber: trackingNumber,
+        );
+      }
+
+      return updated;
+    } catch (e) {
+      throw Exception('Error updating tracking number: $e');
+    }
+  }
+
+  /// Update order cancellation with notification
+  Future<void> updateOrderCancellationWithNotification({
+    required String customerId,
+    required String orderId,
+    required String cancellationReason,
+    String? cancelNote,
+  }) async {
+    try {
+      // Perform the cancellation
+      await updateOrderCancellation(
+        customerId: customerId,
+        orderId: orderId,
+        cancellationReason: cancellationReason,
+        cancelNote: cancelNote,
+      );
+
+      // Create cancellation notification
+      await firestore.collection('notifications').add({
+        'userId': customerId,
+        'title': 'Order Cancelled',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been cancelled. Refund will be processed within 3-5 business days.',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': 'cancelled',
+          'cancellationReason': cancellationReason,
+          'refundExpected': true,
+        },
+      });
+    } catch (e) {
+      throw Exception('Failed to cancel order: $e');
+    }
+  }
+
+  /// Update return request status with notification
+  Future<bool> updateReturnStatusWithNotification({
+    required String returnId,
+    required String newStatus,
+    required String customerId,
+    required String orderId,
+  }) async {
+    try {
+      // Update return status
+      bool updated = await updateReturnStatus(returnId, newStatus);
+
+      if (updated) {
+        // Create appropriate notification based on return status
+        String title = '';
+        String message = '';
+
+        switch (newStatus.toLowerCase()) {
+          case 'approved':
+            title = 'Return Request Approved';
+            message = 'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been approved. Please ship the items back.';
+            break;
+          case 'rejected':
+            title = 'Return Request Rejected';
+            message = 'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been rejected. Contact support for more information.';
+            break;
+          case 'completed':
+            title = 'Return Completed';
+            message = 'Your return for order #${orderId.substring(0, 6).toUpperCase()} has been completed. Refund has been processed.';
+            break;
+          case 'pending_inspection':
+            title = 'Items Received';
+            message = 'We have received your returned items from order #${orderId.substring(0, 6).toUpperCase()}. Inspection in progress.';
+            break;
+          case 'completed_inspection':
+            title = 'Inspection Completed';
+            message = 'Inspection completed for your return from order #${orderId.substring(0, 6).toUpperCase()}. Refund will be processed soon.';
+            break;
+          default:
+            return updated; // Don't send notification for other statuses
+        }
+
+        await firestore.collection('notifications').add({
+          'userId': customerId,
+          'title': title,
+          'message': message,
+          'type': 'order_status',
+          'orderId': orderId,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'metadata': {
+            'returnId': returnId,
+            'returnStatus': newStatus,
+          },
+        });
+      }
+
+      return updated;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Batch update multiple orders with notifications
+  Future<void> batchUpdateOrderStatuses({
+    required List<Map<String, String>> orderUpdates, // List of {customerId, orderId, newStatus}
+  }) async {
+    final batch = firestore.batch();
+
+    for (var update in orderUpdates) {
+      final customerId = update['customerId']!;
+      final orderId = update['orderId']!;
+      final newStatus = update['newStatus']!;
+
+      // Update order
+      batch.update(
+        firestore
+            .collection('users')
+            .doc(customerId)
+            .collection('order')
+            .doc(orderId),
+        {'orderStatus': newStatus},
+      );
+
+      // Create notification
+      final notificationRef = firestore.collection('notifications').doc();
+      batch.set(notificationRef, {
+        'userId': customerId,
+        'title': 'Order Update',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} status has been updated to ${formatStatus(newStatus)}',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': newStatus,
+        },
+      });
+    }
+
+    await batch.commit();
+  }
+
 
   // Delete order
   Future<void> deleteOrder({
@@ -775,4 +1046,18 @@ class OrderDetailsManagementController {
   }
 
 
+}
+String formatStatus(String status) {
+  switch (status.toLowerCase()) {
+    case 'to_ship':
+      return 'Ready to Ship';
+    case 'to_receive':
+      return 'Shipped';
+    case 'completed':
+      return 'Delivered';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return status;
+  }
 }

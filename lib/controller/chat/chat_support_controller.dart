@@ -6,6 +6,7 @@ import '../../model/order_model.dart';
 import '../../model/conversation_model.dart';
 import '../../services/auth_provider.dart';
 import '../../view/chat/active_conversation_dialog.dart';
+import '../order/notif_controller.dart';
 
 class ChatSupportController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -340,6 +341,140 @@ class ChatSupportController extends ChangeNotifier {
       return '${difference.inDays}d ago';
     } else {
       return DateFormat('MMM d').format(date);
+    }
+  }
+
+// Extension methods for ChatSupportController
+// Add these methods to your existing ChatSupportController class:
+
+  /// Initialize controller for notification navigation
+  Future<void> initializeFromNotification({
+    required String conversationId,
+    required String orderId,
+    required String userId,
+  }) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      // Load the conversation
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+
+      if (conversationDoc.exists) {
+        _currentConversation = ConversationModel.fromFirestore(conversationDoc);
+
+        // Load the associated order if it's not a general inquiry
+        if (orderId != 'general') {
+          final orderDoc = await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('order')
+              .doc(orderId)
+              .get();
+
+          if (orderDoc.exists) {
+            _selectedOrder = OrdersModel.fromJson(
+                orderDoc.data() as Map<String, dynamic>,
+                orderDoc.id
+            );
+          }
+        } else {
+          // It's a general inquiry
+          _selectedOrder = OrdersModel(
+            id: 'General Inquiry',
+            orderDate: DateTime.now(),
+            orderStatus: '',
+            totalAmount: 0,
+            eligibilityForReturn: false, paymentCard: '', totalProduct: 0,
+          );
+        }
+
+        // Set flags to show the chat interface
+        _showOrderSelection = false;
+        _showConversationList = false;
+        _isLoading = false;
+
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error initializing from notification: $e');
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Override sendMessage to create notifications for admin messages
+  /// Add this to your ChatSupportController to replace the existing sendMessage method
+  Future<void> sendMessageWithNotification(
+      String message, {
+        bool isAdmin = false,
+        bool isSystem = false,
+      }) async {
+    if (message.trim().isEmpty || _currentConversation == null) return;
+
+    if (_currentConversation!.status == 'ended') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This conversation has ended')),
+      );
+      return;
+    }
+
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
+    String senderName;
+    String senderId;
+    if (isAdmin) {
+      senderName = 'Customer Service';
+      senderId = 'admin';
+    } else if (isSystem) {
+      senderName = 'System';
+      senderId = 'system';
+    } else {
+      senderName = 'Customer'; // Or fetch from user profile
+      senderId = userId!;
+    }
+
+    try {
+      // Create MessageModel
+      final messageModel = MessageModel(
+        id: '', // Will be set by Firestore
+        message: message,
+        senderId: senderId,
+        senderName: senderName,
+        timestamp: null, // Will be set by server
+        isAdmin: isAdmin,
+        isSystem: isSystem,
+      );
+
+      // Add message using the model
+      await _firestore
+          .collection('conversations')
+          .doc(_currentConversation!.id)
+          .collection('messages')
+          .add(messageModel.toMap());
+
+      // Update last message timestamp
+      await _firestore.collection('conversations').doc(_currentConversation!.id).update({
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
+
+      // Create notification if message is from admin and not a system message
+      if (isAdmin && !isSystem) {
+        await NotificationController.createChatNotification(
+          userId: _currentConversation!.userId,
+          conversationId: _currentConversation!.id,
+          orderId: _currentConversation!.orderId,
+          senderName: senderName,
+          lastMessage: message,
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send message')),
+      );
     }
   }
 }

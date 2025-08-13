@@ -1521,29 +1521,49 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     }
   }
 
-  // Update order status with UI feedback
   Future<void> _updateOrderStatus(String newStatus) async {
     try {
-      await _controller.updateOrderStatus(
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
+        ),
+      );
+
+      // Use the notification-enabled update method
+      await _controller.updateOrderStatusWithNotification(
         customerId: widget.order.customerId!,
         orderId: widget.order.id,
         newStatus: newStatus,
       );
+
+      // Reload the orders
       await widget.onOrdersReload();
 
       if (mounted) {
+        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order status updated successfully')),
+          const SnackBar(
+            content: Text('Order status updated and customer notified'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
+        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating order: $e')),
+          SnackBar(
+            content: Text('Error updating order: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
+
 
   // Handle ship to receive transition
   Future<bool> _handleShipToReceive() async {
@@ -1619,6 +1639,30 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'The customer will be notified that their order has been delivered.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
                 color: Colors.amber[50],
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.amber[200]!),
@@ -1648,11 +1692,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _controller.updateOrderCompletion(
-                customerId: widget.order.customerId!,
-                orderId: widget.order.id,
-              );
               Navigator.pop(context, true);
+              // The notification will be sent by _updateOrderStatus
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Complete Order'),
@@ -1742,7 +1783,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   onChanged: (value) {
                     setState(() {
                       selectedReason = value;
-                      // Update the reasonController with the selected value
                       reasonController.text = value ?? '';
                     });
                   },
@@ -1766,12 +1806,27 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               ),
 
               const SizedBox(height: 8),
-              Text(
-                'Please select a reason and optionally provide additional details.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontStyle: FontStyle.italic,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'The customer will be notified about the cancellation and refund process.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue[900],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1806,32 +1861,57 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 }
 
                 try {
-                  await _controller.updateOrderCancellation(
-                    customerId: widget.order.customerId!,
-                    orderId: widget.order.id,
-                    cancellationReason: reasonController.text.trim(), // This contains the selected reason
-                    cancelNote: cancelNoteController.text.trim().isEmpty
-                        ? null
-                        : cancelNoteController.text.trim(), // This contains additional notes
-                  );
                   Navigator.pop(context, true);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to cancel order: $e'),
-                      backgroundColor: Colors.red,
+
+                  // Show loading
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
                     ),
                   );
+
+                  // Use notification-enabled cancellation
+                  await _controller.updateOrderCancellationWithNotification(
+                    customerId: widget.order.customerId!,
+                    orderId: widget.order.id,
+                    cancellationReason: reasonController.text.trim(),
+                    cancelNote: cancelNoteController.text.trim().isEmpty
+                        ? null
+                        : cancelNoteController.text.trim(),
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Order cancelled and customer notified about refund'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading if still open
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to cancel order: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Cancel Order'),
+              child: const Text('Cancel Order & Notify'),
             ),
           ],
         ),
       ),
     ) ?? false;
   }
+
 
   // Show tracking number dialog
   Future<bool> _showTrackingNumberDialog() async {
@@ -1862,7 +1942,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'The shipped date will be set to current date/time.',
+              'The customer will be notified with the tracking information.',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
@@ -1884,43 +1964,72 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               }
 
               try {
-                final success = await _controller.updateTrackingNumber(
+                // Close dialog first
+                Navigator.pop(context, true);
+
+                // Show loading
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
+                  ),
+                );
+
+                // Update tracking number with notification
+                final success = await _controller.updateTrackingNumberWithNotification(
                   customerId: widget.order.customerId!,
                   orderId: widget.order.id,
                   trackingNumber: trackingNumberController.text.trim(),
                 );
 
-                if (!success && context.mounted) {
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                }
+
+                if (!success && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Shipment document not found'),
+                      backgroundColor: Colors.red,
                     ),
                   );
-                  Navigator.pop(context, false);
                   return;
                 }
 
-                if (context.mounted) {
-                  Navigator.pop(context, true);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tracking number added and customer notified'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 }
               } catch (e) {
-                if (context.mounted) {
+                if (mounted) {
+                  Navigator.pop(context); // Close loading if still open
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString())),
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: Colors.red,
+                    ),
                   );
-                  Navigator.pop(context, false);
                 }
               }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF7C3AED),
             ),
-            child: const Text('Confirm'),
+              child: const Text(
+                'Confirm & Notify',
+                style: TextStyle(color: Colors.white),
+              )
           ),
         ],
       ),
     ) ?? false;
   }
+
 
   // Show transition error
   void _showTransitionError(String from, String to) {
