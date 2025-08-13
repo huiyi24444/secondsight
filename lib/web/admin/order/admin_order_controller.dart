@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 
@@ -252,6 +253,25 @@ class OrderManagementController extends ChangeNotifier {
           await shipmentRef.add(shipmentData);
         }
 
+        final orderProductsSnapshot = await _firestore
+            .collection('users')
+            .doc(order.customerId)
+            .collection('order')
+            .doc(orderId)
+            .collection('orderProducts')
+            .get();
+
+        final itemCount = orderProductsSnapshot.size;
+
+
+        // Create shipment notification
+        await NotificationController.createOrderShipmentNotification(
+          userId: order.customerId ?? "N/A",
+          orderId: order.id,
+          totalAmount: order.totalAmount, // Make sure this exists in your order model
+          itemCount: itemCount,  // Or however you store order items
+        );
+
         successCount++;
       } catch (e) {
         errors.add('Order #${order.shortOrderId}: $e');
@@ -271,6 +291,10 @@ class OrderManagementController extends ChangeNotifier {
       'failed': failCount,
       'errors': errors,
     };
+
+
+
+
   }
 
   void _setLoading(bool loading) {

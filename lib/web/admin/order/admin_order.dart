@@ -74,7 +74,10 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF7C3AED),
             ),
-            child: const Text('Confirm'),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

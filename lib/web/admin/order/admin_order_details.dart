@@ -63,14 +63,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   CancellationModel? cancelData;
   Map<String, dynamic>? customerDetails;
 
-  // Define allowed status transitions
-  static const Map<String, List<String>> allowedTransitions = {
-    'to_ship': ['to_receive', 'canceled'],
-    'to_receive': ['completed', 'canceled'],
-    'completed': [],
-    'canceled': [],
-  };
-
   @override
   void initState() {
     super.initState();
@@ -1503,7 +1495,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           proceedWithUpdate = await _handleReceiveToCompleted();
           break;
         case 'to_ship->cancelled':
-        case 'to_receive->cancelled':
           proceedWithUpdate = await _handleCancellation();
           break;
         default:
@@ -1977,7 +1968,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 );
 
                 // Update tracking number with notification
-                final success = await _controller.updateTrackingNumberWithNotification(
+                final success = await _controller.updateTrackingNumber(
                   customerId: widget.order.customerId!,
                   orderId: widget.order.id,
                   trackingNumber: trackingNumberController.text.trim(),

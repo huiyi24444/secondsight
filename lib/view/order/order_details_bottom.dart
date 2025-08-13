@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
 import '../../../view/returnrefund/return_request_view.dart';
@@ -293,6 +294,10 @@ class OrderBottomButtons extends StatelessWidget {
               Navigator.of(context).pop();
 
               if (success) {
+                await NotificationController.createOrderCompletedNotification(
+                  customerId: userId, // adjust to your variable
+                  orderId: orderId           // adjust to your variable
+                );
                 // Show success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

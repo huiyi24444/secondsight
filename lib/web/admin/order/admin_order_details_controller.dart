@@ -46,10 +46,9 @@ class OrderDetailsManagementController {
 
   OrderDetailsManagementController({required this.firestore});
 
-  // Status transition validation constants
   static const Map<String, List<String>> allowedTransitions = {
-    'to_ship': ['to_receive', 'cancelled'],
-    'to_receive': ['completed', 'cancelled'],
+    'to_ship': ['to_receive', 'cancelled'], // ONLY 'to_ship' can transition to 'cancelled'
+    'to_receive': ['completed'], // REMOVED 'cancelled' from here
     'completed': [],
     'cancelled': [],
   };
@@ -81,6 +80,8 @@ class OrderDetailsManagementController {
       return 'Cancelled orders cannot be reactivated.';
     } else if (fromStatus == 'to_receive' && toStatus == 'to_ship') {
       return 'Cannot revert to "To Ship" once tracking number is provided.';
+    } else if (toStatus == 'cancelled' && fromStatus != 'to_ship') {
+      return 'Orders can only be cancelled when in "To Ship" status.'; // NEW: Specific error for cancelled
     } else {
       return 'This status transition is not allowed.';
     }
@@ -302,29 +303,13 @@ class OrderDetailsManagementController {
         newStatus: newStatus,
       );
 
-      // Create notification for status change
-      await NotificationController.createOrderStatusNotification(
-        userId: customerId,
-        orderId: orderId,
-        orderStatus: newStatus,
-      );
-
-      // If changing to "to_receive" (shipped), include tracking number in notification
-      if (newStatus == 'to_receive' && trackingNumber != null) {
-        await _createTrackingNotification(
-          customerId: customerId,
-          orderId: orderId,
-          trackingNumber: trackingNumber,
-        );
-      }
-
       // If order is completed, create delivery notification
       if (newStatus == 'completed') {
         await updateOrderCompletion(
           customerId: customerId,
           orderId: orderId,
         );
-        await _createDeliveryNotification(
+        await NotificationController.createOrderCompletedNotification(
           customerId: customerId,
           orderId: orderId,
         );
@@ -334,76 +319,7 @@ class OrderDetailsManagementController {
     }
   }
 
-  /// Create tracking number notification
-  Future<void> _createTrackingNotification({
-    required String customerId,
-    required String orderId,
-    required String trackingNumber,
-  }) async {
-    await firestore.collection('notifications').add({
-      'userId': customerId,
-      'title': 'Tracking Number Available',
-      'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been shipped. Tracking: $trackingNumber',
-      'type': 'order_status',
-      'orderId': orderId,
-      'isRead': false,
-      'createdAt': FieldValue.serverTimestamp(),
-      'metadata': {
-        'orderStatus': 'shipped',
-        'trackingNumber': trackingNumber,
-      },
-    });
-  }
 
-  /// Create delivery notification
-  Future<void> _createDeliveryNotification({
-    required String customerId,
-    required String orderId,
-  }) async {
-    await firestore.collection('notifications').add({
-      'userId': customerId,
-      'title': 'Order Delivered!',
-      'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been delivered. Thank you for shopping with us!',
-      'type': 'order_status',
-      'orderId': orderId,
-      'isRead': false,
-      'createdAt': FieldValue.serverTimestamp(),
-      'metadata': {
-        'orderStatus': 'delivered',
-        'showReview': true, // Can be used to show review prompt
-      },
-    });
-  }
-
-  /// Update tracking number with notification
-  Future<bool> updateTrackingNumberWithNotification({
-    required String customerId,
-    required String orderId,
-    required String trackingNumber,
-  }) async {
-    try {
-      // Update tracking number
-      bool updated = await updateTrackingNumber(
-        customerId: customerId,
-        orderId: orderId,
-        trackingNumber: trackingNumber,
-      );
-
-      if (updated) {
-        // Update order status to "to_receive" and send notification
-        await updateOrderStatusWithNotification(
-          customerId: customerId,
-          orderId: orderId,
-          newStatus: 'to_receive',
-          trackingNumber: trackingNumber,
-        );
-      }
-
-      return updated;
-    } catch (e) {
-      throw Exception('Error updating tracking number: $e');
-    }
-  }
 
   /// Update order cancellation with notification
   Future<void> updateOrderCancellationWithNotification({

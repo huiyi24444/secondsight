@@ -287,6 +287,30 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
+  /// Create delivery notification
+  static Future<void> createOrderCompletedNotification({
+    required String customerId,
+    required String orderId,
+  }) async {
+   try{
+     await FirebaseFirestore.instance.collection('notifications').add({
+       'userId': customerId,
+       'title': 'Order Delivered',
+       'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been delivered. Thank you for shopping with us!',
+       'type': 'order_status',
+       'orderId': orderId,
+       'isRead': false,
+       'createdAt': FieldValue.serverTimestamp(),
+       'metadata': {
+         'orderStatus': 'delivered',
+         'showReview': true, // Can be used to show review prompt
+       },
+     });
+   }catch(e){
+     debugPrint('Error creating order completed notification: $e');
+   }
+  }
+
 
 
 
