@@ -216,34 +216,52 @@ class AdminReturnDetailsController extends ChangeNotifier {
         title = 'Return Request Approved';
         message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been approved. Please ship the items back using the provided instructions.';
         break;
+
       case 'rejected':
         title = 'Return Request Rejected';
         message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been rejected. Please contact support for more information.';
         break;
+
       case 'pending_inspection':
         title = 'Items Received';
         message = 'We have received your returned items from order #${ProductStatusUtils.shortProductId(productId)}. Our team is now inspecting them.';
         break;
+
       case 'completed_inspection':
         title = 'Inspection Completed';
         message = 'Inspection completed for your return from order #${ProductStatusUtils.shortProductId(productId)}. Processing your refund now.';
         break;
+
       case 'refunded':
         title = 'Refund Processed';
         message = 'Your refund for order #${ProductStatusUtils.shortProductId(productId)} has been processed. It should appear in your account within 3-5 business days.';
         break;
+
+      case 'not_refunded':
+        title = 'Refund Unsuccessful';
+        message = 'We were unable to process the refund for order #${ProductStatusUtils.shortProductId(productId)}. Please contact support.';
+        break;
+
       case 'completed':
         title = 'Return Completed';
         message = 'Your return for order #${ProductStatusUtils.shortProductId(productId)} has been completed successfully.';
         break;
+
       case 'cancelled':
         title = 'Return Cancelled';
         message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been cancelled.';
         break;
+
+      case 'pending_approval':
+        title = 'Return Request Submitted';
+        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been submitted and is pending approval.';
+        break;
+
       default:
         title = 'Return Update';
-        message = 'Your return request status has been updated to ${ProductStatusUtils.shortProductId(productId)}.';
+        message = 'Your return request status has been updated to $newStatus for order #${ProductStatusUtils.shortProductId(productId)}.';
     }
+
 
     await firestore.collection('notifications').add({
       'userId': userId,
@@ -288,163 +306,318 @@ class AdminReturnDetailsController extends ChangeNotifier {
   /// Update return status (original method kept for backward compatibility)
   Future<bool> updateReturnStatus(String returnId, String newStatus) async {
     try {
-      // Special handling for refunded status transition
-      if (newStatus == 'refunded') {
-        // Get the return request details first
-        final returnDoc = await firestore
-            .collection('returnRequests')
-            .doc(returnId)
-            .get();
+      // Get current return request to check current status
+      final returnDoc = await firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .get();
 
-        if (!returnDoc.exists) {
-          throw Exception('Return request not found');
-        }
-
-        final returnData = returnDoc.data() as Map<String, dynamic>;
-
-        // Get order details for refund
-        final userID = returnData['userID'];
-        final productID = returnData['productID'];
-        final orderID = returnData['orderID'];
-        final refundAmount = (returnData['returnPrice'] ?? 0.0) as double;
-        final returnQuantity = returnData['returnQuantity'] ?? 1;
-        final totalRefundAmount = refundAmount * returnQuantity;
-
-        // Get payment method from original order
-        final orderDoc = await firestore
-            .collection('users')
-            .doc(userID)
-            .collection('order')
-            .doc(orderID)
-            .get();
-
-        final paymentMethod = orderDoc.exists
-            ? (orderDoc.data() as Map<String, dynamic>)['paymentMethod'] ?? 'Original Payment Method'
-            : 'Original Payment Method';
-
-        final payment = orderDoc.exists
-            ? (orderDoc.data() as Map<String, dynamic>)['payment'] ?? 'Unknown'
-            : 'Unknown';
-
-        // Create refund document reference
-        final refundRef = firestore.collection('refunds').doc();
-
-        // Prepare refund data using the RefundModel structure
-        final refundData = {
-          'orderId': orderID,
-          'productID': productID,
-          'returnRequestId': returnId,
-          'cancelId': null,
-          'refundAmount': totalRefundAmount,
-          'refundMethod': paymentMethod,
-          'refundDate': FieldValue.serverTimestamp(),
-          'transactionId': payment,
-          'customerId': userID,
-          'refundType': 'return',
-        };
-
-        createReturnNotification(returnId: returnId, newStatus: newStatus, userId: userID, productId: productID );
-
-
-        // Use batch write for atomicity
-        final batch = firestore.batch();
-
-        // Update return request status
-        batch.update(
-          firestore.collection('returnRequests').doc(returnId),
-          {
-            'returnStatus': newStatus,
-            '${newStatus}Date': FieldValue.serverTimestamp(),
-            'refundID': refundRef.id,
-          },
-        );
-
-        // Create refund document in top-level 'refunds' collection
-        batch.set(refundRef, refundData);
-
-        // Commit batch
-        await batch.commit();
+      if (!returnDoc.exists) {
+        throw Exception('Return request not found');
       }
-      // Special handling for cancelled status transition
-      else if (newStatus == 'cancelled') {
-        // Create cancellation document reference
-        final cancellationRef = firestore.collection('cancellation').doc();
 
-        // Prepare cancellation data
-        final cancellationData = {
-          'referenceID': returnId,
-          'cancellationType': 'return_request',
-          'cancelReason': 'Return request cancelled by admin',
-          'cancelDate': FieldValue.serverTimestamp(),
-          'cancelNote': null,
-          'cancelledBy': 'admin',
-          'returnRequestID': returnId,
-        };
+      final returnData = returnDoc.data() as Map<String, dynamic>;
+      final currentStatus = returnData['returnStatus'] as String;
 
-        // Use batch write for atomicity
-        final batch = firestore.batch();
-
-        // Create cancellation document
-        batch.set(cancellationRef, cancellationData);
-
-        // Update return request status
-        batch.update(
-          firestore.collection('returnRequests').doc(returnId),
-          {
-            'returnStatus': newStatus,
-            '${newStatus}Date': FieldValue.serverTimestamp(),
-            'cancelID': cancellationRef.id,
-          },
-        );
-
-        // Commit batch
-        await batch.commit();
+      // Validate status transition based on workflow
+      if (!_isValidStatusTransition(currentStatus, newStatus)) {
+        throw Exception('Invalid status transition from $currentStatus to $newStatus');
       }
-      else {
+
+      // Special handling for different status transitions
+      switch (newStatus) {
+        case 'approved':
+          await _handleApprovedStatus(returnId, returnData);
+          break;
+        case 'rejected':
+          await _handleRejectedStatus(returnId, returnData);
+          break;
+        case 'pending_inspection':
+          await _handlePendingInspectionStatus(returnId, returnData);
+          break;
+        case 'completed_inspection':
+          await _handleCompletedInspectionStatus(returnId, returnData);
+          break;
+        case 'refunded':
+          await _handleRefundedStatus(returnId, returnData);
+          break;
+        case 'not_refunded':
+          await _handleNotRefundedStatus(returnId, returnData);
+          break;
+        case 'cancelled':
+          await _handleCancelledStatus(returnId, returnData);
+          break;
+        default:
         // Standard status update for other statuses
-        await firestore
-            .collection('returnRequests')
-            .doc(returnId)
-            .update({
-          'returnStatus': newStatus,
-          '${newStatus}Date': FieldValue.serverTimestamp(),
-        });
+          await _updateReturnStatusOnly(returnId, newStatus);
       }
 
       return true;
     } catch (e) {
+      debugPrint('Error updating return status: $e');
       return false;
     }
   }
 
-  /// Delete return request with notification
-  Future<bool> deleteReturnRequestWithNotification(String returnId) async {
-    try {
-      // Create a deletion notification before deleting
-      await firestore.collection('notifications').add({
-        'userId': returnRequest.userID,
-        'title': 'Return Request Removed',
-        'message': 'Your return request for order #${getShortOrderId()} has been removed from our system.',
-        'type': 'order_status',
-        'orderId': returnRequest.orderID,
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'metadata': {
-          'returnId': returnId,
-          'action': 'deleted',
-        },
-      });
 
-      // Delete the return request
-      await firestore
-          .collection('returnRequests')
-          .doc(returnId)
-          .delete();
+  /// Validate if status transition is allowed based on workflow
+  bool _isValidStatusTransition(String currentStatus, String newStatus) {
+    // Define allowed transitions based on your workflow
+    final Map<String, List<String>> allowedTransitions = {
+      'pending_approval': ['approved', 'rejected', 'cancelled'],
+      'approved': ['pending_inspection'],
+      'rejected': [], // No further transitions allowed
+      'pending_inspection': ['completed_inspection'],
+      'completed_inspection': ['refunded', 'not_refunded'],
+      'refunded': [], // Final status - no further transitions
+      'not_refunded': [], // Final status - no further transitions
+      'cancelled': [], // Final status - no further transitions
+    };
 
+    // Special case: allow same status (no change)
+    if (currentStatus == newStatus) {
       return true;
-    } catch (e) {
-      return false;
     }
+
+    final allowedNextStatuses = allowedTransitions[currentStatus] ?? [];
+    return allowedNextStatuses.contains(newStatus);
+  }
+
+  /// Handle approved status transition
+  Future<void> _handleApprovedStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'approved',
+        userId: userID,
+        productId: productID
+    );
+
+    // Update status with timestamp
+    await _updateReturnStatusOnly(returnId, 'approved');
+  }
+
+  /// Handle rejected status transition
+  Future<void> _handleRejectedStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'rejected',
+        userId: userID,
+        productId: productID
+    );
+
+    // Update status with timestamp
+    await _updateReturnStatusOnly(returnId, 'rejected');
+  }
+
+  /// Handle pending inspection status transition
+  Future<void> _handlePendingInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'pending_inspection',
+        userId: userID,
+        productId: productID
+    );
+
+    // Update status with timestamp
+    await _updateReturnStatusOnly(returnId, 'pending_inspection');
+  }
+
+  /// Handle completed inspection status transition
+  Future<void> _handleCompletedInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'completed_inspection',
+        userId: userID,
+        productId: productID
+    );
+
+    // Update status with timestamp
+    await _updateReturnStatusOnly(returnId, 'completed_inspection');
+  }
+
+  /// Handle refunded status transition (creates refund document)
+  Future<void> _handleRefundedStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+    final orderID = returnData['orderID'];
+    final refundAmount = (returnData['returnPrice'] ?? 0.0) as double;
+    final returnQuantity = returnData['returnQuantity'] ?? 1;
+    final totalRefundAmount = refundAmount * returnQuantity;
+
+    // Get payment method from original order
+    final orderDoc = await firestore
+        .collection('users')
+        .doc(userID)
+        .collection('order')
+        .doc(orderID)
+        .get();
+
+    final paymentMethod = orderDoc.exists
+        ? (orderDoc.data() as Map<String, dynamic>)['paymentMethod'] ?? 'Original Payment Method'
+        : 'Original Payment Method';
+
+    final payment = orderDoc.exists
+        ? (orderDoc.data() as Map<String, dynamic>)['payment'] ?? 'Unknown'
+        : 'Unknown';
+
+    // Create refund document reference
+    final refundRef = firestore.collection('refunds').doc();
+
+    // Prepare refund data
+    final refundData = {
+      'orderId': orderID,
+      'productID': productID,
+      'returnRequestId': returnId,
+      'cancelId': null,
+      'refundAmount': totalRefundAmount,
+      'refundMethod': paymentMethod,
+      'refundDate': FieldValue.serverTimestamp(),
+      'transactionId': payment,
+      'customerId': userID,
+      'refundType': 'return',
+    };
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'refunded',
+        userId: userID,
+        productId: productID
+    );
+
+    // Use batch write for atomicity
+    final batch = firestore.batch();
+
+    // Update return request status
+    batch.update(
+      firestore.collection('returnRequests').doc(returnId),
+      {
+        'returnStatus': 'refunded',
+        'refundedDate': FieldValue.serverTimestamp(),
+        'refundID': refundRef.id,
+      },
+    );
+
+    // Create refund document
+    batch.set(refundRef, refundData);
+
+    // Commit batch
+    await batch.commit();
+  }
+
+  /// Handle not refunded status transition
+  Future<void> _handleNotRefundedStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'not_refunded',
+        userId: userID,
+        productId: productID
+    );
+
+    // Update status with timestamp
+    await firestore
+        .collection('returnRequests')
+        .doc(returnId)
+        .update({
+      'returnStatus': 'not_refunded',
+      'notRefundedDate': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Handle cancelled status transition (creates cancellation document)
+  Future<void> _handleCancelledStatus(String returnId, Map<String, dynamic> returnData) async {
+    final userID = returnData['userID'];
+    final productID = returnData['productID'];
+
+    // Create cancellation document reference
+    final cancellationRef = firestore.collection('cancellation').doc();
+
+    // Prepare cancellation data
+    final cancellationData = {
+      'referenceID': returnId,
+      'cancellationType': 'return_request',
+      'cancelReason': 'Return request cancelled by admin',
+      'cancelDate': FieldValue.serverTimestamp(),
+      'cancelNote': null,
+      'cancelledBy': 'admin',
+      'returnRequestID': returnId,
+    };
+
+    // Create notification
+    await createReturnNotification(
+        returnId: returnId,
+        newStatus: 'cancelled',
+        userId: userID,
+        productId: productID
+    );
+
+    // Use batch write for atomicity
+    final batch = firestore.batch();
+
+    // Create cancellation document
+    batch.set(cancellationRef, cancellationData);
+
+    // Update return request status
+    batch.update(
+      firestore.collection('returnRequests').doc(returnId),
+      {
+        'returnStatus': 'cancelled',
+        'cancelledDate': FieldValue.serverTimestamp(),
+        'cancelID': cancellationRef.id,
+      },
+    );
+
+    // Commit batch
+    await batch.commit();
+  }
+
+  /// Standard status update with timestamp
+  Future<void> _updateReturnStatusOnly(String returnId, String newStatus) async {
+    final updateData = {
+      'returnStatus': newStatus,
+      '${newStatus}Date': FieldValue.serverTimestamp(),
+    };
+
+    await firestore
+        .collection('returnRequests')
+        .doc(returnId)
+        .update(updateData);
+  }
+
+  /// Get allowed next statuses for current status (for UI dropdown)
+  List<String> getAllowedNextStatuses(String currentStatus) {
+    final Map<String, List<String>> allowedTransitions = {
+      'pending_approval': ['approved', 'rejected', 'cancelled'],
+      'approved': ['pending_inspection'],
+      'rejected': [],
+      'pending_inspection': ['completed_inspection'],
+      'completed_inspection': ['refunded', 'not_refunded'],
+      'refunded': [],
+      'not_refunded': [],
+      'cancelled': [],
+    };
+
+    return allowedTransitions[currentStatus] ?? [];
   }
 
   /// Delete return request (original method kept for backward compatibility)

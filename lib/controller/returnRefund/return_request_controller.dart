@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 import 'dart:io';
 import '../../model/return_request_model.dart';
 import '../../model/order_product_model.dart';
@@ -289,9 +290,17 @@ class ReturnRequestController extends ChangeNotifier {
         refundID: null,
       );
 
-      await FirebaseFirestore.instance
+      final docRef = await FirebaseFirestore.instance
           .collection('returnRequests')
           .add(returnRequest.toMap());
+
+      // 🔔 Create notification for new request
+      await NotificationController.createReturnStatusNotification(
+        returnId: docRef.id,
+        newStatus: returnRequest.returnStatus,
+        customerId: userId,
+        orderId: orderId,
+      );
 
     } catch (e) {
       rethrow;

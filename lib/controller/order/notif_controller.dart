@@ -192,46 +192,6 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
-  // Create order status notification
-  static Future<void> createOrderStatusNotification({
-    required String userId,
-    required String orderId,
-    required String orderStatus,
-  }) async {
-    String title = 'Order Update';
-    String message = '';
-
-    switch (orderStatus) {
-      case 'to_ship':
-        message = 'Your order #${orderId.substring(0, 6).toUpperCase()} is being processed';
-        break;
-      case 'to_receive':
-        message = 'Your order #${orderId.substring(0, 6).toUpperCase()} has been shipped';
-        break;
-      case 'completed':
-        message = 'Your order #${orderId.substring(0, 6).toUpperCase()} has been delivered';
-        break;
-      case 'cancelled':
-        message = 'Your order #${orderId.substring(0, 6).toUpperCase()} has been cancelled';
-        break;
-      default:
-        message = 'Your order #${orderId.substring(0, 6).toUpperCase()} status has been updated';
-    }
-
-    await FirebaseFirestore.instance.collection('notifications').add({
-      'userId': userId,
-      'title': title,
-      'message': message,
-      'type': 'order_status',
-      'orderId': orderId,
-      'isRead': false,
-      'createdAt': FieldValue.serverTimestamp(),
-      'metadata': {
-        'orderStatus': orderStatus,
-      },
-    });
-  }
-
 
   static Future<void> createOrderConfirmationNotification({
     required String userId,
@@ -337,6 +297,89 @@ class NotificationController extends ChangeNotifier {
       throw Exception('Failed to cancel order: $e');
     }
   }
+
+  static Future<bool> createReturnStatusNotification({
+    required String returnId,
+    required String newStatus,
+    required String customerId,
+    required String orderId,
+  }) async {
+    try {
+      // Create appropriate notification based on return status
+      String title = '';
+      String message = '';
+
+      switch (newStatus.toLowerCase()) {
+        case 'approved':
+          title = 'Return Request Approved';
+          message =
+          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been approved. Please ship the items back.';
+          break;
+        case 'rejected':
+          title = 'Return Request Rejected';
+          message =
+          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been rejected. Contact support for more information.';
+          break;
+        case 'completed':
+          title = 'Return Completed';
+          message =
+          'Your return for order #${orderId.substring(0, 6).toUpperCase()} has been completed. Refund has been processed.';
+          break;
+        case 'pending_inspection':
+          title = 'Items Received';
+          message =
+          'We have received your returned items from order #${orderId.substring(0, 6).toUpperCase()}. Inspection in progress.';
+          break;
+        case 'completed_inspection':
+          title = 'Inspection Completed';
+          message =
+          'Inspection completed for your return from order #${orderId.substring(0, 6).toUpperCase()}. Refund will be processed soon.';
+          break;
+        case 'cancelled':
+          title = 'Return Request Cancelled';
+          message =
+          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been cancelled.';
+          break;
+        case 'pending_approval':
+          title = 'Return Request Submitted';
+          message =
+          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been submitted and is pending approval.';
+          break;
+        case 'refunded':
+          title = 'Refund Processed';
+          message =
+          'Your refund for order #${orderId.substring(0, 6).toUpperCase()} has been successfully processed.';
+          break;
+        case 'not_refunded':
+          title = 'Refund Unsuccessful';
+          message =
+          'We were unable to process the refund for order #${orderId.substring(0, 6).toUpperCase()}. Please contact support.';
+          break;
+        default:
+          return false; // Don't send notification for other statuses
+      }
+
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': customerId,
+        'title': title,
+        'message': message,
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'returnId': returnId,
+          'returnStatus': newStatus,
+        },
+      });
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
 
 
 

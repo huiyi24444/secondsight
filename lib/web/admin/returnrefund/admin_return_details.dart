@@ -186,6 +186,7 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             // Right side - Navigation buttons
             Row(
               children: [
+                // Replace the dropdown section in _buildHeaderSection() with this:
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -203,45 +204,77 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
                         )
                       ]
                   ),
-                  child: DropdownButton<String>(
-                    value: currentStatus,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    items: [
-                      'pending_approval',
-                      'approved',
-                      'rejected',
-                      'refunded',
-                      'not_refunded',
-                      'cancelled',
-                      'pending_inspection',
-                      'completed_inspection',
-                    ].map((status) {
-                      return DropdownMenuItem(
-                        value: status,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.only(right: 6),
-                              decoration: BoxDecoration(
-                                color: ReturnStatusUtils.getReturnStatusColor(status),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            Text(
-                              ReturnStatusUtils.getReturnStatusText(status),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: _handleStatusChange,
-                  ),
+                  child: Consumer<AdminReturnDetailsController>(
+                    builder: (context, controller, child) {
+                      // Get allowed next statuses based on current status
+                      final allowedStatuses = [
+                        currentStatus, // Always include current status
+                        ...controller.getAllowedNextStatuses(currentStatus)
+                      ];
 
+                      // If no transitions are allowed, show read-only status
+                      if (allowedStatuses.length == 1) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: ReturnStatusUtils.getReturnStatusColor(currentStatus),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              Text(
+                                ReturnStatusUtils.getReturnStatusText(currentStatus),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.lock,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Show dropdown with allowed statuses
+                      return DropdownButton<String>(
+                        value: currentStatus,
+                        underline: const SizedBox(),
+                        isDense: true,
+                        items: allowedStatuses.map((status) {
+                          return DropdownMenuItem(
+                            value: status,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    color: ReturnStatusUtils.getReturnStatusColor(status),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                Text(
+                                  ReturnStatusUtils.getReturnStatusText(status),
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: _handleStatusChange,
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(width: 20),
                 // Navigation counter/indicator
@@ -296,11 +329,23 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
 
   Future<void> _handleStatusChange(String? newStatus) async {
     if (newStatus != null && newStatus != currentStatus) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
       try {
         final success = await widget.onUpdateReturnStatus(
           widget.returnRequest.id,
           newStatus,
         );
+
+        // Hide loading indicator
+        Navigator.of(context).pop();
 
         if (success) {
           setState(() {
@@ -311,14 +356,39 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             SnackBar(
               content: Text('Return status updated to ${widget.formatStatus(newStatus)}'),
               backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
             ),
           );
+        } else {
+          throw Exception('Failed to update status');
         }
       } catch (e) {
+        // Hide loading indicator if still showing
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+
+        String errorMessage = 'Failed to update status';
+
+        // Check for specific error types
+        if (e.toString().contains('Invalid status transition')) {
+          errorMessage = 'Invalid status transition. Please follow the correct workflow.';
+        } else if (e.toString().contains('Return request not found')) {
+          errorMessage = 'Return request not found.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update status: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
           ),
         );
       }
@@ -783,7 +853,9 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
             final item = entry.value;
             return _buildTimelineItem(
               item['title']!,
-              _formatDate(item['date'] as Timestamp),
+              _formatDate(item['date'] is DateTime
+                  ? Timestamp.fromDate(item['date'] as DateTime)
+                  : item['date'] as Timestamp),
               item['icon'] as IconData,
               item['color'] as Color,
               isCompleted: item['isCompleted'] as bool,

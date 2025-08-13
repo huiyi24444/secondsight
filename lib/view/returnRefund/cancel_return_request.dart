@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 import '../../model/return_request_model.dart';
 
 void showCancelDialog(BuildContext context, String userId, ReturnRequestModel returnRequest) {
@@ -47,12 +48,21 @@ void showCancelDialog(BuildContext context, String userId, ReturnRequestModel re
 Future<void> _cancelReturnRequest(
     BuildContext context, String userId, ReturnRequestModel returnRequest) async {
   try {
+
+    const String newStatus = 'cancelled';
     await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
         .collection('returnRequests')
         .doc(returnRequest.id)
         .update({'returnStatus': 'cancelled'});
+
+    await NotificationController.createReturnStatusNotification(
+      returnId: returnRequest.id,
+      newStatus: newStatus,
+      customerId: userId,
+      orderId: returnRequest.orderID,
+    );
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
