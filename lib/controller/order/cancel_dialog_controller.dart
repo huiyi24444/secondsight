@@ -2,6 +2,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 
 class CancelOrderDialogController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -141,6 +142,15 @@ class CancelOrderDialogController extends ChangeNotifier {
       );
 
       await batch.commit();
+
+      // 🔹 Create cancellation notification after batch success
+      await NotificationController.createOrderCancellationNotification(
+        customerId: customerId,
+        orderId: orderId,
+        cancellationReason: cancellationData['cancellationReason'] ?? '',
+        cancelNote: cancellationData['cancelNote'],
+      );
+
       await Future.delayed(const Duration(milliseconds: 500));
 
       setProcessing(false);

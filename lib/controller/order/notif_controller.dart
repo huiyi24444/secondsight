@@ -311,6 +311,33 @@ class NotificationController extends ChangeNotifier {
    }
   }
 
+  static Future<void> createOrderCancellationNotification({
+    required String customerId,
+    required String orderId,
+    required String cancellationReason,
+    String? cancelNote,
+  }) async {
+    try {
+      // Create cancellation notification
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': customerId,
+        'title': 'Order Cancelled',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been cancelled. Refund will be processed within 3-5 business days.',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': 'cancelled',
+          'cancellationReason': cancellationReason,
+          'refundExpected': true,
+        },
+      });
+    } catch (e) {
+      throw Exception('Failed to cancel order: $e');
+    }
+  }
+
 
 
 
