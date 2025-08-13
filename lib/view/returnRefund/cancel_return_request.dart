@@ -45,24 +45,29 @@ void showCancelDialog(BuildContext context, String userId, ReturnRequestModel re
   );
 }
 
+
+
 Future<void> _cancelReturnRequest(
     BuildContext context, String userId, ReturnRequestModel returnRequest) async {
   try {
-
     const String newStatus = 'cancelled';
+
+    // Update the return request status
     await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
         .collection('returnRequests')
         .doc(returnRequest.id)
-        .update({'returnStatus': 'cancelled'});
+        .update({'returnStatus': newStatus});
 
-    await NotificationController.createReturnStatusNotification(
+    // Create notification with proper parameters
+    await NotificationController.createReturnNotification(
       returnId: returnRequest.id,
       newStatus: newStatus,
-      customerId: userId,
-      orderId: returnRequest.orderID,
+      userId: userId,
+      productId: returnRequest.productID, // ✅ This should work now
+      orderId: returnRequest.orderID, // ✅ Add orderID as well
     );
+
+    debugPrint('✅ Return request cancelled and notification created');
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,6 +78,7 @@ Future<void> _cancelReturnRequest(
       );
     }
   } catch (e) {
+    debugPrint('❌ Error cancelling return request: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

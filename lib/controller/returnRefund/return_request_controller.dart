@@ -234,6 +234,7 @@ class ReturnRequestController extends ChangeNotifier {
   }
 
   // Submit return request with denormalized data
+  // Submit return request with denormalized data
   Future<void> submitRequest() async {
     if (!validateForm()) {
       throw Exception('Please provide a description');
@@ -290,19 +291,33 @@ class ReturnRequestController extends ChangeNotifier {
         refundID: null,
       );
 
+      debugPrint('🚀 [SUBMIT] About to create return request...');
+      debugPrint('📄 [DATA] orderId: $orderId, userId: $userId, productID: $productID');
+
       final docRef = await FirebaseFirestore.instance
           .collection('returnRequests')
           .add(returnRequest.toMap());
 
-      // 🔔 Create notification for new request
-      await NotificationController.createReturnStatusNotification(
-        returnId: docRef.id,
-        newStatus: returnRequest.returnStatus,
-        customerId: userId,
-        orderId: orderId,
-      );
+      debugPrint('✅ [SUCCESS] Return request created with ID: ${docRef.id}');
+
+      // 🔔 Create notification for new request with ALL required parameters
+      debugPrint('🔔 [SUBMIT] Creating notification...');
+      try {
+        await NotificationController.createReturnNotification(
+          returnId: docRef.id,
+          newStatus: returnRequest.returnStatus,
+          userId: userId,
+          productId: productID,
+          orderId: orderId, // ✅ ADD THIS MISSING PARAMETER
+        );
+        debugPrint('✅ [NOTIFICATION] User-side notification created successfully');
+      } catch (notificationError) {
+        debugPrint('❌ [NOTIFICATION] User-side notification failed: $notificationError');
+        // Don't throw - let the return request succeed even if notification fails
+      }
 
     } catch (e) {
+      debugPrint('❌ [SUBMIT] Submit request failed: $e');
       rethrow;
     } finally {
       isSubmitting = false;

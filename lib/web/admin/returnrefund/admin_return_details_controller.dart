@@ -1,6 +1,7 @@
 // admin_return_details_controller.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/controller/order/notif_controller.dart';
 import 'package:secondsight/view/widgets/product_status_utils.dart';
 import '../../../model/order_model.dart';
 import '../../../model/order_product_model.dart';
@@ -202,82 +203,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   }
 
   /// Create notification for return status update
-  Future<void> createReturnNotification({
-    required String returnId,
-    required String newStatus,
-    required String userId,
-    required String productId,
-  }) async {
-    String title = '';
-    String message = '';
 
-    switch (newStatus.toLowerCase()) {
-      case 'approved':
-        title = 'Return Request Approved';
-        message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been approved. Please ship the items back using the provided instructions.';
-        break;
-
-      case 'rejected':
-        title = 'Return Request Rejected';
-        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been rejected. Please contact support for more information.';
-        break;
-
-      case 'pending_inspection':
-        title = 'Items Received';
-        message = 'We have received your returned items from order #${ProductStatusUtils.shortProductId(productId)}. Our team is now inspecting them.';
-        break;
-
-      case 'completed_inspection':
-        title = 'Inspection Completed';
-        message = 'Inspection completed for your return from order #${ProductStatusUtils.shortProductId(productId)}. Processing your refund now.';
-        break;
-
-      case 'refunded':
-        title = 'Refund Processed';
-        message = 'Your refund for order #${ProductStatusUtils.shortProductId(productId)} has been processed. It should appear in your account within 3-5 business days.';
-        break;
-
-      case 'not_refunded':
-        title = 'Refund Unsuccessful';
-        message = 'We were unable to process the refund for order #${ProductStatusUtils.shortProductId(productId)}. Please contact support.';
-        break;
-
-      case 'completed':
-        title = 'Return Completed';
-        message = 'Your return for order #${ProductStatusUtils.shortProductId(productId)} has been completed successfully.';
-        break;
-
-      case 'cancelled':
-        title = 'Return Cancelled';
-        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been cancelled.';
-        break;
-
-      case 'pending_approval':
-        title = 'Return Request Submitted';
-        message = 'Your return request for order #${ProductStatusUtils.shortProductId(productId)} has been submitted and is pending approval.';
-        break;
-
-      default:
-        title = 'Return Update';
-        message = 'Your return request status has been updated to $newStatus for order #${ProductStatusUtils.shortProductId(productId)}.';
-    }
-
-
-    await firestore.collection('notifications').add({
-      'userId': userId,
-      'title': title,
-      'message': message,
-      'type': 'order_status',
-      'productId': productId,
-      'isRead': false,
-      'createdAt': FieldValue.serverTimestamp(),
-      'metadata': {
-        'returnId': returnId,
-        'returnStatus': newStatus,
-        'productName': _productDetails?['productName'] ?? 'Product',
-      },
-    });
-  }
 
   /// Format return status for display
   String formatReturnStatus(String status) {
@@ -383,34 +309,71 @@ class AdminReturnDetailsController extends ChangeNotifier {
     return allowedNextStatuses.contains(newStatus);
   }
 
-  /// Handle approved status transition
+  /// Handle approved status transition - WITH DEBUGGING
+  /// Handle approved status transition - WITH PROPER ERROR HANDLING
   Future<void> _handleApprovedStatus(String returnId, Map<String, dynamic> returnData) async {
+    // 🔍 DEBUG: Print all return data to see what fields are available
+    debugPrint('🔍 [DEBUG] Return data keys: ${returnData.keys.toList()}');
+    debugPrint('🔍 [DEBUG] Full return data: $returnData');
+
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID'];
 
-    // Create notification
-    await createReturnNotification(
+    // 🔍 DEBUG: Print extracted values
+    debugPrint('🔍 [DEBUG] userID: $userID');
+    debugPrint('🔍 [DEBUG] productID: $productID');
+    debugPrint('🔍 [DEBUG] orderID: $orderID');
+
+    // Check if required values are present
+    if (userID == null || productID == null) {
+      debugPrint('❌ [ERROR] Missing required fields: userID=$userID, productID=$productID');
+      throw Exception('Missing required notification data: userID or productID is null');
+    }
+
+    // Create notification with proper error handling
+    try {
+      debugPrint('🔔 [NOTIFICATION] Attempting to create notification...');
+
+      await NotificationController.createReturnNotification(
         returnId: returnId,
         newStatus: 'approved',
         userId: userID,
-        productId: productID
-    );
+        productId: productID,
+        orderId: orderID, // Can be null
+      );
+
+      debugPrint('✅ [SUCCESS] Notification created successfully');
+    } catch (notificationError) {
+      debugPrint('❌ [NOTIFICATION ERROR] Failed to create notification: $notificationError');
+      // Continue with status update even if notification fails
+    }
 
     // Update status with timestamp
-    await _updateReturnStatusOnly(returnId, 'approved');
+    try {
+      debugPrint('📝 [STATUS] Updating return status to approved...');
+      await _updateReturnStatusOnly(returnId, 'approved');
+      debugPrint('✅ [SUCCESS] Status updated successfully');
+    } catch (statusError) {
+      debugPrint('❌ [STATUS ERROR] Failed to update status: $statusError');
+      rethrow; // This is critical, so rethrow
+    }
   }
+
 
   /// Handle rejected status transition
   Future<void> _handleRejectedStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID']; // Add this
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'rejected',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'rejected',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Update status with timestamp
@@ -421,13 +384,15 @@ class AdminReturnDetailsController extends ChangeNotifier {
   Future<void> _handlePendingInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID']; // Add this
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'pending_inspection',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'pending_inspection',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Update status with timestamp
@@ -438,13 +403,15 @@ class AdminReturnDetailsController extends ChangeNotifier {
   Future<void> _handleCompletedInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID']; // Add this
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'completed_inspection',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'completed_inspection',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Update status with timestamp
@@ -494,11 +461,12 @@ class AdminReturnDetailsController extends ChangeNotifier {
     };
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'refunded',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'refunded',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Use batch write for atomicity
@@ -525,13 +493,15 @@ class AdminReturnDetailsController extends ChangeNotifier {
   Future<void> _handleNotRefundedStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID']; // Add this
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'not_refunded',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'not_refunded',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Update status with timestamp
@@ -548,6 +518,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   Future<void> _handleCancelledStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
+    final orderID = returnData['orderID']; // Add this
 
     // Create cancellation document reference
     final cancellationRef = firestore.collection('cancellation').doc();
@@ -564,11 +535,12 @@ class AdminReturnDetailsController extends ChangeNotifier {
     };
 
     // Create notification
-    await createReturnNotification(
-        returnId: returnId,
-        newStatus: 'cancelled',
-        userId: userID,
-        productId: productID
+    await NotificationController.createReturnNotification(
+      returnId: returnId,
+      newStatus: 'cancelled',
+      userId: userID,
+      productId: productID,
+      orderId: orderID, // Add this
     );
 
     // Use batch write for atomicity

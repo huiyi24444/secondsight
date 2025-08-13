@@ -329,6 +329,8 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
 
   Future<void> _handleStatusChange(String? newStatus) async {
     if (newStatus != null && newStatus != currentStatus) {
+      print('🚀 [UI] Status change triggered: $currentStatus → $newStatus');
+
       // Show loading indicator
       showDialog(
         context: context,
@@ -339,10 +341,13 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
       );
 
       try {
-        final success = await widget.onUpdateReturnStatus(
+        // ✅ CALL CONTROLLER DIRECTLY instead of widget callback
+        print('🔄 [UI] Calling controller.updateReturnStatus...');
+        final success = await _controller.updateReturnStatus(
           widget.returnRequest.id,
           newStatus,
         );
+        print('📋 [UI] controller.updateReturnStatus returned: $success');
 
         // Hide loading indicator
         Navigator.of(context).pop();
@@ -363,6 +368,8 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
           throw Exception('Failed to update status');
         }
       } catch (e) {
+        print('💥 [UI] Status change failed: $e');
+
         // Hide loading indicator if still showing
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
@@ -394,7 +401,6 @@ class _ReturnDetailsPageState extends State<ReturnDetailsPage> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final adminProvider = Provider.of<AdminAuthProvider>(context);

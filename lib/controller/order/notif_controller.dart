@@ -6,6 +6,7 @@ import '../../model/notif_model.dart';
 import '../../model/order_model.dart';
 import '../../view/chat/chat_order_selection.dart';
 import '../../view/order/order_details_view.dart';
+import '../../view/widgets/product_status_utils.dart';
 import '../chat/chat_support_controller.dart';
 
 class NotificationController extends ChangeNotifier {
@@ -298,88 +299,125 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
-  static Future<bool> createReturnStatusNotification({
+  static Future<void> createReturnNotification({
     required String returnId,
     required String newStatus,
-    required String customerId,
-    required String orderId,
+    required String userId,
+    required String productId,
+    String? orderId,
   }) async {
     try {
-      // Create appropriate notification based on return status
+      // 🔍 DEBUG: Log all parameters
+      debugPrint('🔔 [NOTIFICATION] Creating return notification:');
+      debugPrint('   - returnId: $returnId');
+      debugPrint('   - newStatus: $newStatus');
+      debugPrint('   - userId: $userId');
+      debugPrint('   - productId: $productId');
+      debugPrint('   - orderId: $orderId');
+
       String title = '';
       String message = '';
 
       switch (newStatus.toLowerCase()) {
         case 'approved':
           title = 'Return Request Approved';
-          message =
-          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been approved. Please ship the items back.';
+          message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been approved. Please ship the items back using the provided instructions.';
           break;
+
         case 'rejected':
           title = 'Return Request Rejected';
-          message =
-          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been rejected. Contact support for more information.';
+          message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been rejected. Please contact support for more information.';
           break;
-        case 'completed':
-          title = 'Return Completed';
-          message =
-          'Your return for order #${orderId.substring(0, 6).toUpperCase()} has been completed. Refund has been processed.';
-          break;
+
         case 'pending_inspection':
           title = 'Items Received';
-          message =
-          'We have received your returned items from order #${orderId.substring(0, 6).toUpperCase()}. Inspection in progress.';
+          message = 'We have received your returned items for product #${ProductStatusUtils.shortProductId(productId)}. Our team is now inspecting them.';
           break;
+
         case 'completed_inspection':
           title = 'Inspection Completed';
-          message =
-          'Inspection completed for your return from order #${orderId.substring(0, 6).toUpperCase()}. Refund will be processed soon.';
+          message = 'Inspection completed for your return of product #${ProductStatusUtils.shortProductId(productId)}. Processing your refund now.';
           break;
-        case 'cancelled':
-          title = 'Return Request Cancelled';
-          message =
-          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been cancelled.';
-          break;
-        case 'pending_approval':
-          title = 'Return Request Submitted';
-          message =
-          'Your return request for order #${orderId.substring(0, 6).toUpperCase()} has been submitted and is pending approval.';
-          break;
+
         case 'refunded':
           title = 'Refund Processed';
-          message =
-          'Your refund for order #${orderId.substring(0, 6).toUpperCase()} has been successfully processed.';
+          message = 'Your refund for product #${ProductStatusUtils.shortProductId(productId)} has been processed. It should appear in your account within 3-5 business days.';
           break;
+
         case 'not_refunded':
           title = 'Refund Unsuccessful';
-          message =
-          'We were unable to process the refund for order #${orderId.substring(0, 6).toUpperCase()}. Please contact support.';
+          message = 'We were unable to process the refund for product #${ProductStatusUtils.shortProductId(productId)}. Please contact support.';
           break;
+
+        case 'completed':
+          title = 'Return Completed';
+          message = 'Your return for product #${ProductStatusUtils.shortProductId(productId)} has been completed successfully.';
+          break;
+
+        case 'cancelled':
+          title = 'Return Cancelled';
+          message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been cancelled.';
+          break;
+
+        case 'pending_approval':
+          title = 'Return Request Submitted';
+          message = 'Your return request for product #${ProductStatusUtils.shortProductId(productId)} has been submitted and is pendinggg approval.';
+          break;
+
         default:
-          return false; // Don't send notification for other statuses
+          title = 'Return Update';
+          message = 'Your return request status has been updated to $newStatus for product #${ProductStatusUtils.shortProductId(productId)}.';
       }
 
+      // 🔍 DEBUG: Log notification content
+      debugPrint('📝 [NOTIFICATION] Title: $title');
+      debugPrint('📝 [NOTIFICATION] Message: $message');
 
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'userId': customerId,
+      final notificationData = {
+        'userId': userId,
         'title': title,
         'message': message,
-        'type': 'order_status',
+        'type': 'return_status',
         'orderId': orderId,
+        'productId': productId,
         'isRead': false,
         'createdAt': FieldValue.serverTimestamp(),
         'metadata': {
           'returnId': returnId,
           'returnStatus': newStatus,
+          'productId': productId,
+          'orderId': orderId,
         },
-      });
+      };
 
-      return true;
-    } catch (e) {
-      return false;
+      // 🔍 DEBUG: Log notification data
+      debugPrint('💾 [FIRESTORE] Writing notification data: $notificationData');
+
+      final docRef = await FirebaseFirestore.instance
+          .collection('notifications')
+          .add(notificationData);
+
+      debugPrint('✅ [SUCCESS] Return notification created with ID: ${docRef.id}');
+      debugPrint('   - For user: $userId');
+      debugPrint('   - Status: $newStatus');
+      debugPrint('   - Return ID: $returnId');
+
+    } catch (e, stackTrace) {
+      debugPrint('❌ [ERROR] Failed to create return notification: $e');
+      debugPrint('📋 [STACK] $stackTrace');
+
+      // Check specific error types
+      if (e.toString().contains('permission')) {
+        debugPrint('🔒 [PERMISSION] Check Firestore security rules for notifications collection');
+      }
+      if (e.toString().contains('network')) {
+        debugPrint('🌐 [NETWORK] Check internet connection');
+      }
+
+      // ⚠️ IMPORTANT: Rethrow the error so we can see it in the admin controller
+      rethrow;
     }
   }
-
 
 
 
