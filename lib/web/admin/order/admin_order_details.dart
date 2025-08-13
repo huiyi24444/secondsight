@@ -1188,7 +1188,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           _buildInfoRow(
             'Shipped',
             shipment?.shippedDate != null
-                ? _formatDateTime(shipment!.shippedDate!)
+                ? DateFormatter.formatDateTime(shipment!.shippedDate!)
                 : 'Not yet shipped',
             valueColor: shipment?.shippedDate != null ? null : Colors.orange[600],
           ),
@@ -1462,7 +1462,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 ),
                 if (date != null)
                   Text(
-                    _formatDateTime(date),
+                    DateFormatter.formatDateTime(date),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   )
                 else if (!isCompleted)
@@ -2040,16 +2040,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         backgroundColor: Colors.red,
       ),
     );
-  }
-
-  String _formatDate(DateTime dateTime) {
-    final formatter = DateFormat('dd MMM yyyy');
-    return formatter.format(dateTime);
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final formatter = DateFormat('dd MMM yyyy, HH:mm');
-    return formatter.format(dateTime);
   }
 
   String getReturnEligibilityText(OrdersModel order) {
