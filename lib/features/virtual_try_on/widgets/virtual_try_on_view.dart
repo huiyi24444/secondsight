@@ -654,295 +654,120 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
-        // Camera preview
-        SizedBox(
-          child: CameraPreview(widget.cameraController),
-        ),
+        // Camera preview area with overlays
+        Expanded(
+          child: Stack(
+            children: [
+              // Camera
+              CameraPreview(widget.cameraController),
 
-        // Camera preview with repaint boundary - constrained to camera area only
-        Positioned.fill(
-          bottom: 120, // Adjust this value based on your control panel height
-          child: CustomPaint(
-            painter: ClothingOverlayPainter(
-              pose: _currentPose,
-              clothingImage: _clothingImage,
-              cameraSize: widget.cameraSize,
-              clothingType: widget.clothingType,
-            ),
-          ),
-        ),
-
-        // Loading indicator for image
-        if (_isLoadingImage)
-          Center(
-            child: Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 8),
-                  Text(
-                    'Loading clothing...',
-                    style: TextStyle(color: Colors.white),
+              // Clothing overlay
+              Positioned.fill(
+                child: ClipRect(
+                  child: CustomPaint(
+                    painter: ClothingOverlayPainter(
+                      pose: _currentPose,
+                      clothingImage: _clothingImage,
+                      cameraSize: widget.cameraSize,
+                      clothingType: widget.clothingType,
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
 
-        // Debug overlay
-        Positioned(
-          top: 0,
-          left: 0,
-          child: Container(
-            color: Colors.black54,
-            padding: EdgeInsets.all(8),
-            child: Text(
-              'Pose: ${_currentPose != null ? "Detected" : "Not detected"}\n'
-                  'Landmarks: ${_currentPose?.landmarks.length ?? 0}\n'
-                  'Type: ${widget.clothingType}\n'
-                  'Image: ${_clothingImage != null ? "Loaded" : _isLoadingImage ? "Loading..." : "Failed"}\n'
-                  'Stream: ${_isImageStreamActive ? "Active" : "Inactive"}',
-              style: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ),
-        ),
-
-        // Camera controls
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withOpacity(0.8),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Timer settings panel
-                if (_showTimerSettings)
-                  Container(
-                    margin: EdgeInsets.only(bottom: 20),
+              // Loading indicator
+              if (_isLoadingImage)
+                Center(
+                  child: Container(
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 8),
                         Text(
-                          'Timer Duration',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [3, 5, 10].map((seconds) {
-                            final isSelected = _timerDuration == seconds;
-                            return GestureDetector(
-                              onTap: () => _setTimerDuration(seconds),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white),
-                                ),
-                                child: Text(
-                                  '${seconds}s',
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                          'Loading clothing...',
+                          style: TextStyle(color: Colors.white),
                         ),
                       ],
                     ),
                   ),
-
-                // Main controls row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Gallery button
-                    Stack(
-                      children: [
-                        IconButton(
-                          onPressed: _viewGallery,
-                          icon: Icon(Icons.photo_library_outlined),
-                          iconSize: 30,
-                          color: Colors.white,
-                        ),
-                        if (_recentImages.isNotEmpty)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).primaryColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${_recentImages.length}',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    // Capture button with timer
-                    GestureDetector(
-                      onTap: _isCapturing || _isTimerActive ? null :
-                      (_timerDuration > 0 ? _startTimer : _capturePhoto),
-                      child: AnimatedBuilder(
-                        animation: _isTimerActive ? _timerAnimation : _pulseAnimation,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _isTimerActive ? _timerAnimation.value : 1.0,
-                            child: Container(
-                              width: 70,
-                              height: 70,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _isTimerActive ? Colors.red : Colors.white,
-                                  width: 4,
-                                ),
-                                color: _isCapturing ? Colors.grey :
-                                _isTimerActive ? Colors.red.withOpacity(0.8) : Colors.white,
-                              ),
-                              child: _isCapturing
-                                  ? Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                                  strokeWidth: 3,
-                                ),
-                              )
-                                  : _isTimerActive
-                                  ? Center(
-                                child: Text(
-                                  '$_remainingTime',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              )
-                                  : Icon(
-                                Icons.camera,
-                                color: Colors.black,
-                                size: 35,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    // Timer settings button
-                    GestureDetector(
-                      onTap: _isTimerActive ? _cancelTimer : _showTimerOptions,
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _isTimerActive ? Colors.red.withOpacity(0.8) :
-                          _showTimerSettings ? Colors.white : Colors.transparent,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: Icon(
-                          _isTimerActive ? Icons.close :
-                          _showTimerSettings ? Icons.timer_off : Icons.timer,
-                          color: _isTimerActive ? Colors.white :
-                          _showTimerSettings ? Colors.black : Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
 
-                // Timer indicator
-                if (_timerDuration > 0 && !_isTimerActive && !_showTimerSettings)
-                  Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Timer: ${_timerDuration}s',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
+              // Debug overlay
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  color: Colors.black54,
+                  padding: EdgeInsets.all(8),
+                  child: Text(
+                    'Pose: ${_currentPose != null ? "Detected" : "Not detected"}\n'
+                        'Landmarks: ${_currentPose?.landmarks.length ?? 0}\n'
+                        'Type: ${widget.clothingType}\n'
+                        'Image: ${_clothingImage != null ? "Loaded" : _isLoadingImage ? "Loading..." : "Failed"}\n'
+                        'Stream: ${_isImageStreamActive ? "Active" : "Inactive"}',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
 
-        if (_isTimerActive)
-          Center(
-            child: AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.black.withOpacity(0.8),
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$_remainingTime',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                        ),
+        // Camera controls (completely separate section below)
+        Container(
+          height: 235, // fixed height for controls
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white, // or gradient if you want
+          ),
+          padding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Example control buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    onPressed: _viewGallery,
+                    icon: Icon(Icons.photo_library_outlined),
+                    iconSize: 30,
+                  ),
+                  GestureDetector(
+                    onTap: _isCapturing ? null : _capturePhoto,
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black,
                       ),
+                      child: Icon(Icons.camera, color: Colors.white, size: 35),
                     ),
                   ),
-                );
-              },
-            ),
+                  IconButton(
+                    onPressed: _showTimerOptions,
+                    icon: Icon(Icons.timer),
+                    iconSize: 30,
+                  ),
+                ],
+              ),
+            ],
           ),
+        ),
       ],
     );
   }
+
+
 
 }
 
