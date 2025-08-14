@@ -142,15 +142,25 @@ class _RegisterViewState extends State<RegisterView> {
                           filled: true,
                           fillColor: theme.cardColor,
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your name';
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a password';
+                            }
+                            if (value.length < 8) {
+                              return 'Password must be at least 8 characters';
+                            }
+                            if (!RegExp(r'^(?=.*[A-Z])').hasMatch(value)) {
+                              return 'Password must contain at least one uppercase letter';
+                            }
+                            if (!RegExp(r'^(?=.*\d)').hasMatch(value)) {
+                              return 'Password must contain at least one number';
+                            }
+                            if (!RegExp(r'^(?=.*[!@#\$&*~])').hasMatch(value)) {
+                              return 'Password must contain at least one special character';
+                            }
+                            return null;
                           }
-                          if (value.length < 3) {
-                            return 'Name must be at least 3 characters';
-                          }
-                          return null;
-                        },
+
                       ),
                       const SizedBox(height: 16),
 

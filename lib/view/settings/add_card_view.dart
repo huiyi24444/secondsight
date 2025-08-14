@@ -118,37 +118,6 @@ class _AddCardForm extends StatelessWidget {
 
                 const Spacer(),
 
-                // Information about the process
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.orange[700],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'You\'ll be redirected to a secure payment form to enter your card details. No charges will be made at this time.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.orange[700],
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
                 // Add payment method button
                 LongButton(
                   label: controller.isLoading ? "Processing..." : "Add Payment Card",
@@ -158,38 +127,6 @@ class _AddCardForm extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 16),
-
-                // Test mode notice (remove in production)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.amber.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_outlined,
-                        color: Colors.amber[700],
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Test Mode: Use card 4242 4242 4242 4242 with any future date and CVC',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.amber[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),

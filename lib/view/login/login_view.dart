@@ -58,10 +58,12 @@ class _LoginViewState extends State<LoginView> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // App Logo or Title
-                      Icon(
-                        Icons.lock_outline,
-                        size: 80,
-                        color: theme.primaryColor,
+                      SizedBox(
+                        height: 100, // bigger height
+                        child: Image.asset(
+                          'assets/images/secondsight_logo.png',
+                          fit: BoxFit.contain,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       Text(
