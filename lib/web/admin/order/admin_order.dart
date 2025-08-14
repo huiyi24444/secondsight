@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:secondsight/view/widgets/user_utils.dart';
 import '../../../model/order_model.dart';
@@ -24,6 +25,8 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   late OrderManagementController _controller;
   bool _isProcessing = false;
 
+  bool showAdvancedFilters = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,14 +43,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     super.dispose();
   }
 
-  void _showCreateOrderDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return CreateOrderDialog(onOrderCreated: _controller.loadOrders);
-      },
-    );
-  }
+
 
   Future<void> _processBulkUpdate() async {
     // Validate selections
@@ -174,6 +170,8 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                           child: Column(
                             children: [
                               _buildHeader(controller),
+                              _buildAdvancedFiltersPanel(controller),
+                              const SizedBox(height: 10),
                               _buildFilterAndSortBar(controller),
                               _buildFilterTabs(controller),
                               const SizedBox(height: 20),
@@ -303,6 +301,20 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
             ),
           ),
           const SizedBox(width: 12),
+          // ADD THIS BUTTON:
+          IconButton(
+            onPressed: () {
+              setState(() {
+                showAdvancedFilters = !showAdvancedFilters;
+              });
+            },
+            icon: Icon(
+              showAdvancedFilters ? Icons.filter_list_off : Icons.filter_list,
+              color: showAdvancedFilters ? Color(0xFF7C3AED) : Colors.grey[600],
+            ),
+            tooltip: 'Advanced Filters',
+          ),
+          const SizedBox(width: 12),
           // Bulk Update Toggle Button
           ElevatedButton.icon(
             onPressed: controller.toggleBulkMode,
@@ -318,6 +330,207 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       ),
     );
   }
+
+  Widget _buildAdvancedFiltersPanel(OrderManagementController controller) {
+    if (!showAdvancedFilters) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Advanced Filters',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xFF7C3AED),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => controller.clearAllAdvancedFilters(),
+                icon: const Icon(Icons.clear, size: 16),
+                label: const Text('Clear All Filters'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+
+          // Single Row: Date Range + Amount Range
+          Row(
+            children: [
+              // Date Range
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Date Range',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    DropdownButtonFormField<DateRange>(
+                      value: controller.selectedDateRange,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        isDense: true,
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: DateRange.all, child: Text('All Time')),
+                        DropdownMenuItem(value: DateRange.today, child: Text('Today')),
+                        DropdownMenuItem(value: DateRange.yesterday, child: Text('Yesterday')),
+                        DropdownMenuItem(value: DateRange.last7Days, child: Text('Last 7 Days')),
+                        DropdownMenuItem(value: DateRange.last30Days, child: Text('Last 30 Days')),
+                        DropdownMenuItem(value: DateRange.thisMonth, child: Text('This Month')),
+                        DropdownMenuItem(value: DateRange.lastMonth, child: Text('Last Month')),
+                        DropdownMenuItem(value: DateRange.custom, child: Text('Custom Range')),
+                      ],
+                      onChanged: (value) {
+                        controller.setDateRange(value!);
+                        if (value == DateRange.custom) {
+                          _showCustomDateRangeDialog(controller);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 15),
+
+              // Amount Range
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Amount Range (RM)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: controller.minAmountController,
+                            decoration: InputDecoration(
+                              hintText: 'Min',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly, // Allow numbers only
+                            ],
+                            onChanged: (_) => controller.applyAdvancedFilters(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('-'),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: controller.maxAmountController,
+                            decoration: InputDecoration(
+                              hintText: 'Max',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly, // Allow numbers only
+                            ],
+                            onChanged: (_) => controller.applyAdvancedFilters(),
+
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Custom small dialog for date range selection
+  Future<void> _showCustomDateRangeDialog(
+      OrderManagementController controller) async {
+    DateTimeRange tempRange = controller.customDateRange ??
+        DateTimeRange(start: DateTime.now(), end: DateTime.now());
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Select Custom Date Range'),
+          content: SizedBox(
+            width: 300,
+            height: 200,
+            child: CalendarDatePicker(
+              initialDate: tempRange.start,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              onDateChanged: (picked) {
+                tempRange = DateTimeRange(
+                  start: picked,
+                  end: tempRange.end.isBefore(picked) ? picked : tempRange.end,
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                controller.setCustomDateRange(tempRange);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 
   Widget _buildFilterAndSortBar(OrderManagementController controller) {
     return Container(

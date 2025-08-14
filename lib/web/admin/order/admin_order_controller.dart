@@ -57,6 +57,35 @@ class OrderManagementController extends ChangeNotifier {
   int get endIndex => startIndex + _itemsPerPage;
   int get selectedCount => _selectedOrders.values.where((selected) => selected).length;
 
+  // Advanced Filter Properties
+  String _selectedStatusFilter = 'All Statuses';
+  DateRange _selectedDateRange = DateRange.all;
+  String _selectedPaymentMethod = 'All Methods';
+  String _selectedProductCountFilter = 'All Counts';
+  DateTimeRange? _customDateRange;
+
+  final TextEditingController minAmountController = TextEditingController();
+  final TextEditingController maxAmountController = TextEditingController();
+
+  // ADD NEW GETTERS:
+  String get selectedStatusFilter => _selectedStatusFilter;
+  DateRange get selectedDateRange => _selectedDateRange;
+  String get selectedPaymentMethod => _selectedPaymentMethod;
+  String get selectedProductCountFilter => _selectedProductCountFilter;
+  DateTimeRange? get customDateRange => _customDateRange;
+
+  bool get hasActiveFilters {
+    return _selectedStatusFilter != 'All Statuses' ||
+        _selectedDateRange != DateRange.all ||
+        _selectedPaymentMethod != 'All Methods' ||
+        _selectedProductCountFilter != 'All Counts' ||
+        minAmountController.text.isNotEmpty ||
+        maxAmountController.text.isNotEmpty;
+  }
+
+
+
+
   // Check if all "to_ship" orders are selected
   bool get allToShipSelected {
     final toShipOrders = _filteredOrders.where((order) =>
@@ -305,7 +334,7 @@ class OrderManagementController extends ChangeNotifier {
   void filterOrders() {
     List<OrdersModel> filtered = _orders;
 
-    // Filter by status
+    // Existing status filter (from tabs)
     if (_selectedTab != 'All') {
       filtered = filtered.where((order) {
         switch (_selectedTab) {
@@ -323,7 +352,80 @@ class OrderManagementController extends ChangeNotifier {
       }).toList();
     }
 
-    // Filter by search
+    // ADD ADVANCED FILTERS:
+
+    // Additional Status Filter
+    if (_selectedStatusFilter != 'All Statuses') {
+      filtered = filtered.where((order) =>
+      order.orderStatus.toLowerCase() == _selectedStatusFilter.toLowerCase()).toList();
+    }
+
+    // Date Range Filter
+    if (_selectedDateRange != DateRange.all) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      filtered = filtered.where((order) {
+        final orderDate = DateTime(order.orderDate.year, order.orderDate.month, order.orderDate.day);
+
+        switch (_selectedDateRange) {
+          case DateRange.today:
+            return orderDate.isAtSameMomentAs(today);
+          case DateRange.yesterday:
+            return orderDate.isAtSameMomentAs(today.subtract(Duration(days: 1)));
+          case DateRange.last7Days:
+            return orderDate.isAfter(today.subtract(Duration(days: 7)));
+          case DateRange.last30Days:
+            return orderDate.isAfter(today.subtract(Duration(days: 30)));
+          case DateRange.thisMonth:
+            return orderDate.year == now.year && orderDate.month == now.month;
+          case DateRange.lastMonth:
+            final lastMonth = DateTime(now.year, now.month - 1);
+            return orderDate.year == lastMonth.year && orderDate.month == lastMonth.month;
+          case DateRange.custom:
+            if (_customDateRange != null) {
+              return orderDate.isAfter(_customDateRange!.start.subtract(Duration(days: 1))) &&
+                  orderDate.isBefore(_customDateRange!.end.add(Duration(days: 1)));
+            }
+            return true;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Amount Range Filter
+    if (minAmountController.text.isNotEmpty || maxAmountController.text.isNotEmpty) {
+      filtered = filtered.where((order) {
+        final amount = order.totalAmount;
+        final minAmount = double.tryParse(minAmountController.text) ?? 0.0;
+        final maxAmount = double.tryParse(maxAmountController.text) ?? double.infinity;
+
+        return amount >= minAmount && amount <= maxAmount;
+      }).toList();
+    }
+
+    // Product Count Filter
+    if (_selectedProductCountFilter != 'All Counts') {
+      filtered = filtered.where((order) {
+        final productCount = _orderProducts[order.id]?.length ?? 0;
+
+        switch (_selectedProductCountFilter) {
+          case '1':
+            return productCount == 1;
+          case '2-5':
+            return productCount >= 2 && productCount <= 5;
+          case '6-10':
+            return productCount >= 6 && productCount <= 10;
+          case '10+':
+            return productCount > 10;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Existing search filter
     if (searchController.text.isNotEmpty) {
       final search = searchController.text.toLowerCase();
       filtered = filtered.where((order) =>
@@ -332,12 +434,12 @@ class OrderManagementController extends ChangeNotifier {
       ).toList();
     }
 
-    // Filter overdue only if toggle is on
+    // Existing overdue filter
     if (_showOverdueOnly) {
       filtered = filtered.where((order) => isOrderOverdue(order)).toList();
     }
 
-    // Apply sorting
+    // MODIFY SORTING to include new options:
     switch (_currentSort) {
       case SortOption.dateNewest:
         filtered.sort((a, b) => b.orderDate.compareTo(a.orderDate));
@@ -353,6 +455,20 @@ class OrderManagementController extends ChangeNotifier {
           if (!aOverdue && bOverdue) return 1;
           return b.orderDate.compareTo(a.orderDate);
         });
+        break;
+      case SortOption.amountHighLow:
+        filtered.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+        break;
+      case SortOption.amountLowHigh:
+        filtered.sort((a, b) => a.totalAmount.compareTo(b.totalAmount));
+        break;
+      case SortOption.customerAZ:
+        filtered.sort((a, b) => (_customerNames[a.customerId] ?? '')
+            .compareTo(_customerNames[b.customerId] ?? ''));
+        break;
+      case SortOption.customerZA:
+        filtered.sort((a, b) => (_customerNames[b.customerId] ?? '')
+            .compareTo(_customerNames[a.customerId] ?? ''));
         break;
     }
 
@@ -521,13 +637,64 @@ class OrderManagementController extends ChangeNotifier {
       throw Exception('Failed to cancel order: $e');
     }
   }
+
   @override
   void dispose() {
     searchController.removeListener(_onSearchChanged);
     searchController.dispose();
+
+    // ADD THESE LINES:
+    minAmountController.dispose();
+    maxAmountController.dispose();
+
     // Dispose all tracking controllers
     _trackingControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
+  }
+
+
+  void setStatusFilter(String status) {
+    _selectedStatusFilter = status;
+    applyAdvancedFilters();
+  }
+
+  void setDateRange(DateRange range) {
+    _selectedDateRange = range;
+    if (range != DateRange.custom) {
+      _customDateRange = null;
+    }
+    applyAdvancedFilters();
+  }
+
+  void setCustomDateRange(DateTimeRange range) {
+    _customDateRange = range;
+    applyAdvancedFilters();
+  }
+
+  void setPaymentMethodFilter(String method) {
+    _selectedPaymentMethod = method;
+    applyAdvancedFilters();
+  }
+
+  void setProductCountFilter(String count) {
+    _selectedProductCountFilter = count;
+    applyAdvancedFilters();
+  }
+
+  void clearAllAdvancedFilters() {
+    _selectedStatusFilter = 'All Statuses';
+    _selectedDateRange = DateRange.all;
+    _selectedPaymentMethod = 'All Methods';
+    _selectedProductCountFilter = 'All Counts';
+    _customDateRange = null;
+    minAmountController.clear();
+    maxAmountController.clear();
+    _currentSort = SortOption.dateNewest;
+    applyAdvancedFilters();
+  }
+
+  void applyAdvancedFilters() {
+    filterOrders();
   }
 }
 
@@ -536,7 +703,13 @@ enum SortOption {
   dateNewest,
   dateOldest,
   overdueFirst,
+  amountHighLow,    // ADD THIS
+  amountLowHigh,    // ADD THIS
+  customerAZ,       // ADD THIS
+  customerZA,       // ADD THIS
 }
+
+
 
 // Extension to add copyWith method to OrdersModel
 extension OrdersModelExtension on OrdersModel {
@@ -552,4 +725,14 @@ extension OrdersModelExtension on OrdersModel {
         paymentCard: this.paymentCard
     );
   }
+}
+enum DateRange {
+  all,
+  today,
+  yesterday,
+  last7Days,
+  last30Days,
+  thisMonth,
+  lastMonth,
+  custom,
 }
