@@ -106,29 +106,30 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
           ),
           child: Container(
             padding: EdgeInsets.all(20),
+            constraints: BoxConstraints(
+              maxWidth: 160, // limit dialog width
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Lottie Animation
                 SizedBox(
-                  height: 220,
-                  width: 220,
+                  height: 200,
+                  width: 200,
                   child: Lottie.asset(
                     'assets/animations/vto_icon.json',
-                    height: 220,
-                    width: 220,
+                    height: 200,
+                    width: 200,
                     fit: BoxFit.contain,
                   ),
                 ),
-
-                SizedBox(height: 3),
 
                 // Guide Text
                 Text(
                   'Place your phone upright at a 90° angle\nand position it slightly farther away for the best experience.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     color: Colors.black87,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
@@ -156,7 +157,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
                       'Got it!',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
