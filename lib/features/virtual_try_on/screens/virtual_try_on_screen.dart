@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../../model/product_model.dart';
@@ -9,6 +10,7 @@ import '../widgets/virtual_try_on_view.dart';
 class VirtualTryOnScreen extends StatefulWidget {
   final String productId;
   final Product? product;
+
 
   const VirtualTryOnScreen({
     Key? key,
@@ -28,10 +30,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
   bool _hasPermission = false;
   String _errorMessage = '';
 
+  bool _showGuide = true;  // Show guide initially
+  bool _hasSeenGuide = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    print('[DEBUG] VirtualTryOnScreen initialized.');
+    print('[DEBUG] _showGuide: $_showGuide, _hasSeenGuide: $_hasSeenGuide');
+
     _initializeApp();
   }
 
@@ -40,13 +49,31 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     if (widget.product != null) {
       _product = widget.product;
     } else {
-      await _loadProduct();
+      _loadProduct();
     }
 
     // Then initialize camera
     await _initializeCamera();
-
     setState(() => _isLoading = false);
+
+
+    // Show guide dialog after everything is loaded
+    if (_showGuide && !_hasSeenGuide && mounted) {
+      // Add a small delay to ensure the camera preview is ready
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          _showGuideDialog();
+        }
+      });
+    }
+  }
+
+  // Method to dismiss guide
+  void _dismissGuide() {
+    setState(() {
+      _showGuide = false;
+      _hasSeenGuide = true;
+    });
   }
 
   Future<void> _loadProduct() async {
@@ -65,6 +92,82 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
       print('Error loading product: $e');
       _errorMessage = 'Failed to load product';
     }
+  }
+
+  // Show guide dialog over camera
+  void _showGuideDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Lottie Animation
+                SizedBox(
+                  height: 220,
+                  width: 220,
+                  child: Lottie.asset(
+                    'assets/animations/vto_icon.json',
+                    height: 220,
+                    width: 220,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+
+                SizedBox(height: 3),
+
+                // Guide Text
+                Text(
+                  'Place your phone upright at a 90° angle\nand position it slightly farther away for the best experience.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.black87,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                SizedBox(height: 24),
+
+                // Continue Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 45,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close dialog
+                      _dismissGuide(); // Update state
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF8E6CEF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Got it!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _initializeCamera() async {
@@ -192,6 +295,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
 
   @override
   Widget build(BuildContext context) {
+
     // Show loading screen
     if (_isLoading) {
       return Scaffold(
@@ -425,3 +529,4 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     );
   }
 }
+

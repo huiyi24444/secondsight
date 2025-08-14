@@ -98,6 +98,7 @@ flutter:
   assets:
     - assets/images/
     - assets/animations/loading.json
+    - assets/animations/vto_icon.json
 
   fonts:
     - family: Gabarito

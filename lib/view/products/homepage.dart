@@ -448,7 +448,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   showDebugInfo:
                   isLoggedIn, // Only show debug info for logged-in users
                 ),
-
+                const SizedBox(height: 20),
                 // Recommendations section - show for ALL users
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
