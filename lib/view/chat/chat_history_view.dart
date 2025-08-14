@@ -1,6 +1,7 @@
 // views/chat/conversation_list_page.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../model/conversation_model.dart';
 import '../../services/auth_provider.dart';
 import '../widgets/chat_history_widget.dart';
@@ -28,8 +29,7 @@ class ConversationListPage extends StatelessWidget {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        leading: CustomBackButton(),
       ),
       body: ConversationList(
         firestore: firestore,

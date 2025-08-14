@@ -196,31 +196,83 @@ class ChatSupportController extends ChangeNotifier {
 
   Future<void> loadConversation(String conversationId) async {
     try {
+      // Set flags immediately to prevent showing order selection
       _showConversationList = false;
       _showOrderSelection = false;
+      _currentConversation = ConversationModel(
+        id: conversationId,
+        userId: '', // Will be updated below
+        orderId: '', // Will be updated below
+        status: 'active', // Will be updated below
+        createdAt: Timestamp.now(), // Will be updated below
+        lastMessageAt: Timestamp.now(), // Will be updated below
+      );
+      notifyListeners(); // Immediate UI update
 
-      // Load conversation using the model
+      // Load conversation data from Firestore
       final conversationDoc = await _firestore
           .collection('conversations')
           .doc(conversationId)
           .get();
 
       if (conversationDoc.exists) {
+        // Update with real conversation data
         _currentConversation = ConversationModel.fromFirestore(conversationDoc);
 
-        // Load the associated order if needed
-        if (_currentConversation != null && _selectedOrder == null) {
-          // You might want to load the order data here
-          // based on _currentConversation.orderId
+        // Load the associated order if it exists and is not a general inquiry
+        if (_currentConversation!.orderId != 'general' && _currentConversation!.orderId.isNotEmpty) {
+          try {
+            final orderDoc = await _firestore
+                .collection('users')
+                .doc(_currentConversation!.userId)
+                .collection('order')
+                .doc(_currentConversation!.orderId)
+                .get();
+
+            if (orderDoc.exists) {
+              _selectedOrder = OrdersModel.fromJson(
+                orderDoc.data() as Map<String, dynamic>,
+                orderDoc.id,
+              );
+            }
+          } catch (e) {
+            print('Error loading order: $e');
+            // If order loading fails, create a placeholder
+            _selectedOrder = OrdersModel(
+              id: _currentConversation!.orderId,
+              orderDate: DateTime.now(),
+              orderStatus: 'unknown',
+              totalAmount: 0.0,
+              eligibilityForReturn: false,
+              totalProduct: 0,
+              paymentCard: '',
+            );
+          }
+        } else {
+          // It's a general inquiry
+          _selectedOrder = OrdersModel(
+            id: 'General Inquiry',
+            orderDate: DateTime.now(),
+            orderStatus: 'general',
+            totalAmount: 0.0,
+            eligibilityForReturn: false,
+            totalProduct: 0,
+            paymentCard: '',
+          );
         }
 
         notifyListeners();
+      } else {
+        // Conversation doesn't exist, go back to order selection
+        showOrderSelectionView();
       }
     } catch (e) {
       print('Error loading conversation: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to load conversation')),
       );
+      // On error, go back to order selection
+      showOrderSelectionView();
     }
   }
 

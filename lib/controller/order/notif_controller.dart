@@ -161,7 +161,7 @@ class NotificationController extends ChangeNotifier {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChatSupportView(
+                builder: (_) => ChatOrderSelection(
                   //preloadedController: chatController,
                 ),
               ),

@@ -9,13 +9,13 @@ import '../../services/auth_provider.dart';
 import '../widgets/build_message.dart';
 import 'end_chat_dialog.dart';
 
-class ChatInterfaceWidget extends StatelessWidget {
+class ChatInterfaceView extends StatelessWidget {
   final dynamic controller;
   final ScrollController scrollController;
   final TextEditingController messageController;
 
 
-  const ChatInterfaceWidget({
+  const ChatInterfaceView({
     Key? key,
     required this.controller,
     required this.scrollController,

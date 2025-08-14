@@ -18,14 +18,14 @@ import 'chat_history_view.dart';
 import 'chat_interface_view.dart';
 import 'end_chat_dialog.dart';
 
-class ChatSupportView extends StatefulWidget {
-  const ChatSupportView({Key? key}) : super(key: key);
+class ChatOrderSelection extends StatefulWidget {
+  const ChatOrderSelection({Key? key}) : super(key: key);
 
   @override
-  State<ChatSupportView> createState() => _ChatSupportViewState();
+  State<ChatOrderSelection> createState() => _ChatSupportViewState();
 }
 
-class _ChatSupportViewState extends State<ChatSupportView> {
+class _ChatSupportViewState extends State<ChatOrderSelection> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late ChatSupportController _controller;
@@ -76,7 +76,6 @@ class _ChatSupportViewState extends State<ChatSupportView> {
         title: Row(
           children: [
             Container(
-
               width: 40,
               height: 40,
               decoration: BoxDecoration(
@@ -154,9 +153,16 @@ class _ChatSupportViewState extends State<ChatSupportView> {
         onStartNew: () => _controller.showOrderSelectionView(),
         formatDate: _controller.formatDate,
       )
+      // Check for active conversation BEFORE checking order selection
+          : _controller.conversationId != null && !_controller.showOrderSelection
+          ? ChatInterfaceView(
+        controller: _controller,
+        scrollController: _scrollController,
+        messageController: _messageController,
+      )
           : _controller.showOrderSelection
           ? _buildOrderSelection()
-          : ChatInterfaceWidget(
+          : ChatInterfaceView(
         controller: _controller,
         scrollController: _scrollController,
         messageController: _messageController,
