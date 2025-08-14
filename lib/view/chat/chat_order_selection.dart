@@ -19,7 +19,13 @@ import 'chat_interface_view.dart';
 import 'end_chat_dialog.dart';
 
 class ChatOrderSelection extends StatefulWidget {
-  const ChatOrderSelection({Key? key}) : super(key: key);
+  final String? conversationIdToLoad;
+
+
+  const ChatOrderSelection({
+    Key? key,
+    this.conversationIdToLoad,
+  }) : super(key: key);
 
   @override
   State<ChatOrderSelection> createState() => _ChatSupportViewState();
@@ -35,7 +41,14 @@ class _ChatSupportViewState extends State<ChatOrderSelection> {
     super.initState();
     _controller = ChatSupportController(context);
     _controller.addListener(_onControllerUpdate);
-    _controller.showOrderSelectionView();
+
+    // Check if we need to load a specific conversation
+    if (widget.conversationIdToLoad != null) {
+      _controller.loadConversation(widget.conversationIdToLoad!);
+    } else {
+      _controller.showOrderSelectionView();
+    }
+
     _controller.setLoadingComplete();
   }
 

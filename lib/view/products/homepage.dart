@@ -13,6 +13,7 @@ import '../../model/product_model.dart';
 import '../../services/lazy_loading_grid.dart';
 import '../../services/recommendation_service.dart';
 import '../chat/chat_order_selection.dart';
+import '../chat/chat_selection_page.dart';
 import '../checkout/cart_view.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_provider.dart';
@@ -276,7 +277,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const ChatOrderSelection(),
+                        builder: (context) => const ChatSelectionPage(),
                       ),
                     );
                   },
