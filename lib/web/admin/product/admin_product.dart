@@ -459,7 +459,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                               columns: const [
                                 DataColumn(label: SizedBox(width: 30, child: Checkbox(value: false, onChanged: null))),
                                 DataColumn(label: Text('Product')),
-                                DataColumn(label: Text('SKU')),
+                                DataColumn(label: Text('ID')),
                                 DataColumn(label: Text('Category')),
                                 DataColumn(label: Text('Condition')),
                                 DataColumn(label: Text('Price')),

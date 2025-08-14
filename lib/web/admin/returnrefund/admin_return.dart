@@ -163,7 +163,7 @@ class ReturnManagementView extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        controller.formatStatus(item['status']),
+                                        ReturnStatusUtils.getReturnStatusText(item['status']),
                                         style: TextStyle(
                                           color: ReturnStatusUtils.getReturnStatusColor(item['status']),
                                           fontSize: 12,

@@ -313,7 +313,9 @@ class _CheckoutViewState extends State<CheckoutView> {
 
       // 👇 Create the order with the shipmentID included
       final orderRef = await userRef.collection('order').add({
+        'confirmedDate': Timestamp.fromDate(DateTime.now()),
         'orderDate': Timestamp.fromDate(DateTime.now()),
+        'toShipDate': Timestamp.fromDate(DateTime.now()),
         'orderStatus': 'to_ship',
         'totalAmount': widget.total,
         'eligibilityForReturn': true,

@@ -196,7 +196,9 @@ class OfflineRecommendationService {
           final products = await _firestore
               .collection('products')
               .where(FieldPath.documentId, whereIn: batchIds)
+              .where('productStatus', isEqualTo: 'available') // ✅ ADD THIS LINE
               .get();
+
 
           for (var product in products.docs) {
             final productData = product.data();
@@ -288,6 +290,20 @@ class OfflineRecommendationService {
     }
   }
 
+  List<PersonalizedRecommendation> _filterAvailableRecommendations(
+      List<PersonalizedRecommendation> recommendations,
+      List<Map<String, dynamic>> allProducts
+      ) {
+    final availableProductIds = allProducts
+        .where((product) => product['productStatus'] == 'available')
+        .map((product) => product['id'] as String)
+        .toSet();
+
+    return recommendations
+        .where((rec) => availableProductIds.contains(rec.productId))
+        .toList();
+  }
+
   /// Generate content-based recommendations
   Future<List<PersonalizedRecommendation>> _generateContentBasedRecommendations(
       UserPreferences preferences,
@@ -377,9 +393,8 @@ class OfflineRecommendationService {
     debugPrint("Total available products: ${allProducts.length}");
     debugPrint("Filtered product similarities: ${productSimilarities.length}");
 
-
-
-    return recommendations;
+    final filteredRecommendations = _filterAvailableRecommendations(recommendations, allProducts);
+    return filteredRecommendations;
   }
 
   /// Create user preference vector from interaction history
@@ -612,7 +627,7 @@ class OfflineRecommendationService {
     try {
       final popularProducts = await _firestore
           .collection('products')
-          .where('productStatus', isEqualTo: 'available')
+          .where('productStatus', isEqualTo: 'available') // ✅ ADD THIS LINE
           .orderBy('viewCount', descending: true)
           .limit(20)
           .get();

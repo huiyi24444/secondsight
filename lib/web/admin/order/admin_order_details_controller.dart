@@ -126,32 +126,74 @@ class OrderDetailsManagementController {
         shipment!.trackingNumber!.isNotEmpty;
   }
 
-  // Update order status
   Future<void> updateOrderStatus({
     required String customerId,
     required String orderId,
     required String newStatus,
+    String? lastUpdatedBy, // Add this parameter to track who made the change
   }) async {
+    Map<String, dynamic> updateData = {
+      'orderStatus': newStatus,
+      'lastStatusUpdate': Timestamp.now(),
+    };
+
+    // Add lastUpdatedBy if provided
+    if (lastUpdatedBy != null) {
+      updateData['lastUpdatedBy'] = lastUpdatedBy;
+    }
+
+    // Add specific date fields based on status
+    switch (newStatus.toLowerCase()) {
+      case 'confirmed':
+        updateData['confirmedDate'] = Timestamp.now();
+        break;
+      case 'to_ship':
+        updateData['toShipDate'] = Timestamp.now();
+        break;
+      case 'to_receive':
+      case 'shipped':
+        updateData['toReceiveDate'] = Timestamp.now();
+        break;
+      case 'completed':
+      case 'delivered':
+        updateData['completedDate'] = Timestamp.now();
+        break;
+      case 'cancelled':
+        updateData['cancelDate'] = Timestamp.now();
+        break;
+    }
+
     await firestore
         .collection('users')
         .doc(customerId)
         .collection('order')
         .doc(orderId)
-        .update({'orderStatus': newStatus});
+        .update(updateData);
   }
 
-  // Update order completion
   Future<void> updateOrderCompletion({
     required String customerId,
     required String orderId,
+    String? lastUpdatedBy,
   }) async {
+    Map<String, dynamic> updateData = {
+      'completedDate': Timestamp.now(),
+      'orderStatus': 'completed',
+      'lastStatusUpdate': Timestamp.now(),
+    };
+
+    if (lastUpdatedBy != null) {
+      updateData['lastUpdatedBy'] = lastUpdatedBy;
+    }
+
     await firestore
         .collection('users')
         .doc(customerId)
         .collection('order')
         .doc(orderId)
-        .update({'completedDate': Timestamp.now()});
+        .update(updateData);
   }
+
 
   // Modified order cancellation to follow order controller's updateOrderCancellation
   Future<void> updateOrderCancellation({
@@ -159,6 +201,7 @@ class OrderDetailsManagementController {
     required String orderId,
     required String cancellationReason,
     String? cancelNote,
+    String? lastUpdatedBy,
   }) async {
     try {
       // First, verify the order can be cancelled
@@ -183,33 +226,32 @@ class OrderDetailsManagementController {
       // Get order details for refund
       final orderTotal = (orderData['totalAmount'] ?? 0.0) as double;
       final paymentMethod = orderData['paymentMethod'] ?? 'Original Payment Method';
-      final payment = orderData['payment'] ?? 'Unknown'; // This will be used as transactionId
+      final payment = orderData['payment'] ?? 'Unknown';
 
       // Create document references
       final cancellationRef = firestore.collection('cancellation').doc();
       final refundRef = firestore.collection('refunds').doc();
 
-      // Prepare cancellation data using the enhanced CancellationModel structure
+      // Prepare cancellation data
       final cancellationData = {
         'referenceID': orderId,
-        'cancellationType': 'order', // Specify this is an order cancellation
+        'cancellationType': 'order',
         'cancelReason': cancellationReason,
         'cancelDate': Timestamp.now(),
         'cancelNote': cancelNote,
-        'cancelledBy': 'Admin', // Since this is from admin panel
-        // Include legacy fields for backward compatibility
+        'cancelledBy': lastUpdatedBy ?? 'Admin',
         'orderID': orderId,
       };
 
-      // Prepare refund data using the RefundModel structure
+      // Prepare refund data
       final refundData = {
         'orderId': orderId,
-        'returnRequestId': null, // null for cancellation refunds
+        'returnRequestId': null,
         'cancelId': cancellationRef.id,
         'refundAmount': orderTotal,
         'refundMethod': paymentMethod,
         'refundDate': Timestamp.now(),
-        'transactionId': payment, // Use 'payment' attribute as transactionId
+        'transactionId': payment,
         'customerId': customerId,
         'refundType': 'cancellation',
       };
@@ -220,10 +262,10 @@ class OrderDetailsManagementController {
       // Create cancellation document
       batch.set(cancellationRef, cancellationData);
 
-      // Create refund document in top-level 'refunds' collection
+      // Create refund document
       batch.set(refundRef, refundData);
 
-      // Update order document
+      // Update order document with proper date tracking
       batch.update(
         firestore
             .collection('users')
@@ -232,9 +274,11 @@ class OrderDetailsManagementController {
             .doc(orderId),
         {
           'orderStatus': 'cancelled',
-          'cancelDate': Timestamp.now(),
+          'cancelDate': Timestamp.now(), // Set the cancelDate
           'cancelID': cancellationRef.id,
-          'refundID': refundRef.id, // Link to refund document
+          'refundID': refundRef.id,
+          'lastStatusUpdate': Timestamp.now(), // Track when this change was made
+          'lastUpdatedBy': lastUpdatedBy ?? 'Admin', // Track who made the change
         },
       );
 
@@ -280,6 +324,7 @@ class OrderDetailsManagementController {
     required String orderId,
     required String newStatus,
     String? trackingNumber,
+    String? lastUpdatedBy,
   }) async {
     try {
       // Get the current order to check the old status
@@ -296,18 +341,20 @@ class OrderDetailsManagementController {
 
       final currentStatus = orderDoc.data()?['orderStatus'] ?? '';
 
-      // Update the order status
+      // Update the order status with proper date tracking
       await updateOrderStatus(
         customerId: customerId,
         orderId: orderId,
         newStatus: newStatus,
+        lastUpdatedBy: lastUpdatedBy,
       );
 
-      // If order is completed, create delivery notification
+      // If order is completed, ensure completedDate is set
       if (newStatus == 'completed') {
         await updateOrderCompletion(
           customerId: customerId,
           orderId: orderId,
+          lastUpdatedBy: lastUpdatedBy,
         );
         await NotificationController.createOrderCompletedNotification(
           customerId: customerId,
@@ -321,20 +368,23 @@ class OrderDetailsManagementController {
 
 
 
-  /// Update order cancellation with notification
+
+// Modified cancellation with notification to include proper date tracking
   Future<void> updateOrderCancellationWithNotification({
     required String customerId,
     required String orderId,
     required String cancellationReason,
     String? cancelNote,
+    String? lastUpdatedBy,
   }) async {
     try {
-      // Perform the cancellation
+      // Perform the cancellation with proper date tracking
       await updateOrderCancellation(
         customerId: customerId,
         orderId: orderId,
         cancellationReason: cancellationReason,
         cancelNote: cancelNote,
+        lastUpdatedBy: lastUpdatedBy,
       );
 
       // Create cancellation notification
@@ -419,9 +469,10 @@ class OrderDetailsManagementController {
     }
   }
 
-  /// Batch update multiple orders with notifications
+// Modified batch update to include proper date tracking
   Future<void> batchUpdateOrderStatuses({
-    required List<Map<String, String>> orderUpdates, // List of {customerId, orderId, newStatus}
+    required List<Map<String, String>> orderUpdates,
+    String? lastUpdatedBy,
   }) async {
     final batch = firestore.batch();
 
@@ -430,6 +481,37 @@ class OrderDetailsManagementController {
       final orderId = update['orderId']!;
       final newStatus = update['newStatus']!;
 
+      // Prepare update data with proper date tracking
+      Map<String, dynamic> updateData = {
+        'orderStatus': newStatus,
+        'lastStatusUpdate': Timestamp.now(),
+      };
+
+      if (lastUpdatedBy != null) {
+        updateData['lastUpdatedBy'] = lastUpdatedBy;
+      }
+
+      // Add specific date fields based on status
+      switch (newStatus.toLowerCase()) {
+        case 'confirmed':
+          updateData['confirmedDate'] = Timestamp.now();
+          break;
+        case 'to_ship':
+          updateData['toShipDate'] = Timestamp.now();
+          break;
+        case 'to_receive':
+        case 'shipped':
+          updateData['toReceiveDate'] = Timestamp.now();
+          break;
+        case 'completed':
+        case 'delivered':
+          updateData['completedDate'] = Timestamp.now();
+          break;
+        case 'cancelled':
+          updateData['cancelDate'] = Timestamp.now();
+          break;
+      }
+
       // Update order
       batch.update(
         firestore
@@ -437,7 +519,7 @@ class OrderDetailsManagementController {
             .doc(customerId)
             .collection('order')
             .doc(orderId),
-        {'orderStatus': newStatus},
+        updateData,
       );
 
       // Create notification

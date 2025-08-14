@@ -26,6 +26,8 @@ class ReturnRequestModel {
   final Timestamp? pendinginspectionDate;
   final Timestamp? completedinsepectionDate;
   final Timestamp? cancelledDate;
+  final Timestamp? refundDate;
+  final Timestamp? notRefundDate;
 
   final String? refundID;
 
@@ -54,6 +56,8 @@ class ReturnRequestModel {
     this.pendinginspectionDate,
     this.completedinsepectionDate,
     this.cancelledDate,
+    this.refundDate,
+    this.notRefundDate,
 
     this.refundID,
   });
@@ -93,6 +97,8 @@ class ReturnRequestModel {
       pendinginspectionDate: data['pendinginspectionDate'] as Timestamp?,
       completedinsepectionDate: data['completedinsepectionDate'] as Timestamp?,
       cancelledDate: data['cancelledDate'] as Timestamp?,
+      refundDate: data['refundDate'] as Timestamp?,
+      notRefundDate: data['notRefundDate'] as Timestamp?,
 
       refundID: data['refundID'] as String? ?? '',
     );
@@ -119,6 +125,8 @@ class ReturnRequestModel {
       'pendinginspectionDate': pendinginspectionDate,
       'completedinsepectionDate': completedinsepectionDate,
       'cancelledDate': cancelledDate,
+      'refundDate': refundDate,
+      'notRefundDate': notRefundDate,
       'refundID': refundID,
     };
 

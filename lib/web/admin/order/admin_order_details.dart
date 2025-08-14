@@ -365,7 +365,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    widget.order.orderStatus.toUpperCase(),
+                  OrderStatusUtils.formatStatus( widget.order.orderStatus),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

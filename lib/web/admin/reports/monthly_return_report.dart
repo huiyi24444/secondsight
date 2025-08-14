@@ -65,7 +65,7 @@ class MonthlyReturnReport {
               child: pw.Text(
                 'This report analyzes return request patterns for ${DateFormat('MMMM yyyy').format(selectedMonth)}. '
                     'Total return requests: ${returnData['totalReturns']}, '
-                    'representing ${returnData['returnRate']}% of total orders. '
+                    'representing ${returnData['returnRate'].toStringAsFixed(2)}% of total orders.'
                     'The primary reason for returns was "${returnData['topReason']}" accounting for ${returnData['topReasonPercentage'].toStringAsFixed(1)}% of all returns. '
                     'Total value of returned items: RM${returnData['totalValue'].toStringAsFixed(2)}.',
                 style: pw.TextStyle(fontSize: 11, height: 1.5),

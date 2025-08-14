@@ -316,6 +316,15 @@ class AdminReportController {
         previousStart = currentStart;
         previousEnd = currentStart;
         break;
+      default:
+      // Default to month if unsupported filter type
+        currentStart = DateTime(selectedDate.year, selectedDate.month, 1);
+        currentEnd = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+        final prevMonth = selectedDate.month == 1 ? 12 : selectedDate.month - 1;
+        final prevYear = selectedDate.month == 1 ? selectedDate.year - 1 : selectedDate.year;
+        previousStart = DateTime(prevYear, prevMonth, 1);
+        previousEnd = currentStart;
+        break;
     }
 
     return {
@@ -449,6 +458,18 @@ class AdminReportController {
   }
 
   int _calculatePercentageChange(num currentValue, num previousValue) {
+    if (previousValue == 0) {
+      // If previous value is 0, return 100% if current > 0, else 0%
+      return currentValue > 0 ? 100 : 0;
+    }
+
+    // Calculate percentage change
+    double change = ((currentValue - previousValue) / previousValue) * 100;
+
+    // Round to nearest integer
+    return change.round();
+  }
+  int calculatePercentageChange(num currentValue, num previousValue) {
     if (previousValue == 0) {
       // If previous value is 0, return 100% if current > 0, else 0%
       return currentValue > 0 ? 100 : 0;

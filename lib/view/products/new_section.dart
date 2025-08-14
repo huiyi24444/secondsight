@@ -13,6 +13,18 @@ class NewProductsHorizontalSection extends StatelessWidget {
     this.limit = 10,
   }) : super(key: key);
 
+  List<Product> _filterAvailableProducts(List<Product> products) {
+    return products.where((product) {
+      final status = product.status?.toLowerCase();
+
+      // Filter out unwanted statuses
+      final isAvailable = status != null &&
+          status == 'available';
+
+      return isAvailable;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     print('NewProductsHorizontalSection building at ${DateTime.now()}');
@@ -20,7 +32,7 @@ class NewProductsHorizontalSection extends StatelessWidget {
       stream: FirebaseFirestore.instance
           .collection('products')
           .orderBy('createdAt', descending: true)
-          .limit(limit)
+          .limit(limit * 2)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -46,8 +58,12 @@ class NewProductsHorizontalSection extends StatelessWidget {
             ),
           );
         }
+        // Convert to products and filter by status
+        final allProducts = docs.map((doc) => Product.fromDocumentSnapshot(doc)).toList();
+        final availableProducts = _filterAvailableProducts(allProducts);
 
-        final products = docs.map((doc) => Product.fromDocumentSnapshot(doc)).toList();
+        // Take only the requested limit after filtering
+        final products = availableProducts.take(limit).toList();
 
         return SizedBox(
           height: 270,

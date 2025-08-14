@@ -44,9 +44,48 @@ class MonthlySalesReport {
       final categoryData = await _fetchCategorySales(selectedMonth);
       // Fetch current admin name
       final adminName = await _controller.getCurrentAdminName();
+
+      final previousMonth = DateTime(
+        selectedMonth.month == 1 ? selectedMonth.year - 1 : selectedMonth.year,
+        selectedMonth.month == 1 ? 12 : selectedMonth.month - 1,
+        1,
+      );
+
+      final previousStats = await _controller.fetchDashboardStats(
+        filterType: DateFilterType.month,
+        selectedDate: previousMonth,
+      );
+
+// Calculate Average Order Value for current period
+      double currentAOV = stats.allOrders > 0 ? (stats.totalRevenue / stats.allOrders) : 0.0;
+
+// Calculate Average Order Value for previous period
+      double previousAOV = previousStats.allOrders > 0
+          ? (previousStats.totalRevenue / previousStats.allOrders)
+          : 0.0;
+
+// Calculate AOV change using the controller's public method
+      int aovChange = _controller.calculatePercentageChange(currentAOV, previousAOV);
+
+// Calculate Order Completion Rate for current period
+      double currentCompletionRate = stats.allOrders > 0
+          ? ((stats.completedOrders / stats.allOrders) * 100)
+          : 0.0;
+
+// Calculate Order Completion Rate for previous period
+      double previousCompletionRate = previousStats.allOrders > 0
+          ? ((previousStats.completedOrders / previousStats.allOrders) * 100)
+          : 0.0;
+
+// Calculate completion rate change using the controller's public method
+      int completionRateChange = _controller.calculatePercentageChange(currentCompletionRate, previousCompletionRate);
+
+
       print('Revenue Change: ${stats.revenueChange}');
       print('Order Change: ${stats.orderChange}');
       final pdf = pw.Document();
+
+
 
       pdf.addPage(
         pw.MultiPage(
@@ -130,17 +169,16 @@ class MonthlySalesReport {
                 ),
                 _buildKPIRow(
                   'Average Order Value',
-                  'RM${stats.allOrders > 0 ? (stats.totalRevenue / stats.allOrders).toStringAsFixed(2) : "0.00"}',
-                  null, // <-- no change value, show N/A
-                  true,
+                  'RM${currentAOV.toStringAsFixed(2)}',
+                  aovChange, // Pass the calculated change instead of null
+                  aovChange >= 0,
                 ),
                 _buildKPIRow(
                   'Order Completion Rate',
-                  '${stats.allOrders > 0 ? ((stats.completedOrders / stats.allOrders) * 100).toStringAsFixed(1) : "0"}%',
-                  null, // <-- no change value, show N/A
-                  stats.completedOrders > stats.cancelledOrders,
+                  '${currentCompletionRate.toStringAsFixed(1)}%',
+                  completionRateChange, // Pass the calculated change instead of null
+                  completionRateChange >= 0,
                 ),
-
               ],
             ),
 
@@ -310,15 +348,33 @@ class MonthlySalesReport {
   }
 
   String _formatMetricValue(dynamic value, {bool isPercentage = false}) {
+    if (value == null) return 'No data';
+
     if (value is String) {
       return value; // Return 'No data' as is
-    } else if (value is int) {
+    }
+
+    if (value is int) {
+      if (value == 0) return 'No data';
+
       if (isPercentage) {
         return '$value%';
       } else {
         return _formatHours(value);
       }
     }
+
+    if (value is double) {
+      final intValue = value.round();
+      if (intValue == 0) return 'No data';
+
+      if (isPercentage) {
+        return '$intValue%';
+      } else {
+        return _formatHours(intValue);
+      }
+    }
+
     return 'No data';
   }
 

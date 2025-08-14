@@ -312,7 +312,6 @@ class AdminReturnDetailsController extends ChangeNotifier {
   /// Handle approved status transition - WITH DEBUGGING
   /// Handle approved status transition - WITH PROPER ERROR HANDLING
   Future<void> _handleApprovedStatus(String returnId, Map<String, dynamic> returnData) async {
-    // 🔍 DEBUG: Print all return data to see what fields are available
     debugPrint('🔍 [DEBUG] Return data keys: ${returnData.keys.toList()}');
     debugPrint('🔍 [DEBUG] Full return data: $returnData');
 
@@ -320,12 +319,10 @@ class AdminReturnDetailsController extends ChangeNotifier {
     final productID = returnData['productID'];
     final orderID = returnData['orderID'];
 
-    // 🔍 DEBUG: Print extracted values
     debugPrint('🔍 [DEBUG] userID: $userID');
     debugPrint('🔍 [DEBUG] productID: $productID');
     debugPrint('🔍 [DEBUG] orderID: $orderID');
 
-    // Check if required values are present
     if (userID == null || productID == null) {
       debugPrint('❌ [ERROR] Missing required fields: userID=$userID, productID=$productID');
       throw Exception('Missing required notification data: userID or productID is null');
@@ -340,32 +337,41 @@ class AdminReturnDetailsController extends ChangeNotifier {
         newStatus: 'approved',
         userId: userID,
         productId: productID,
-        orderId: orderID, // Can be null
+        orderId: orderID,
       );
 
       debugPrint('✅ [SUCCESS] Notification created successfully');
     } catch (notificationError) {
       debugPrint('❌ [NOTIFICATION ERROR] Failed to create notification: $notificationError');
-      // Continue with status update even if notification fails
     }
 
-    // Update status with timestamp
+    // Update status with proper date tracking
     try {
       debugPrint('📝 [STATUS] Updating return status to approved...');
-      await _updateReturnStatusOnly(returnId, 'approved');
+
+      await firestore
+          .collection('returnRequests')
+          .doc(returnId)
+          .update({
+        'returnStatus': 'approved',
+        'approvedDate': FieldValue.serverTimestamp(), // Set the approvedDate
+      });
+
       debugPrint('✅ [SUCCESS] Status updated successfully');
     } catch (statusError) {
       debugPrint('❌ [STATUS ERROR] Failed to update status: $statusError');
-      rethrow; // This is critical, so rethrow
+      rethrow;
     }
   }
 
 
-  /// Handle rejected status transition
+
+
+  /// Handle rejected status transition - WITH PROPER DATE TRACKING
   Future<void> _handleRejectedStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
-    final orderID = returnData['orderID']; // Add this
+    final orderID = returnData['orderID'];
 
     // Create notification
     await NotificationController.createReturnNotification(
@@ -373,18 +379,24 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'rejected',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
-    // Update status with timestamp
-    await _updateReturnStatusOnly(returnId, 'rejected');
+    // Update status with proper date tracking
+    await firestore
+        .collection('returnRequests')
+        .doc(returnId)
+        .update({
+      'returnStatus': 'rejected',
+      'rejectedDate': FieldValue.serverTimestamp(), // Set the rejectedDate
+    });
   }
 
-  /// Handle pending inspection status transition
+  /// Handle pending inspection status transition - WITH PROPER DATE TRACKING
   Future<void> _handlePendingInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
-    final orderID = returnData['orderID']; // Add this
+    final orderID = returnData['orderID'];
 
     // Create notification
     await NotificationController.createReturnNotification(
@@ -392,18 +404,22 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'pending_inspection',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
-    // Update status with timestamp
-    await _updateReturnStatusOnly(returnId, 'pending_inspection');
+    // Update status with proper date tracking
+    await firestore
+        .collection('returnRequests')
+        .doc(returnId)
+        .update({
+      'returnStatus': 'pending_inspection',
+      'pendinginspectionDate': FieldValue.serverTimestamp(), // Set the pendinginspectionDate
+    });
   }
-
-  /// Handle completed inspection status transition
   Future<void> _handleCompletedInspectionStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
-    final orderID = returnData['orderID']; // Add this
+    final orderID = returnData['orderID'];
 
     // Create notification
     await NotificationController.createReturnNotification(
@@ -411,14 +427,20 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'completed_inspection',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
-    // Update status with timestamp
-    await _updateReturnStatusOnly(returnId, 'completed_inspection');
+    // Update status with proper date tracking
+    await firestore
+        .collection('returnRequests')
+        .doc(returnId)
+        .update({
+      'returnStatus': 'completed_inspection',
+      'completedinsepectionDate': FieldValue.serverTimestamp(), // Set the completedinsepectionDate
+    });
   }
 
-  /// Handle refunded status transition (creates refund document)
+  /// Handle refunded status transition - WITH PROPER DATE TRACKING
   Future<void> _handleRefundedStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
@@ -466,18 +488,19 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'refunded',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
     // Use batch write for atomicity
     final batch = firestore.batch();
 
-    // Update return request status
+    // Update return request status with proper date tracking
     batch.update(
       firestore.collection('returnRequests').doc(returnId),
       {
         'returnStatus': 'refunded',
-        'refundedDate': FieldValue.serverTimestamp(),
+        'refundedDate': FieldValue.serverTimestamp(), // Set the refundedDate (custom field)
+        'completedDate': FieldValue.serverTimestamp(), // Also set completedDate since refund completes the process
         'refundID': refundRef.id,
       },
     );
@@ -489,11 +512,11 @@ class AdminReturnDetailsController extends ChangeNotifier {
     await batch.commit();
   }
 
-  /// Handle not refunded status transition
+  /// Handle not refunded status transition - WITH PROPER DATE TRACKING
   Future<void> _handleNotRefundedStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
-    final orderID = returnData['orderID']; // Add this
+    final orderID = returnData['orderID'];
 
     // Create notification
     await NotificationController.createReturnNotification(
@@ -501,24 +524,25 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'not_refunded',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
-    // Update status with timestamp
+    // Update status with proper date tracking
     await firestore
         .collection('returnRequests')
         .doc(returnId)
         .update({
       'returnStatus': 'not_refunded',
-      'notRefundedDate': FieldValue.serverTimestamp(),
+      'completedDate': FieldValue.serverTimestamp(), // Set completedDate since process is finished
+      'notRefundedDate': FieldValue.serverTimestamp(), // Custom field for not refunded date
     });
   }
 
-  /// Handle cancelled status transition (creates cancellation document)
+  /// Handle cancelled status transition - WITH PROPER DATE TRACKING
   Future<void> _handleCancelledStatus(String returnId, Map<String, dynamic> returnData) async {
     final userID = returnData['userID'];
     final productID = returnData['productID'];
-    final orderID = returnData['orderID']; // Add this
+    final orderID = returnData['orderID'];
 
     // Create cancellation document reference
     final cancellationRef = firestore.collection('cancellation').doc();
@@ -540,7 +564,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
       newStatus: 'cancelled',
       userId: userID,
       productId: productID,
-      orderId: orderID, // Add this
+      orderId: orderID,
     );
 
     // Use batch write for atomicity
@@ -549,12 +573,12 @@ class AdminReturnDetailsController extends ChangeNotifier {
     // Create cancellation document
     batch.set(cancellationRef, cancellationData);
 
-    // Update return request status
+    // Update return request status with proper date tracking
     batch.update(
       firestore.collection('returnRequests').doc(returnId),
       {
         'returnStatus': 'cancelled',
-        'cancelledDate': FieldValue.serverTimestamp(),
+        'cancelledDate': FieldValue.serverTimestamp(), // Set the cancelledDate
         'cancelID': cancellationRef.id,
       },
     );
@@ -564,18 +588,51 @@ class AdminReturnDetailsController extends ChangeNotifier {
   }
 
   /// Standard status update with timestamp
+  /// REPLACE the existing _updateReturnStatusOnly method with this enhanced version
   Future<void> _updateReturnStatusOnly(String returnId, String newStatus) async {
-    final updateData = {
+    Map<String, dynamic> updateData = {
       'returnStatus': newStatus,
-      '${newStatus}Date': FieldValue.serverTimestamp(),
     };
+
+    // Add specific date fields based on status
+    switch (newStatus.toLowerCase()) {
+      case 'pending':
+      case 'pending_approval':
+        updateData['pendingDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'approved':
+        updateData['approvedDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'rejected':
+        updateData['rejectedDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'pending_inspection':
+        updateData['pendinginspectionDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'completed_inspection':
+        updateData['completedinsepectionDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'completed':
+        updateData['completedDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'cancelled':
+        updateData['cancelledDate'] = FieldValue.serverTimestamp();
+        break;
+      case 'refunded':
+        updateData['completedDate'] = FieldValue.serverTimestamp();
+        // Note: refundedDate would be set in the specific handler method
+        break;
+      case 'not_refunded':
+        updateData['completedDate'] = FieldValue.serverTimestamp();
+        updateData['notRefundedDate'] = FieldValue.serverTimestamp();
+        break;
+    }
 
     await firestore
         .collection('returnRequests')
         .doc(returnId)
         .update(updateData);
   }
-
   /// Get allowed next statuses for current status (for UI dropdown)
   List<String> getAllowedNextStatuses(String currentStatus) {
     final Map<String, List<String>> allowedTransitions = {
@@ -625,6 +682,7 @@ class AdminReturnDetailsController extends ChangeNotifier {
   }
 
   /// Get return timeline data
+  /// Get return timeline data - FIXED REFUND LOGIC
   List<Map<String, dynamic>> getReturnTimeline() {
     final List<Map<String, dynamic>> timeline = [];
 
@@ -683,8 +741,10 @@ class AdminReturnDetailsController extends ChangeNotifier {
       });
     }
 
-    // Add refunded step if applicable
-    if (returnRequest.refundID != null) {
+    // FIXED: Add refunded step ONLY when status is actually 'refunded' AND refundID exists
+    if (returnRequest.returnStatus.toLowerCase() == 'refunded' &&
+        returnRequest.refundID != null &&
+        returnRequest.refundID!.isNotEmpty) {
       timeline.add({
         'title': 'Refund Processed',
         'date': returnRequest.completedDate ?? DateTime.now(),
@@ -694,8 +754,21 @@ class AdminReturnDetailsController extends ChangeNotifier {
       });
     }
 
-    // Add completed step if applicable
-    if (returnRequest.completedDate != null) {
+    // FIXED: Add not refunded step if applicable
+    if (returnRequest.returnStatus.toLowerCase() == 'not_refunded') {
+      timeline.add({
+        'title': 'Not Refunded',
+        'date': returnRequest.completedDate ?? DateTime.now(),
+        'icon': Icons.money_off,
+        'color': Colors.orange[700]!,
+        'isCompleted': true,
+      });
+    }
+
+    // FIXED: Add completed step ONLY when completed but NOT refunded/not_refunded
+    if (returnRequest.completedDate != null &&
+        returnRequest.returnStatus.toLowerCase() != 'refunded' &&
+        returnRequest.returnStatus.toLowerCase() != 'not_refunded') {
       timeline.add({
         'title': 'Return Completed',
         'date': returnRequest.completedDate!,

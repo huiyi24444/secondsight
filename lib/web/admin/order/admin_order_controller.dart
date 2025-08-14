@@ -232,7 +232,9 @@ class OrderManagementController extends ChangeNotifier {
   }
 
   // Bulk update selected orders
-  Future<Map<String, dynamic>> bulkUpdateOrders() async {
+  // Bulk update selected orders - MODIFIED WITH DATE TRACKING
+  Future<Map<String, dynamic>> bulkUpdateOrders({String? lastUpdatedBy}) async {
+
     final selectedOrderIds = _selectedOrders.entries
         .where((entry) => entry.value)
         .map((entry) => entry.key)
@@ -253,13 +255,25 @@ class OrderManagementController extends ChangeNotifier {
       }
 
       try {
-        // Update order status
+        // Prepare update data with proper date tracking
+        Map<String, dynamic> orderUpdateData = {
+          'orderStatus': 'to_receive',
+          'toReceiveDate': FieldValue.serverTimestamp(), // NEW: Set toReceiveDate
+          'lastStatusUpdate': FieldValue.serverTimestamp(), // NEW: Set lastStatusUpdate
+        };
+
+        // Add lastUpdatedBy if provided
+        if (lastUpdatedBy != null) {
+          orderUpdateData['lastUpdatedBy'] = lastUpdatedBy; // NEW: Set lastUpdatedBy
+        }
+
+        // Update order status with date tracking
         await _firestore
             .collection('users')
             .doc(order.customerId)
             .collection('order')
             .doc(orderId)
-            .update({'orderStatus': 'to_receive'});
+            .update(orderUpdateData);
 
         // Update or create shipment document
         final shipmentRef = _firestore
@@ -273,7 +287,7 @@ class OrderManagementController extends ChangeNotifier {
 
         final shipmentData = {
           'trackingNumber': trackingNumber,
-          'shippedDate': Timestamp.now(),
+          'shippedDate': FieldValue.serverTimestamp(), // Use serverTimestamp for consistency
         };
 
         if (shipmentSnapshot.docs.isNotEmpty) {
@@ -292,13 +306,12 @@ class OrderManagementController extends ChangeNotifier {
 
         final itemCount = orderProductsSnapshot.size;
 
-
         // Create shipment notification
         await NotificationController.createOrderShipmentNotification(
           userId: order.customerId ?? "N/A",
           orderId: order.id,
-          totalAmount: order.totalAmount, // Make sure this exists in your order model
-          itemCount: itemCount,  // Or however you store order items
+          totalAmount: order.totalAmount,
+          itemCount: itemCount,
         );
 
         successCount++;
@@ -320,10 +333,6 @@ class OrderManagementController extends ChangeNotifier {
       'failed': failCount,
       'errors': errors,
     };
-
-
-
-
   }
 
   void _setLoading(bool loading) {

@@ -349,6 +349,7 @@ class OrderBottomButtons extends StatelessWidget {
   Future<void> _showProductSelectionDialog(BuildContext context) async {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Allow custom height
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -363,6 +364,7 @@ class OrderBottomButtons extends StatelessWidget {
             final submittedOrderProductIDs = submittedSnapshot.data!;
 
             return Container(
+              height: MediaQuery.of(context).size.height * 0.7, // Fixed height at 70% of screen
               padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -382,75 +384,76 @@ class OrderBottomButtons extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: controller.getOrderProductsStream(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Center(
-                          child: CircularProgressIndicator(color: Color(0xFF8E6CEF)),
-                        );
-                      }
-
-                      final allProducts = snapshot.data!.docs;
-
-                      // Filter products: exclude those with existing return requests
-                      final products = allProducts.where((doc) {
-                        final orderProductId = doc.id;
-                        return !submittedOrderProductIDs.contains(orderProductId);
-                      }).toList();
-
-                      if (products.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: Text('No products available for return.'),
-                          ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          final data = products[index].data() as Map<String, dynamic>;
-                          final orderProduct = controller.createOrderProductFromDocument(data);
-                          final productRef = orderProduct.productID;
-                          final orderProductId = products[index].id;
-
-                          return FutureBuilder<DocumentSnapshot>(
-                            future: controller.getProductDocument(productRef),
-                            builder: (context, productSnapshot) {
-                              if (!productSnapshot.hasData) {
-                                return const SizedBox(
-                                  height: 60,
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF8E6CEF),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final product = productSnapshot.data!.data() as Map<String, dynamic>?;
-                              final productURL = controller.extractProductImageUrl(product);
-                              final productName = controller.extractProductName(product);
-
-                              return _buildProductSelectionItem(
-                                context,
-                                orderProduct,
-                                productURL,
-                                productName,
-                                orderProductId,
-                              );
-                            },
+                  Expanded( // This prevents overflow
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: controller.getOrderProductsStream(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: Color(0xFF8E6CEF)),
                           );
-                        },
-                      );
-                    },
+                        }
+
+                        final allProducts = snapshot.data!.docs;
+
+                        // Filter products: exclude those with existing return requests
+                        final products = allProducts.where((doc) {
+                          final orderProductId = doc.id;
+                          return !submittedOrderProductIDs.contains(orderProductId);
+                        }).toList();
+
+                        if (products.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text('No products available for return.'),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          // Removed shrinkWrap and NeverScrollableScrollPhysics
+                          // to allow proper scrolling
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            final data = products[index].data() as Map<String, dynamic>;
+                            final orderProduct = controller.createOrderProductFromDocument(data);
+                            final productRef = orderProduct.productID;
+                            final orderProductId = products[index].id;
+
+                            return FutureBuilder<DocumentSnapshot>(
+                              future: controller.getProductDocument(productRef),
+                              builder: (context, productSnapshot) {
+                                if (!productSnapshot.hasData) {
+                                  return const SizedBox(
+                                    height: 60,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF8E6CEF),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final product = productSnapshot.data!.data() as Map<String, dynamic>?;
+                                final productURL = controller.extractProductImageUrl(product);
+                                final productName = controller.extractProductName(product);
+
+                                return _buildProductSelectionItem(
+                                  context,
+                                  orderProduct,
+                                  productURL,
+                                  productName,
+                                  orderProductId,
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             );

@@ -13,6 +13,19 @@ class VirtualTryOnProductsSection extends StatelessWidget {
     this.limit = 10,
   }) : super(key: key);
 
+  // Helper method to filter out sold/inactive products
+  List<Product> _filterAvailableProducts(List<Product> products) {
+    return products.where((product) {
+      final status = product.status?.toLowerCase();
+
+      // Filter out unwanted statuses
+      final isAvailable = status != null &&
+          status == 'available';
+
+      return isAvailable;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     print('DEBUG: VirtualTryOnProductsSection build started at ${DateTime.now()} with limit=$limit');
@@ -22,7 +35,7 @@ class VirtualTryOnProductsSection extends StatelessWidget {
           .collection('products')
           .where('virtualTryOn.enabled', isEqualTo: true)
           .orderBy('createdAt', descending: true)
-          .limit(limit)
+          .limit(limit * 2) // Increased limit to account for filtering
           .snapshots(),
       builder: (context, snapshot) {
         print('DEBUG: StreamBuilder triggered at ${DateTime.now()} - connectionState=${snapshot.connectionState}');
@@ -63,7 +76,31 @@ class VirtualTryOnProductsSection extends StatelessWidget {
           );
         }
 
-        final products = docs.map((doc) => Product.fromDocumentSnapshot(doc)).toList();
+        // Convert to products and filter by status
+        final allProducts = docs.map((doc) => Product.fromDocumentSnapshot(doc)).toList();
+        final availableProducts = _filterAvailableProducts(allProducts);
+
+        // Take only the requested limit after filtering
+        final products = availableProducts.take(limit).toList();
+
+        print('DEBUG: Total Virtual Try-On products fetched: ${allProducts.length}');
+        print('DEBUG: Available Virtual Try-On products after filtering: ${availableProducts.length}');
+        print('DEBUG: Displaying: ${products.length}');
+
+        if (products.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text(
+                'No available Virtual Try-On products',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          );
+        }
 
         return SizedBox(
           height: 270,
