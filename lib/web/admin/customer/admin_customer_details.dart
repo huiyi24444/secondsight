@@ -257,17 +257,17 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                                     : 'No transactions',
                               ),
                               const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Delete functionality
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red[100],
-                                  foregroundColor: Colors.red[700],
-                                  minimumSize: const Size(double.infinity, 45),
-                                ),
-                                child: const Text('Delete Account'),
-                              ),
+                              //ElevatedButton(
+                              //                                 onPressed: () {
+                              //                                   // Delete functionality
+                              //                                 },
+                              //                                 style: ElevatedButton.styleFrom(
+                              //                                   backgroundColor: Colors.red[100],
+                              //                                   foregroundColor: Colors.red[700],
+                              //                                   minimumSize: const Size(double.infinity, 45),
+                              //                                 ),
+                              //                                 child: const Text('Delete Account'),
+                              //                               ),
                             ],
                           ),
                         ),

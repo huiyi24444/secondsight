@@ -167,7 +167,7 @@ class OrderDetailsInChat extends StatelessWidget {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Product SKU: ${ProductStatusUtils.shortProductId(product.productID.id)}',
+                                              'Product ID: ${ProductStatusUtils.shortProductId(product.productID.id)}',
                                               style: const TextStyle(fontWeight: FontWeight.w500),
                                             ),
                                             const SizedBox(height: 4),

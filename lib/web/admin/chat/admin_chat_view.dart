@@ -116,7 +116,7 @@ class _AdminChatViewState extends State<AdminChatView> {
                           controller: _searchController,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
-                            hintText: 'Search conversations...',
+                            hintText: 'Search by user ID, order ID, name, or email...',
                             hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
                             prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.7)),
                             border: InputBorder.none,

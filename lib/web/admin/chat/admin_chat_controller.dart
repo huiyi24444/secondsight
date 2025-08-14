@@ -1,4 +1,6 @@
 // admin_chat_controller.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -16,11 +18,19 @@ class AdminChatController extends ChangeNotifier with ActivityLoggerMixin {
   String _filterStatus = 'all';
   String _searchQuery = '';
 
+  Timer? _searchDebounce;
+
   ConversationModel? get selectedConversation => _selectedConversation;
   List<ConversationModel> get allConversations => _allConversations;
   String get filterStatus => _filterStatus;
 
   AdminChatController(this.context);
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadConversations() async {
     try {
@@ -75,8 +85,14 @@ class AdminChatController extends ChangeNotifier with ActivityLoggerMixin {
   }
 
   void filterConversations(String query) {
-    _searchQuery = query.toLowerCase();
-    notifyListeners();
+    // Cancel previous timer
+    if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
+
+    // Set new timer
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      _searchQuery = query.toLowerCase().trim();
+      notifyListeners();
+    });
   }
 
   Stream<List<ConversationModel>> getFilteredConversationsStream() {
@@ -90,18 +106,64 @@ class AdminChatController extends ChangeNotifier with ActivityLoggerMixin {
     return query
         .orderBy('lastMessageAt', descending: true)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
       var conversations = snapshot.docs
           .map((doc) => ConversationModel.fromFirestore(doc))
           .toList();
 
       // Apply search filter if needed
       if (_searchQuery.isNotEmpty) {
-        conversations = conversations.where((conv) {
-          // This would need to be enhanced to search by user name
-          // For now, searching by order ID
-          return conv.orderId.toLowerCase().contains(_searchQuery);
-        }).toList();
+        List<ConversationModel> filteredConversations = [];
+
+        for (final conv in conversations) {
+          bool matches = false;
+
+          // Search by order ID
+          if (conv.orderId.toLowerCase().contains(_searchQuery)) {
+            matches = true;
+          }
+
+          // Search by user ID
+          if (!matches && conv.userId.toLowerCase().contains(_searchQuery)) {
+            matches = true;
+          }
+
+          // Search by short user ID (the displayed format)
+          if (!matches) {
+            final shortId = shortUserId(conv.userId).toLowerCase();
+            if (shortId.contains(_searchQuery)) {
+              matches = true;
+            }
+          }
+
+          // Optional: Search by user details (name, email) - requires additional query
+          if (!matches) {
+            try {
+              final userDoc = await _firestore
+                  .collection('users')
+                  .doc(conv.userId)
+                  .get();
+
+              if (userDoc.exists) {
+                final userData = userDoc.data() ?? {};
+                final fullName = (userData['fullName'] ?? '').toString().toLowerCase();
+                final email = (userData['email'] ?? '').toString().toLowerCase();
+
+                if (fullName.contains(_searchQuery) || email.contains(_searchQuery)) {
+                  matches = true;
+                }
+              }
+            } catch (e) {
+              print('Error searching user details for ${conv.userId}: $e');
+            }
+          }
+
+          if (matches) {
+            filteredConversations.add(conv);
+          }
+        }
+
+        return filteredConversations;
       }
 
       return conversations;
