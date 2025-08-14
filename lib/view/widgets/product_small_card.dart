@@ -6,6 +6,7 @@ import 'package:secondsight/model/product_model.dart';
 import 'package:secondsight/view/products/product_details_view.dart';
 import '../../services/CustomCacheManager.dart';
 import '../../services/auth_provider.dart';
+import 'order_status_utils.dart';
 
 class ProductSmallCard extends StatefulWidget {
   final Product product;
@@ -162,6 +163,31 @@ class _ProductSmallCardState extends State<ProductSmallCard> with AutomaticKeepA
                       },
                     ),
                   ),
+
+                  // Condition badge
+                  if (widget.product.condition != null &&
+                      widget.product.condition.isNotEmpty)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: OrderStatusUtils
+                              .getConditionColor(widget.product.condition)
+                              .withOpacity(0.6), // 80% opacity
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          OrderStatusUtils.formatCondition(widget.product.condition),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

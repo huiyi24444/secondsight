@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:secondsight/model/category_model.dart';
 import 'package:secondsight/view/products/product_view.dart';
+import 'package:secondsight/view/products/vto_section.dart';
 import 'package:secondsight/view/search/search_view.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/view/products/new_section.dart';
@@ -401,6 +402,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 const SizedBox(height: 20),
 
+
+
+                const SizedBox(height: 20),
+
                 // Recommendations section - show for ALL users
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -441,10 +446,52 @@ class _MyHomePageState extends State<MyHomePage> {
                 RecommendationsSection(
                   userId: userId, // Can be null for non-logged-in users
                   showDebugInfo:
-                      isLoggedIn, // Only show debug info for logged-in users
+                  isLoggedIn, // Only show debug info for logged-in users
                 ),
 
+                // Recommendations section - show for ALL users
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Products w/ Virtual Try On',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProductView(
+                              userId: userId, // Pass userId (can be null)
+                              isVirtualTryOn: true,
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        'View More',
+                        style: TextStyle(
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          color: Color(0xFF8E6CEF),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 1),
+
+                // Always show recommendations section
+                VirtualTryOnProductsSection(),
+
+
                 const SizedBox(height: 20),
+
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

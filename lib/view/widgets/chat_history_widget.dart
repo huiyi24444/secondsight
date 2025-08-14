@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/custom_back_button.dart';
 import '../../services/auth_provider.dart';
 import '../../model/conversation_model.dart'; // Import your model
 
@@ -30,10 +31,12 @@ class ConversationList extends StatelessWidget {
   Widget build(BuildContext context) {
     final userId = Provider.of<AuthProvider>(context, listen: false).userId;
 
+
     return Column(
       children: [
         // Header (unchanged)
         Container(
+
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(

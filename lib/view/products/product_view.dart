@@ -9,6 +9,7 @@ class ProductView extends StatefulWidget {
   final DocumentReference? categoryRef;
   final bool isNewIn;
   final bool isRecommendations;
+  final bool isVirtualTryOn;
   final String? userId; // Add this to pass the userId
 
   const ProductView({
@@ -16,6 +17,7 @@ class ProductView extends StatefulWidget {
     this.categoryRef,
     this.isNewIn = false,
     this.isRecommendations = false,
+    this.isVirtualTryOn = false,
     this.userId,
   }) : super(key: key);
 
@@ -35,7 +37,16 @@ class _ProductViewState extends State<ProductView> {
       // Always initialize _recommendedProductsFuture for recommendations, regardless of userId
       _recommendedProductsFuture = _fetchRankedRecommendedProducts(widget.userId);
     } else {
-      if (widget.isNewIn) {
+      if (widget.isVirtualTryOn) {
+        // New stream for Virtual Try-On products
+        _productStream = FirebaseFirestore.instance
+            .collection('products')
+            .where('virtualTryOn.enabled', isEqualTo: true)
+            .where('productStatus', whereNotIn: ['sold', 'inactive'])
+            .where('stockQuantity', isGreaterThan: 0)
+            .orderBy('createdAt', descending: true)
+            .snapshots();
+      } else if (widget.isNewIn) {
         _productStream = FirebaseFirestore.instance
             .collection('products')
             .where('productStatus', whereNotIn: ['sold', 'inactive'])
@@ -219,6 +230,17 @@ class _ProductViewState extends State<ProductView> {
                   ),
                 ),
               )
+            else if (widget.isVirtualTryOn)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    'Products w/ Virtual Try On',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
             else if (widget.categoryRef != null)
                 FutureBuilder<DocumentSnapshot>(
                   future: widget.categoryRef!.get(),

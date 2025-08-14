@@ -73,10 +73,10 @@ class _ChatSupportViewState extends State<ChatSupportView> {
             }
           },
         ),
-
         title: Row(
           children: [
             Container(
+
               width: 40,
               height: 40,
               decoration: BoxDecoration(

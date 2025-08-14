@@ -30,6 +30,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  bool hasVirtualTryOn = false;
   double? minPrice;
   double? maxPrice;
   String sortOption = 'recommended';
@@ -91,6 +92,10 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         filters.add('productPrice <= $maxPrice');
       }
 
+      if (hasVirtualTryOn) {
+        filters.add('virtualTryOn.enabled:true');
+      }
+
       // Size filter with proper formatting
       if (selectedSizes.isNotEmpty) {
         final sizeFilter = selectedSizes
@@ -139,6 +144,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       maxPrice = null;
       selectedSizes.clear();
       sortOption = 'recommended';
+      hasVirtualTryOn = false; // Reset virtual try-on filter
     });
     _performSearch();
   }
@@ -148,7 +154,8 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     return minPrice != null ||
         maxPrice != null ||
         selectedSizes.isNotEmpty ||
-        sortOption != 'recommended';
+        sortOption != 'recommended' ||
+        hasVirtualTryOn; // Include virtual try-on in active filters check
   }
 
   // Get count of active filters
@@ -157,6 +164,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     if (minPrice != null || maxPrice != null) count++;
     if (selectedSizes.isNotEmpty) count++;
     if (sortOption != 'recommended') count++;
+    if (hasVirtualTryOn) count++; // Count virtual try-on filter
     return count;
   }
 
@@ -354,6 +362,88 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     );
   }
 
+  void _openVirtualTryOnSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(25, 20, 25, 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      const Spacer(),
+                      const Text(
+                        'Virtual Try-On',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SwitchListTile(
+                      title: const Text('Show only items with Virtual Try-On'),
+                      subtitle: const Text('Filter products that support AR try-on feature'),
+                      value: hasVirtualTryOn,
+                      onChanged: (value) {
+                        setModalState(() {
+                          hasVirtualTryOn = value;
+                        });
+                      },
+                      activeColor: Colors.deepPurple,
+                      secondary: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            hasVirtualTryOn = false;
+                          });
+                        },
+                        child: const Text('Clear'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {}); // Update main UI
+                          _performSearch();
+                        },
+                        child: const Text('Apply'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSortOption(String label, String value) {
     final isSelected = sortOption == value;
 
@@ -451,6 +541,22 @@ class _SearchResultsViewState extends State<SearchResultsView> {
           onDelete: () {
             setState(() {
               selectedSizes.clear();
+            });
+            _performSearch();
+          },
+        ),
+      );
+    }
+
+    if (hasVirtualTryOn) {
+      filterChips.add(
+        _buildChip(
+          label: 'Virtual Try-On',
+          isActive: true,
+          onTap: _openVirtualTryOnSheet,
+          onDelete: () {
+            setState(() {
+              hasVirtualTryOn = false;
             });
             _performSearch();
           },
@@ -594,6 +700,11 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                       label: 'Size',
                       onTap: _openSizeSheet,
                       isActive: selectedSizes.isNotEmpty,
+                    ),
+                    _buildChip(
+                      label: 'Try-On',
+                      onTap: _openVirtualTryOnSheet,
+                      isActive: hasVirtualTryOn,
                     ),
                   ],
                 ),

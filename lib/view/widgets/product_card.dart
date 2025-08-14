@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:secondsight/model/product_model.dart';
 import 'package:secondsight/view/products/product_details_view.dart';
+import 'package:secondsight/view/widgets/order_status_utils.dart';
 import '../../services/CustomCacheManager.dart';
 import '../../services/auth_provider.dart';
 
@@ -96,6 +97,32 @@ class _ProductCardState extends State<ProductCard> with AutomaticKeepAliveClient
                       ),
                     ),
                   ),
+
+                  // Condition badge
+                  if (widget.product.condition != null &&
+                      widget.product.condition.isNotEmpty)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
+                        decoration: BoxDecoration(
+                          color: OrderStatusUtils
+                              .getConditionColor(widget.product.condition)
+                              .withOpacity(0.6), // 80% opacity
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          OrderStatusUtils.formatCondition(widget.product.condition),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
                   Positioned(
                     top: 8,
                     right: 8,
