@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../widgets/custom_back_button.dart';
 import 'chat_order_selection.dart';
 import 'chat_history_view.dart';
+import '../../controller/chat/chat_support_controller.dart';
+import '../../services/auth_provider.dart';
 
 class ChatSelectionPage extends StatelessWidget {
   const ChatSelectionPage({Key? key}) : super(key: key);
@@ -127,7 +130,7 @@ class ChatSelectionPage extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // View Conversation History Card
+            // View Conversation History Card with Badge
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -183,18 +186,58 @@ class ChatSelectionPage extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.blue[100],
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Icon(
-                        Icons.history,
-                        color: Colors.blue[600],
-                        size: 30,
-                      ),
+                    // History Icon with Badge
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Icon(
+                            Icons.history,
+                            color: Colors.blue[600],
+                            size: 30,
+                          ),
+                        ),
+                        // Unread Messages Badge
+                        StreamBuilder<int>(
+                          stream: _getUnreadMessagesCount(context),
+                          builder: (context, snapshot) {
+                            final unreadCount = snapshot.data ?? 0;
+
+                            if (unreadCount == 0) return const SizedBox.shrink();
+
+                            return Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                child: Text(
+                                  unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -224,5 +267,37 @@ class ChatSelectionPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Helper method to get unread messages count
+  Stream<int> _getUnreadMessagesCount(BuildContext context) {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
+    return FirebaseFirestore.instance
+        .collectionGroup('messages')
+        .where('isAdmin', isEqualTo: true)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      int unreadCount = 0;
+
+      for (var messageDoc in snapshot.docs) {
+        // Get the conversation ID from the message document path
+        final conversationId = messageDoc.reference.parent.parent!.id;
+
+        // Check if this conversation belongs to the current user
+        final conversationDoc = await FirebaseFirestore.instance
+            .collection('conversations')
+            .doc(conversationId)
+            .get();
+
+        if (conversationDoc.exists &&
+            conversationDoc.data()?['userId'] == userId) {
+          unreadCount++;
+        }
+      }
+
+      return unreadCount;
+    });
   }
 }

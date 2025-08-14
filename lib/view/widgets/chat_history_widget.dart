@@ -31,12 +31,10 @@ class ConversationList extends StatelessWidget {
   Widget build(BuildContext context) {
     final userId = Provider.of<AuthProvider>(context, listen: false).userId;
 
-
     return Column(
       children: [
         // Header (unchanged)
         Container(
-
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -140,21 +138,68 @@ class ConversationList extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: conversation.status == 'active'
-                                  ? Colors.purple[100]
-                                  : Colors.grey[200],
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                            child: Icon(
-                              Icons.chat,
-                              color: conversation.status == 'active'
-                                  ? Colors.purple
-                                  : Colors.grey[400],
-                            ),
+                          // Chat Avatar with Badge
+                          Stack(
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: conversation.status == 'active'
+                                      ? Colors.purple[100]
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: Icon(
+                                  Icons.chat,
+                                  color: conversation.status == 'active'
+                                      ? Colors.purple
+                                      : Colors.grey[400],
+                                ),
+                              ),
+                              // Unread Messages Badge
+                              StreamBuilder<QuerySnapshot>(
+                                stream: firestore
+                                    .collection('conversations')
+                                    .doc(conversation.id)
+                                    .collection('messages')
+                                    .where('isAdmin', isEqualTo: true)
+                                    .where('isRead', isEqualTo: false)
+                                    .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) return const SizedBox.shrink();
+
+                                  final unreadCount = snapshot.data!.docs.length;
+
+                                  if (unreadCount == 0) return const SizedBox.shrink();
+
+                                  return Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 18,
+                                        minHeight: 18,
+                                      ),
+                                      child: Text(
+                                        unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -228,8 +273,6 @@ class ConversationList extends StatelessWidget {
             },
           ),
         ),
-
-
       ],
     );
   }

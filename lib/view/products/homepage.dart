@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secondsight/view/products/new_section.dart';
 import 'package:secondsight/view/widgets/searchBar.dart';
 import 'package:secondsight/view/settings/profile_view.dart';
+import '../../controller/chat/chat_support_controller.dart';
 import '../../model/product_model.dart';
 import '../../services/lazy_loading_grid.dart';
 import '../../services/recommendation_service.dart';
@@ -258,7 +259,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           ),
           title: Padding(
-            padding: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(top: 10, left: 30),
             child: SizedBox(
               height: 61,
               child: Image.asset(
@@ -269,24 +270,61 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           centerTitle: true,
           actions: [
-            if (isLoggedIn)
-              Padding(
-                padding: const EdgeInsets.only(right: 1.0, top: 12),
-                child: IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChatSelectionPage(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.messenger_outline),
-                  color: Colors.black,
-                ),
-              ),
             Padding(
-              padding: const EdgeInsets.only(right: 16.0, top: 12),
+              padding: const EdgeInsets.only(top: 12.0), // example padding
+              child: isLoggedIn
+                  ? StreamBuilder<int>(
+                stream: ChatSupportController(context).getUnreadMessagesCount(),
+                builder: (context, snapshot) {
+                  final unreadCount = snapshot.data ?? 0;
+
+                  return Stack(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.messenger_outline),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChatSelectionPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: 0,
+                          top: 1,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              unreadCount > 99 ? '99+' : unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              )
+                  : const SizedBox(), // empty widget when not logged in
+            ),
+
+            Padding(
+              padding: const EdgeInsets.only(right: 14.0, top: 13),
               child: isLoggedIn
                   ? CartIconWithBadge()
                   : IconButton(

@@ -134,6 +134,7 @@ class AdminChatController extends ChangeNotifier with ActivityLoggerMixin {
         timestamp: null,
         isAdmin: true,
         isSystem: false,
+        isRead: false,
       );
 
       await _firestore

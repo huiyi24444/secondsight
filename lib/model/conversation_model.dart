@@ -56,6 +56,7 @@ class MessageModel {
   final Timestamp? timestamp;
   final bool isAdmin;
   final bool isSystem;
+  final bool? isRead; // Add this field
 
   MessageModel({
     required this.id,
@@ -65,6 +66,7 @@ class MessageModel {
     this.timestamp,
     required this.isAdmin,
     required this.isSystem,
+    this.isRead, // Default to false (unread)
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot doc) {
@@ -77,6 +79,7 @@ class MessageModel {
       timestamp: data['timestamp'],
       isAdmin: data['isAdmin'] ?? false,
       isSystem: data['isSystem'] ?? false,
+      isRead: data['isRead'] ?? false, // Add this line
     );
   }
 
@@ -88,6 +91,7 @@ class MessageModel {
       'timestamp': timestamp ?? FieldValue.serverTimestamp(),
       'isAdmin': isAdmin,
       'isSystem': isSystem,
+      'isRead': isRead, // Add this line
     };
   }
 }

@@ -280,6 +280,7 @@ class ChatSupportController extends ChangeNotifier {
       String message, {
         bool isAdmin = false,
         bool isSystem = false,
+        bool isRead = false,
       }) async {
     if (message.trim().isEmpty || _currentConversation == null) return;
 
@@ -311,6 +312,7 @@ class ChatSupportController extends ChangeNotifier {
         timestamp: null, // Will be set by server
         isAdmin: isAdmin,
         isSystem: isSystem,
+        isRead: isRead,
       );
 
       // Add message using the model
@@ -527,6 +529,64 @@ class ChatSupportController extends ChangeNotifier {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to send message')),
       );
+    }
+  }
+
+  Stream<int> getUnreadMessagesCount() {
+    final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
+    return _firestore
+        .collectionGroup('messages')
+        .where('isAdmin', isEqualTo: true)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      int unreadCount = 0;
+
+      for (var messageDoc in snapshot.docs) {
+        // Get the conversation ID from the message document path
+        final conversationId = messageDoc.reference.parent.parent!.id;
+
+        // Check if this conversation belongs to the current user
+        final conversationDoc = await _firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .get();
+
+        if (conversationDoc.exists &&
+            conversationDoc.data()?['userId'] == userId) {
+          unreadCount++;
+        }
+      }
+
+      return unreadCount;
+    });
+  }
+
+  Future<void> markMessagesAsRead() async {
+    if (_currentConversation == null) return;
+
+    try {
+      final userId = Provider.of<AuthProvider>(context, listen: false).userId;
+
+      // Get all unread admin messages in this conversation
+      final unreadMessages = await _firestore
+          .collection('conversations')
+          .doc(_currentConversation!.id)
+          .collection('messages')
+          .where('isAdmin', isEqualTo: true)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      // Mark them as read
+      WriteBatch batch = _firestore.batch();
+      for (var doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print('Error marking messages as read: $e');
     }
   }
 }

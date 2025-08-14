@@ -1,8 +1,10 @@
 // create_conversation_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:secondsight/view/widgets/user_utils.dart';
 
 import '../../../model/order_model.dart';
+import '../../../view/widgets/order_status_utils.dart';
 import '../login/activity_logger_mixin.dart';
 import 'admin_chat_controller.dart';
 
@@ -99,7 +101,6 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> wit
   Future<void> _selectUser(Map<String, dynamic> user) async {
     setState(() {
       _selectedUserId = user['id'];
-      _selectedUserName = user['name'];
       _searchResults = [];
       _searchController.text = user['email'];
       _isLoadingOrders = true;
@@ -328,11 +329,13 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> wit
                       leading: CircleAvatar(
                         backgroundColor: Colors.purple[100],
                         child: Text(
-                          user['name'][0].toUpperCase(),
+                          user['id'] != null && user['id'].isNotEmpty
+                              ? user['id'][0].toUpperCase()
+                              : '?',
                           style: TextStyle(color: Colors.purple[700]),
                         ),
                       ),
-                      title: Text(user['fullName'] ?? 'Unknown'),
+                      title: Text(shortUserId(user['id'])),
                       subtitle: Text(user['email']),
                       onTap: () => _selectUser(user),
                     );
@@ -426,7 +429,7 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> wit
                         },
                         title: Text('Order #${order.shortOrderId}'),
                         subtitle: Text(
-                          'RM ${order.totalAmount.toStringAsFixed(2)} - ${order.orderStatus}',
+                          'RM ${order.totalAmount.toStringAsFixed(2)} - ${OrderStatusUtils.getStatusText(order.orderStatus)}',
                         ),
                         activeColor: Colors.purple,
                       );
@@ -457,7 +460,10 @@ class _CreateConversationDialogState extends State<CreateConversationDialog> wit
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text('Start Conversation'),
+                  child: const Text(
+                    'Start Conversation',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             ),

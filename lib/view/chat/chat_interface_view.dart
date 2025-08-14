@@ -1,4 +1,3 @@
-
 //chat_interface_view.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -9,11 +8,10 @@ import '../../services/auth_provider.dart';
 import '../widgets/build_message.dart';
 import 'end_chat_dialog.dart';
 
-class ChatInterfaceView extends StatelessWidget {
+class ChatInterfaceView extends StatefulWidget {
   final dynamic controller;
   final ScrollController scrollController;
   final TextEditingController messageController;
-
 
   const ChatInterfaceView({
     Key? key,
@@ -21,12 +19,27 @@ class ChatInterfaceView extends StatelessWidget {
     required this.scrollController,
     required this.messageController,
   }) : super(key: key);
+
+  @override
+  State<ChatInterfaceView> createState() => _ChatInterfaceViewState();
+}
+
+class _ChatInterfaceViewState extends State<ChatInterfaceView> {
+  @override
+  void initState() {
+    super.initState();
+    // Mark messages as read when chat interface opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.controller.markMessagesAsRead();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        if (controller.selectedOrder != null &&
-            controller.selectedOrder!.id != 'General Inquiry')
+        if (widget.controller.selectedOrder != null &&
+            widget.controller.selectedOrder!.id != 'General Inquiry')
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -39,14 +52,14 @@ class ChatInterfaceView extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Chatting about Order #${controller.selectedOrder!.shortOrderId}',
+                    'Chatting about Order #${widget.controller.selectedOrder!.shortOrderId}',
                     style: TextStyle(
                       color: Colors.purple[700],
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                if (controller.conversationStatus == 'ended')
+                if (widget.controller.conversationStatus == 'ended')
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -70,14 +83,14 @@ class ChatInterfaceView extends StatelessWidget {
           ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: controller.getMessagesStream(),
+            stream: widget.controller.getMessagesStream(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
               final messages = snapshot.data!.docs;
               return ListView.builder(
-                controller: scrollController,
+                controller: widget.scrollController,
                 padding: const EdgeInsets.all(16),
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
@@ -103,8 +116,8 @@ class ChatInterfaceView extends StatelessWidget {
             },
           ),
         ),
-        if (controller.conversationId != null &&
-            controller.conversationStatus == 'active')
+        if (widget.controller.conversationId != null &&
+            widget.controller.conversationStatus == 'active')
           Positioned(
             child: Material(
               elevation: 4,
@@ -114,7 +127,7 @@ class ChatInterfaceView extends StatelessWidget {
                   EndConversationDialog.show(
                     context: context,
                     onConfirm: () {
-                      controller.endConversation();
+                      widget.controller.endConversation();
                     },
                   );
                 },
@@ -155,8 +168,8 @@ class ChatInterfaceView extends StatelessWidget {
               ),
             ),
           ),
-        SizedBox(height: 15),
-        if (controller.conversationStatus != 'ended')
+        const SizedBox(height: 15),
+        if (widget.controller.conversationStatus != 'ended')
           Stack(
             children: [
               // Message Input Container
@@ -182,7 +195,7 @@ class ChatInterfaceView extends StatelessWidget {
                             borderRadius: BorderRadius.circular(25),
                           ),
                           child: TextField(
-                            controller: messageController,
+                            controller: widget.messageController,
                             decoration: InputDecoration(
                               hintText: 'Type your message...',
                               hintStyle: TextStyle(color: Colors.grey[500]),
@@ -196,8 +209,8 @@ class ChatInterfaceView extends StatelessWidget {
                             textInputAction: TextInputAction.send,
                             onSubmitted: (value) {
                               if (value.trim().isEmpty) return;
-                              controller.sendMessage(value.trim());
-                              messageController.clear();
+                              widget.controller.sendMessage(value.trim());
+                              widget.messageController.clear();
                             },
                           ),
                         ),
@@ -205,10 +218,10 @@ class ChatInterfaceView extends StatelessWidget {
                       const SizedBox(width: 12),
                       GestureDetector(
                         onTap: () {
-                          final text = messageController.text.trim();
+                          final text = widget.messageController.text.trim();
                           if (text.isEmpty) return;
-                          controller.sendMessage(text);
-                          messageController.clear();
+                          widget.controller.sendMessage(text);
+                          widget.messageController.clear();
                         },
                         child: Container(
                           width: 48,
@@ -262,5 +275,4 @@ class ChatInterfaceView extends StatelessWidget {
       ],
     );
   }
-
 }
