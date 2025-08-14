@@ -238,7 +238,7 @@ class _RecommendationsSectionState extends State<RecommendationsSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Show debug info if enabled
-        if (widget.showDebugInfo) _buildDebugInfo(),
+        //if (widget.showDebugInfo) _buildDebugInfo(),
 
         // Main recommendations content
         FutureBuilder<List<Product>>(

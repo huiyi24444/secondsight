@@ -246,7 +246,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
     super.dispose();
   }
 
-  // 5. ADD THESE NEW TIMER METHODS
   void _showTimerOptions() {
     setState(() {
       _showTimerSettings = !_showTimerSettings;
@@ -270,6 +269,11 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
 
     // Start countdown
     _captureTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
       setState(() {
         _remainingTime--;
       });
@@ -291,15 +295,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
       }
     });
   }
-
-  void _cancelTimer() {
-    _captureTimer?.cancel();
-    setState(() {
-      _isTimerActive = false;
-      _remainingTime = 0;
-    });
-  }
-
 
   Future<void> _loadClothingImage() async {
     if (_isDisposed) return;
@@ -732,31 +727,196 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+
+              // Timer Settings UI (show when _showTimerSettings is true)
+              if (_showTimerSettings)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Set Timer Duration',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _timerOptionButton(0),
+                          _timerOptionButton(3),
+                          _timerOptionButton(5),
+                          _timerOptionButton(10),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Timer Countdown Display (show when timer is active)
+              if (_isTimerActive)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    children: [
+                      ScaleTransition(
+                        scale: _timerAnimation,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.red,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.3),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$_remainingTime',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Example control buttons row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  // Gallery button
                   IconButton(
                     onPressed: _viewGallery,
-                    icon: Icon(Icons.photo_library_outlined),
-                    iconSize: 30,
-                  ),
-                  GestureDetector(
-                    onTap: _isCapturing ? null : _capturePhoto,
-                    child: Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black,
-                      ),
-                      child: Icon(Icons.camera, color: Colors.white, size: 35),
+                    icon: Stack(
+                      children: [
+                        Icon(Icons.photo_library_outlined, size: 30),
+                        if (_recentImages.isNotEmpty)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${_recentImages.length}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: _showTimerOptions,
-                    icon: Icon(Icons.timer),
-                    iconSize: 30,
+
+                  // Capture button - THIS IS THE KEY FIX
+                  GestureDetector(
+                    onTap: _isCapturing || _isTimerActive
+                        ? null
+                        : () {
+                      // Check if timer is set and greater than 0
+                      if (_timerDuration > 0 && !_isTimerActive) {
+                        _startTimer(); // Start timer countdown
+                      } else {
+                        _capturePhoto(); // Capture immediately
+                      }
+                    },
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimationController,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _isCapturing ? _pulseAnimation.value : 1.0,
+                          child: Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isCapturing
+                                  ? Colors.red
+                                  : (_isTimerActive ? Colors.orange : Colors.black),
+                              boxShadow: [
+                                if (_isCapturing || _isTimerActive)
+                                  BoxShadow(
+                                    color: (_isCapturing ? Colors.red : Colors.orange)
+                                        .withOpacity(0.3),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                              ],
+                            ),
+                            child: Icon(
+                              _isCapturing
+                                  ? Icons.camera_alt
+                                  : (_isTimerActive ? Icons.timer : Icons.camera),
+                              color: Colors.white,
+                              size: 35,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Timer button
+                  GestureDetector(
+                    onTap: _isCapturing ? null : _showTimerOptions,
+                    child: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _showTimerSettings
+                            ? Color(0xFF8E6CEF).withOpacity(0.2)
+                            : Colors.transparent,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timer,
+                            size: 30,
+                            color: _showTimerSettings
+                                ? Color(0xFF8E6CEF)
+                                : Colors.black,
+                          ),
+                          if (_timerDuration > 0)
+                            Text(
+                              '${_timerDuration}s',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _showTimerSettings
+                                    ? Color(0xFF8E6CEF)
+                                    : Colors.black,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -767,8 +927,33 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
     );
   }
 
-
-
+  // Also, add this method to allow disabling timer (set to 0)
+  Widget _timerOptionButton(int seconds) {
+    final isSelected = _timerDuration == seconds;
+    return GestureDetector(
+      onTap: () => _setTimerDuration(seconds),
+      child: Container(
+        width: 60,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isSelected ? Color(0xFF8E6CEF) : Colors.white,
+          border: Border.all(
+            color: isSelected ? Color(0xFF8E6CEF) : Colors.grey[300]!,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            seconds == 0 ? 'Off' : '${seconds}s',
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 
