@@ -81,9 +81,6 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       // Build filters array
       List<String> filters = [];
 
-      // Status filter (always applied)
-      filters.add('(NOT productStatus:sold) AND (NOT productStatus:inactive)');
-
       // Price filters
       if (minPrice != null && minPrice! > 0) {
         filters.add('productPrice >= $minPrice');
@@ -116,11 +113,25 @@ class _SearchResultsViewState extends State<SearchResultsView> {
 
       final AlgoliaQuerySnapshot snap = await query.getObjects();
 
-      print('DEBUG: Query returned ${snap.hits.length} results'); // Debug log
 
+      // Client-side filtering for status
       final results = snap.hits
           .map((hit) => Product.fromAlgolia(hit.data, hit.objectID))
+          .where((product) {
+        // Check the actual field name your Product model uses
+        final status = product.status?.toLowerCase();
+
+        // Filter out unwanted statuses
+        return status != null &&
+            status != 'sold' &&
+            status != 'inactive' &&
+            status != 'unavailable' &&
+            status != 'deleted';
+      })
           .toList();
+
+      print('DEBUG: Total from Algolia: ${snap.hits.length}');
+      print('DEBUG: After status filtering: ${results.length}');
 
       setState(() {
         _results = results;
