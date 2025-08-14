@@ -95,6 +95,8 @@ class OrderStatusUtils {
         return 'Used';
       case 'well_worn':
         return 'Well Worn';
+      case 'fair':
+        return 'Fair';
       default:
         return condition;
 
