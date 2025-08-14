@@ -11,7 +11,7 @@ class RecommendationsSection extends StatefulWidget {
   const RecommendationsSection({
     Key? key,
     this.userId,
-    this.showDebugInfo = true, // Default to false in production
+    this.showDebugInfo = false, // Default to false in production
   }) : super(key: key);
 
   @override

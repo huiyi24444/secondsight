@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../model/product_model.dart';
 import '../widgets/virtual_try_on_view.dart';
 
@@ -23,6 +24,7 @@ class VirtualTryOnScreen extends StatefulWidget {
 }
 
 class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBindingObserver {
+  static const String _showGuideKey = 'show_vto_guide';
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   Product? _product;
@@ -94,6 +96,31 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     }
   }
 
+  // Check user preference for showing guide
+  Future<void> _checkGuidePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final shouldShowGuide = prefs.getBool(_showGuideKey) ?? true;
+      setState(() {
+        _showGuide = shouldShowGuide;
+        _hasSeenGuide = !shouldShowGuide;
+      });
+    } catch (e) {
+      print('Error checking guide preference: $e');
+      // Default to showing guide if there's an error
+    }
+  }
+
+  // Save user preference to not show guide again
+  Future<void> _saveGuidePreference(bool showGuide) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_showGuideKey, showGuide);
+    } catch (e) {
+      print('Error saving guide preference: $e');
+    }
+  }
+
   // Show guide dialog over camera
   void _showGuideDialog() {
     showDialog(
@@ -133,6 +160,27 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
                     color: Colors.black87,
                     height: 1.4,
                     fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                SizedBox(height: 16),
+
+                // "Do not show again" text
+                GestureDetector(
+                  onTap: () async {
+                    // Save preference and close dialog
+                    await _saveGuidePreference(false);
+                    Navigator.of(context).pop();
+                    _dismissGuide();
+                  },
+                  child: Text(
+                    'Do not show again',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      decoration: TextDecoration.underline,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
 

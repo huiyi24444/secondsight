@@ -502,40 +502,110 @@ class OfflineRecommendationService {
     return dotProduct / (sqrt(magnitudeA) * sqrt(magnitudeB));
   }
 
-  /// Generate recommendation reason
+  /// Generate recommendation reason - FIXED VERSION
+
+  /// Generate recommendation reason - FIXED VERSION
   Future<String> _getRecommendationReason(Map<String, dynamic> product, UserPreferences preferences) async {
-    final reasons = <String>[];
+    final reasons = <RecommendationReason>[];
 
     // Check category match
     final category = await resolveCategory(product['category']);
-
     if (category != null && preferences.favoriteCategories.containsKey(category)) {
-      reasons.add('Similar to your favorite category');
+      final categoryCount = preferences.favoriteCategories[category]!;
+      reasons.add(RecommendationReason(
+        text: 'Similar to your favorite category',
+        priority: 2, // Medium priority
+        specificity: categoryCount.toDouble(), // More interactions = higher specificity
+      ));
     }
 
     // Check tag overlap
     final productTags = (product['tags'] as List<dynamic>?)?.cast<String>() ?? [];
     final commonTags = productTags.where((tag) => preferences.preferredTags.containsKey(tag)).toList();
     if (commonTags.isNotEmpty) {
-      reasons.add('Matches your interests: ${commonTags.take(2).join(', ')}');
+      final totalTagWeight = commonTags.fold(0, (sum, tag) => sum + (preferences.preferredTags[tag] ?? 0));
+      reasons.add(RecommendationReason(
+        text: 'Matches your interests: ${commonTags.take(2).join(', ')}',
+        priority: 1, // Highest priority - most specific
+        specificity: totalTagWeight.toDouble(),
+      ));
     }
 
-    // Price range
+    // Check product condition preference
+    final condition = product['productCondition'] as String?;
+    if (condition != null && preferences.preferredConditions.containsKey(condition)) {
+      final conditionCount = preferences.preferredConditions[condition]!;
+      reasons.add(RecommendationReason(
+        text: 'Matches your preferred condition: $condition',
+        priority: 3, // Lower priority
+        specificity: conditionCount.toDouble(),
+      ));
+    }
+
+    // Check price range
     if (preferences.purchasedProducts.isNotEmpty) {
-      final avgPrice = preferences.purchasedProducts
+      final validPrices = preferences.purchasedProducts
           .map((p) => (p.data['productPrice'] as num?)?.toDouble() ?? 0.0)
           .where((price) => price > 0)
-          .fold(0.0, (sum, price) => sum + price) /
-          preferences.purchasedProducts.length;
+          .toList();
 
-      final productPrice = (product['productPrice'] as num?)?.toDouble() ?? 0.0;
-      if ((productPrice - avgPrice).abs() < avgPrice * 0.3) {
-        reasons.add('In your price range');
+      if (validPrices.isNotEmpty) {
+        final avgPrice = validPrices.fold(0.0, (sum, price) => sum + price) / validPrices.length;
+
+        final productPrice = (product['productPrice'] as num?)?.toDouble() ?? 0.0;
+        if (productPrice > 0 && (productPrice - avgPrice).abs() < avgPrice * 0.3) {
+          reasons.add(RecommendationReason(
+            text: 'In your typical price range (\${productPrice.toStringAsFixed(0)})',
+            priority: 4, // Lowest priority
+            specificity: 1.0,
+          ));
+        }
       }
     }
 
-    return reasons.isNotEmpty ? reasons.first : 'Based on your browsing history';
+    // Check if similar to recently viewed items
+    final productName = product['productName'] as String? ?? '';
+    final productWords = productName.toLowerCase().split(' ').where((w) => w.length > 2).toSet();
+
+    for (var viewedProduct in preferences.viewedProducts.take(10)) {
+      final viewedName = viewedProduct.data['productName'] as String? ?? '';
+      final viewedWords = viewedName.toLowerCase().split(' ').where((w) => w.length > 2).toSet();
+      final commonWords = productWords.intersection(viewedWords);
+
+      if (commonWords.length >= 2) {
+        reasons.add(RecommendationReason(
+          text: 'Similar to "${viewedName.length > 30 ? '${viewedName.substring(0, 30)}...' : viewedName}"',
+          priority: 1, // High priority - very specific
+          specificity: commonWords.length.toDouble(),
+        ));
+        break; // Only add one similar item reason
+      }
+    }
+
+    // If no specific reasons found, return default
+    if (reasons.isEmpty) {
+      return 'Based on your browsing history';
+    }
+
+    // Sort by priority (lower number = higher priority), then by specificity (higher = better)
+    reasons.sort((a, b) {
+      final priorityComparison = a.priority.compareTo(b.priority);
+      if (priorityComparison != 0) return priorityComparison;
+      return b.specificity.compareTo(a.specificity); // Higher specificity first
+    });
+
+    // Return the best reason, with some variety injection
+    final bestReasons = reasons.where((r) => r.priority == reasons.first.priority).toList();
+
+    // Add some randomness among equally good reasons to create variety
+    if (bestReasons.length > 1) {
+      final random = Random();
+      return bestReasons[random.nextInt(bestReasons.length)].text;
+    }
+
+    return reasons.first.text;
   }
+
 
   /// Generate default recommendations for new users
   Future<List<PersonalizedRecommendation>> _generateDefaultRecommendations(String userId) async {
@@ -888,4 +958,17 @@ class RecommendationMetadata {
       version: map['version'] ?? '3.0-offline',
     );
   }
+}
+
+// Helper class for organizing recommendation reasons
+class RecommendationReason {
+  final String text;
+  final int priority; // 1 = highest priority, 4 = lowest priority
+  final double specificity; // Higher number = more specific reason
+
+  RecommendationReason({
+    required this.text,
+    required this.priority,
+    required this.specificity,
+  });
 }

@@ -94,7 +94,7 @@ class ClothingOverlayPainter extends CustomPainter {
     final rightHip = pose!.rightHip != null ? transformLandmarkForDisplay(pose!.rightHip!.x, pose!.rightHip!.y, size) : null;
 
     final shoulderWidth = (rightShoulder.dx - leftShoulder.dx).abs();
-    final baseScale = shoulderWidth / clothingImage!.width * 2.3;
+    final baseScale = shoulderWidth / clothingImage!.width * 1.8;   //adjust size
 
     final confidenceScale = 1.0;
 
@@ -159,7 +159,7 @@ class ClothingOverlayPainter extends CustomPainter {
 
     // IMPORTANT: Increase the scale factor to make bottoms appear wider
     // Instead of 2.0, use 2.5 or 3.0 to extend beyond hip landmarks
-    final widthMultiplier = 6.5; // Adjust this value to control how much wider the bottoms appear
+    final widthMultiplier = 2.0; // Adjust this value to control how much wider the bottoms appear
     final baseScale = hipWidth / clothingImage!.width * widthMultiplier;
 
     final centerX = (leftHip.dx + rightHip.dx) / 2;
@@ -172,7 +172,7 @@ class ClothingOverlayPainter extends CustomPainter {
     );
 
     // Adjust Y position - you can tweak this multiplier too
-    final adjustedY = centerY - (hipWidth * 1.5); // Reduced from 0.75 to position it better
+    final adjustedY = centerY - (hipWidth * 0.7); // Reduced from 0.75 to position it better
 
     canvas.save();
     canvas.translate(centerX, adjustedY);
