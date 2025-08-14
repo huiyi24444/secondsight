@@ -25,6 +25,7 @@ class AdminController with ActivityLoggerMixin{
         'role': admin.role,
         'isActive': admin.isEnabled,
         'lastActive': lastActive,
+        'createdAt': admin.createdAt,
       };
     }).toList();
   }

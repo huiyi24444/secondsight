@@ -83,16 +83,6 @@ class ReturnManagementView extends StatelessWidget {
                                   onChanged: (_) => controller.filterReturns(),
                                 ),
                               ),
-                              const SizedBox(width: 20),
-                              ElevatedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Return'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF7C3AED),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                ),
-                              ),
                             ],
                           ),
                         ),

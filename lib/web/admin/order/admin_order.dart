@@ -314,17 +314,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
           ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: _showCreateOrderDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Order'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
         ],
       ),
     );

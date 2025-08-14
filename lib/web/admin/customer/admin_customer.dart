@@ -118,15 +118,17 @@ class _CustomerManagementPageState extends State<CustomerManagementPage> {
                                 ),
                               ),
                               const SizedBox(width: 20),
-                              ElevatedButton.icon(
-                                onPressed: () => _controller.showAddCustomerDialog(context),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add Customer'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF7C3AED),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                ),
-                              ),
+                              //ElevatedButton.icon(
+                              //                                 onPressed: () => _controller.showAddCustomerDialog(context),
+                              //                                 icon: const Icon(Icons.add, color: Colors.white),
+                              //                                 label: const Text('Add Customer', style: TextStyle(
+                              //                                   color: Colors.white,
+                              //                                 ),),
+                              //                                 style: ElevatedButton.styleFrom(
+                              //                                   backgroundColor: const Color(0xFF7C3AED),
+                              //                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              //                                 ),
+                              //                               ),
                             ],
                           ),
                         ),

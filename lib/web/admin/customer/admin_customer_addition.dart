@@ -156,7 +156,12 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                         strokeWidth: 2,
                       ),
                     )
-                        : const Text('Add'),
+                        :const Text(
+                      'Add',
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ],
               ),

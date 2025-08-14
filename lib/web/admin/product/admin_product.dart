@@ -206,7 +206,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
                               // Advanced Filters Panel
                               if (showAdvancedFilters) ...[
-                                SizedBox(height: 15),
+                                SizedBox(height: 10),
                                 Container(
                                   padding: EdgeInsets.all(15),
                                   decoration: BoxDecoration(
@@ -509,7 +509,17 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                                             ),
                                           ),
                                           const SizedBox(width: 10),
-                                          Flexible(child: Text(product.name)),
+                                          SizedBox(
+                                            width: 150, // fixed column width
+                                            child: Tooltip(
+                                              message: product.name, // full text on hover
+                                              child: Text(
+                                                product.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                              ),
+                                            ),
+                                          ),
                                         ],
 
                                       ),

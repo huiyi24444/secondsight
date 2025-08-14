@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondsight/view/widgets/dateTime_utils.dart';
 import '../../../model/admin_model.dart';
 import '../../../view/widgets/user_utils.dart';
 import '../services/permissions_guard.dart';
@@ -184,6 +185,9 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   }
 
   Widget _buildAdminTable() {
+
+
+
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _getFilteredAdmins(),
       builder: (context, snapshot) {
@@ -204,6 +208,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final startIndex = (_currentPage - 1) * _itemsPerPage;
         final endIndex = (startIndex + _itemsPerPage).clamp(0, admins.length);
         final currentAdmins = admins.sublist(startIndex, endIndex);
+
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -237,6 +242,9 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
               const DataColumn(label: Text('Action')),
             ],
             rows: currentAdmins.map((admin) {
+              print('DEBUG → Admin: ${admin['id']} '
+                  '| lastActive: ${admin['lastActive']} '
+                  '| createdAt: ${admin['createdAt']}');
               return DataRow(
                 cells: [
                   DataCell(
@@ -275,6 +283,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                     ),
                   ),
                   DataCell(Text(admin['email'])),
+
                   DataCell(
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -309,8 +318,10 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                       ),
                     ),
                   ),
-                  DataCell(Text(admin['lastActive'])),
-                  DataCell(Text('3 months ago')), // You may replace this with actual logic
+                  DataCell(Text(admin['lastActive'])
+                  ),
+                  DataCell(Text(DateFormatter.formatDate(admin['createdAt']))
+                  ), // You may replace this with actual logic
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,
