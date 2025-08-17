@@ -54,12 +54,66 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       return;
     }
 
-    // Confirm action
+    // Show confirmation dialog with auto-generation info
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Bulk Update'),
-        content: Text('Mark ${_controller.selectedCount} orders as shipped?'),
+        title: const Text('Confirm Bulk Shipment'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Mark ${_controller.selectedCount} orders as shipped?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tracking numbers will be automatically generated for all selected orders.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blue[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.notifications_active, color: Colors.green[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Customers will be notified with their tracking information.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -71,7 +125,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
               backgroundColor: const Color(0xFF7C3AED),
             ),
             child: const Text(
-              'Confirm',
+              'Ship Orders',
               style: TextStyle(color: Colors.white),
             ),
           ),
@@ -87,43 +141,21 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       final result = await _controller.bulkUpdateOrders();
 
       if (mounted) {
-        final message = result['success'] > 0
-            ? 'Successfully updated ${result['success']} orders'
-            : 'Failed to update orders';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: result['success'] > 0 ? Colors.green : Colors.red,
-          ),
-        );
+        if (result['success'] > 0) {
+          // Show success dialog with tracking numbers
+          _showBulkUpdateSuccess(result);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update orders'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
 
         if (result['errors'].isNotEmpty) {
           // Show detailed error dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Update Errors'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: result['errors'].map<Widget>((error) =>
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text('• $error'),
-                      )
-                  ).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
+          _showBulkUpdateErrors(result['errors']);
         }
       }
     } finally {
@@ -131,6 +163,118 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     }
   }
 
+  void _showBulkUpdateSuccess(Map<String, dynamic> result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green[700], size: 24),
+            const SizedBox(width: 8),
+            const Text('Bulk Update Successful'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Successfully updated ${result['success']} orders with auto-generated tracking numbers:',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: (result['trackingNumbers'] as List<String>)
+                          .map((trackingInfo) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          trackingInfo,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          ),
+                        ),
+                      ))
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'All customers have been notified via push notifications.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBulkUpdateErrors(List<String> errors) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Errors'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: errors.map<Widget>((error) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('• $error'),
+                )
+            ).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
 
   @override
@@ -835,36 +979,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                 ),
               ),
               // Tracking Number Input (shown in bulk mode for selected "to_ship" orders)
-              if (controller.bulkMode && canSelect && isSelected) ...[
-                Expanded(
-                  flex: 3,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: TextFormField(
-                      controller: controller.getTrackingController(order.id),
-                      decoration: InputDecoration(
-                        hintText: 'Enter tracking number',
-                        hintStyle: TextStyle(fontSize: 13),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          borderSide: BorderSide(color: Colors.blue[400]!),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ),
-              ] else ...[
+
                 Expanded(
                   flex: controller.bulkMode ? 3 : 1,
                   child: Container(
@@ -883,7 +998,6 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                     ),
                   ),
                 ),
-              ],
               const SizedBox(width: 8),
               // Action buttons (hidden in bulk mode)
               if (!controller.bulkMode) ...[

@@ -291,31 +291,79 @@ class OrderDetailsManagementController {
   }
 
   // Update tracking number
-  Future<bool> updateTrackingNumber({
+  // Add this method to OrderDetailsManagementController class
+
+  /// Update tracking number and order status to 'to_receive' with timestamps
+  Future<bool> updateTrackingNumberAndStatus({
     required String customerId,
     required String orderId,
     required String trackingNumber,
+    String? lastUpdatedBy,
   }) async {
     try {
-      final shipmentRef = firestore
+      // Get references
+      final orderRef = firestore
           .collection('users')
           .doc(customerId)
           .collection('order')
-          .doc(orderId)
-          .collection('shipment');
+          .doc(orderId);
 
-      final snapshot = await shipmentRef.get();
+      final shipmentRef = orderRef.collection('shipment');
 
-      if (snapshot.docs.isNotEmpty) {
-        await snapshot.docs.first.reference.update({
+      // Get shipment documents
+      final shipmentSnapshot = await shipmentRef.get();
+
+      if (shipmentSnapshot.docs.isEmpty) {
+        return false;
+      }
+
+      // Use batch write for atomicity
+      final batch = firestore.batch();
+
+      // Update shipment with tracking number and shipped date
+      batch.update(
+        shipmentSnapshot.docs.first.reference,
+        {
           'trackingNumber': trackingNumber,
           'shippedDate': Timestamp.now(),
-        });
-        return true;
+        },
+      );
+
+      // Update order status and timestamps
+      Map<String, dynamic> orderUpdateData = {
+        'orderStatus': 'to_receive',
+        'toReceiveDate': Timestamp.now(),
+        'lastStatusUpdate': Timestamp.now(),
+      };
+
+      if (lastUpdatedBy != null) {
+        orderUpdateData['lastUpdatedBy'] = lastUpdatedBy;
       }
-      return false;
+
+      batch.update(orderRef, orderUpdateData);
+
+      // Create notification for customer
+      final notificationRef = firestore.collection('notifications').doc();
+      batch.set(notificationRef, {
+        'userId': customerId,
+        'title': 'Order Shipped',
+        'message': 'Your order #${orderId.substring(0, 6).toUpperCase()} has been shipped! Tracking number: $trackingNumber',
+        'type': 'order_status',
+        'orderId': orderId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderStatus': 'to_receive',
+          'trackingNumber': trackingNumber,
+        },
+      });
+
+      // Commit all changes
+      await batch.commit();
+
+      return true;
     } catch (e) {
-      throw Exception('Error updating tracking number: $e');
+      throw Exception('Error updating tracking number and status: $e');
     }
   }
 

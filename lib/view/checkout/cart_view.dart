@@ -198,14 +198,11 @@ class _CartViewState extends State<CartView> {
                                               BlendMode.multiply,
                                             ),
                                             child: item.product.images.isNotEmpty
-                                                ? Transform.rotate(
-                                              angle: math.pi, // 180 degrees rotation
-                                              child: Image.network(
-                                                item.product.images.first,
-                                                width: 80,
-                                                height: 80,
-                                                fit: BoxFit.cover,
-                                              ),
+                                                ? Image.network(
+                                              item.product.images.first,
+                                              width: 80,
+                                              height: 80,
+                                              fit: BoxFit.cover,
                                             )
                                                 : Container(
                                               width: 80,
@@ -219,6 +216,7 @@ class _CartViewState extends State<CartView> {
                                             ),
                                           ),
                                         ),
+
                                         if (isOutOfStock)
                                           Positioned.fill(
                                             child: Container(

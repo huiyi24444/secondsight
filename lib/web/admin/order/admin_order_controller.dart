@@ -230,11 +230,18 @@ class OrderManagementController extends ChangeNotifier {
       _setLoading(false);
     }
   }
+  String _generateTrackingNumber() {
+    final now = DateTime.now();
+    final randomSuffix = (DateTime.now().microsecond % 10000).toString().padLeft(4, '0');
 
-  // Bulk update selected orders
-  // Bulk update selected orders - MODIFIED WITH DATE TRACKING
+    // Format: SS + YYMMDD + HHMMSS + XXXX
+    // SS = SecondSight, YYMMDD = date, HHMMSS = time, XXXX = random suffix
+    final trackingNumber = 'SS${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}$randomSuffix';
+
+    return trackingNumber;
+  }
+
   Future<Map<String, dynamic>> bulkUpdateOrders({String? lastUpdatedBy}) async {
-
     final selectedOrderIds = _selectedOrders.entries
         .where((entry) => entry.value)
         .map((entry) => entry.key)
@@ -243,28 +250,27 @@ class OrderManagementController extends ChangeNotifier {
     int successCount = 0;
     int failCount = 0;
     List<String> errors = [];
+    List<String> generatedTrackingNumbers = []; // Track generated numbers for confirmation
 
     for (final orderId in selectedOrderIds) {
       final order = _orders.firstWhere((o) => o.id == orderId);
-      final trackingNumber = getTrackingController(orderId).text.trim();
 
-      if (trackingNumber.isEmpty) {
-        errors.add('Order #${order.shortOrderId}: Missing tracking number');
-        failCount++;
-        continue;
-      }
+      // Auto-generate tracking number for each order
+      final trackingNumber = _generateTrackingNumber();
+      // Add small delay to ensure unique tracking numbers
+      await Future.delayed(const Duration(milliseconds: 10));
 
       try {
         // Prepare update data with proper date tracking
         Map<String, dynamic> orderUpdateData = {
           'orderStatus': 'to_receive',
-          'toReceiveDate': FieldValue.serverTimestamp(), // NEW: Set toReceiveDate
-          'lastStatusUpdate': FieldValue.serverTimestamp(), // NEW: Set lastStatusUpdate
+          'toReceiveDate': FieldValue.serverTimestamp(),
+          'lastStatusUpdate': FieldValue.serverTimestamp(),
         };
 
         // Add lastUpdatedBy if provided
         if (lastUpdatedBy != null) {
-          orderUpdateData['lastUpdatedBy'] = lastUpdatedBy; // NEW: Set lastUpdatedBy
+          orderUpdateData['lastUpdatedBy'] = lastUpdatedBy;
         }
 
         // Update order status with date tracking
@@ -287,7 +293,7 @@ class OrderManagementController extends ChangeNotifier {
 
         final shipmentData = {
           'trackingNumber': trackingNumber,
-          'shippedDate': FieldValue.serverTimestamp(), // Use serverTimestamp for consistency
+          'shippedDate': FieldValue.serverTimestamp(),
         };
 
         if (shipmentSnapshot.docs.isNotEmpty) {
@@ -306,14 +312,24 @@ class OrderManagementController extends ChangeNotifier {
 
         final itemCount = orderProductsSnapshot.size;
 
-        // Create shipment notification
-        await NotificationController.createOrderShipmentNotification(
-          userId: order.customerId ?? "N/A",
-          orderId: order.id,
-          totalAmount: order.totalAmount,
-          itemCount: itemCount,
-        );
+        // Create shipment notification with tracking number
+        await _firestore.collection('notifications').add({
+          'userId': order.customerId,
+          'title': 'Order Shipped',
+          'message': 'Your order #${order.shortOrderId} has been shipped! Tracking number: $trackingNumber',
+          'type': 'order_status',
+          'orderId': order.id,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'metadata': {
+            'orderStatus': 'to_receive',
+            'trackingNumber': trackingNumber,
+            'itemCount': itemCount,
+            'totalAmount': order.totalAmount,
+          },
+        });
 
+        generatedTrackingNumbers.add('${order.shortOrderId}: $trackingNumber');
         successCount++;
       } catch (e) {
         errors.add('Order #${order.shortOrderId}: $e');
@@ -332,6 +348,7 @@ class OrderManagementController extends ChangeNotifier {
       'success': successCount,
       'failed': failCount,
       'errors': errors,
+      'trackingNumbers': generatedTrackingNumbers, // Include generated tracking numbers
     };
   }
 

@@ -1557,6 +1557,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
 
   // Handle ship to receive transition
+  // Update the _handleStatusChange method where _showTrackingNumberDialog is called
+
   Future<bool> _handleShipToReceive() async {
     final validationResult = _controller.validateShipToReceive(
       order: widget.order,
@@ -1579,6 +1581,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         return false;
 
       case OrderDetailsManagementController.NO_TRACKING:
+      // This will now automatically update the status to 'to_receive' when tracking is added
         return await _showTrackingNumberDialog();
 
       case OrderDetailsManagementController.VALIDATION_OK:
@@ -1905,36 +1908,83 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
 
   // Show tracking number dialog
+  // Modified _showTrackingNumberDialog method
   Future<bool> _showTrackingNumberDialog() async {
-    final trackingNumberController = TextEditingController();
+    // Generate tracking number automatically
+    final generatedTrackingNumber = _generateTrackingNumber();
 
     return await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Enter Tracking Number'),
+        title: const Text('Generated Tracking Number'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'A tracking number is required to update the status to "To Receive".',
+              'A tracking number has been automatically generated for this shipment.',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: trackingNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Tracking Number *',
-                hintText: 'Enter tracking number',
-                border: OutlineInputBorder(),
+
+            // Display the generated tracking number
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
               ),
-              autofocus: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tracking Number',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  SelectableText(
+                    generatedTrackingNumber,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
             ),
+
             const SizedBox(height: 8),
-            Text(
-              'The customer will be notified with the tracking information.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'The customer will be notified with this tracking information.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1943,82 +1993,101 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (trackingNumberController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a tracking number'),
-                  ),
-                );
-                return;
-              }
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Add a regenerate button in case user wants a different tracking number
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context, false);
+                  // Recursively call the function to generate a new tracking number
+                  _showTrackingNumberDialog();
+                },
+                child: const Text('Regenerate'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    // Close dialog first
+                    Navigator.pop(context, true);
 
-              try {
-                // Close dialog first
-                Navigator.pop(context, true);
+                    // Show loading
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(
+                        child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
+                      ),
+                    );
 
-                // Show loading
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
-                  ),
-                );
+                    // Update tracking number with the generated number and order status
+                    final success = await _controller.updateTrackingNumberAndStatus(
+                      customerId: widget.order.customerId!,
+                      orderId: widget.order.id,
+                      trackingNumber: generatedTrackingNumber,
+                    );
 
-                // Update tracking number with notification
-                final success = await _controller.updateTrackingNumber(
-                  customerId: widget.order.customerId!,
-                  orderId: widget.order.id,
-                  trackingNumber: trackingNumberController.text.trim(),
-                );
+                    if (mounted) {
+                      Navigator.pop(context); // Close loading
+                    }
 
-                if (mounted) {
-                  Navigator.pop(context); // Close loading
-                }
+                    if (!success && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Shipment document not found'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
 
-                if (!success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Shipment document not found'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tracking number added and customer notified'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  Navigator.pop(context); // Close loading if still open
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString()),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-            ),
-              child: const Text(
-                'Confirm & Notify',
-                style: TextStyle(color: Colors.white),
-              )
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Order shipped with tracking number $generatedTrackingNumber. Customer notified.'),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      Navigator.pop(context); // Close loading if still open
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e.toString()),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                ),
+                child: const Text(
+                  'Confirm & Notify',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     ) ?? false;
+  }
+
+  String _generateTrackingNumber() {
+    final now = DateTime.now();
+    final timestamp = now.millisecondsSinceEpoch.toString();
+    final randomSuffix = (DateTime.now().microsecond % 10000).toString().padLeft(4, '0');
+
+    // Format: SS + YYMMDD + HHMMSS + XXXX
+    // SS = SecondSight, YYMMDD = date, HHMMSS = time, XXXX = random suffix
+    final trackingNumber = 'SS${now.year.toString().substring(2)}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}$randomSuffix';
+
+    return trackingNumber;
   }
 
 
