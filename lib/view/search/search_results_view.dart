@@ -60,6 +60,9 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         return;
       }
 
+      // DEBUG: Print the current filter state
+      print('DEBUG: hasVirtualTryOn filter is: $hasVirtualTryOn');
+
       // First determine which index to use based on sort option
       String indexName = 'products';
       switch (sortOption) {
@@ -89,10 +92,6 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         filters.add('productPrice <= $maxPrice');
       }
 
-      if (hasVirtualTryOn) {
-        filters.add('virtualTryOn.enabled:true');
-      }
-
       // Size filter with proper formatting
       if (selectedSizes.isNotEmpty) {
         final sizeFilter = selectedSizes
@@ -113,8 +112,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
 
       final AlgoliaQuerySnapshot snap = await query.getObjects();
 
-
-      // Client-side filtering for status
+      // Client-side filtering for status AND virtual try-on
       final results = snap.hits
           .map((hit) => Product.fromAlgolia(hit.data, hit.objectID))
           .where((product) {
@@ -122,16 +120,37 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         final status = product.status?.toLowerCase();
 
         // Filter out unwanted statuses
-        return status != null &&
+        bool statusOk = status != null &&
             status != 'sold' &&
             status != 'inactive' &&
             status != 'unavailable' &&
             status != 'deleted';
+
+        // DEBUG: Print virtual try-on data for debugging
+        if (hasVirtualTryOn) {
+          print('DEBUG: Checking product "${product.name}":');
+          print('  - virtualTryOn map: ${product.virtualTryOn}');
+          print('  - virtualTryOn.isEmpty: ${product.virtualTryOn.isEmpty}');
+          print('  - virtualTryOn["tryOnData"]: ${product.virtualTryOn['tryOnData']}');
+          print('  - virtualTryOn["enabled"]: ${product.virtualTryOn['enabled']}');
+          print('  - product.hasVirtualTryOn: ${product.hasVirtualTryOn}');
+          print('  - statusOk: $statusOk');
+          print('  - Final result: ${statusOk && product.hasVirtualTryOn}');
+          print('---');
+        }
+
+        // Apply virtual try-on filter if enabled
+        if (hasVirtualTryOn) {
+          return statusOk && product.hasVirtualTryOn;
+        }
+
+        return statusOk;
       })
           .toList();
 
       print('DEBUG: Total from Algolia: ${snap.hits.length}');
-      print('DEBUG: After status filtering: ${results.length}');
+      print('DEBUG: Virtual try-on filter active: $hasVirtualTryOn');
+      print('DEBUG: After all filtering: ${results.length}');
 
       setState(() {
         _results = results;
@@ -381,6 +400,9 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       ),
       backgroundColor: Colors.white,
       builder: (_) {
+        // Create a local copy of the state for the modal
+        bool localHasVirtualTryOn = hasVirtualTryOn;
+
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
@@ -411,11 +433,13 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                     child: SwitchListTile(
                       title: const Text('Show only items with Virtual Try-On'),
                       subtitle: const Text('Filter products that support AR try-on feature'),
-                      value: hasVirtualTryOn,
+                      value: localHasVirtualTryOn,
                       onChanged: (value) {
                         setModalState(() {
-                          hasVirtualTryOn = value;
+                          localHasVirtualTryOn = value;
                         });
+                        // DEBUG: Print when switch is toggled
+                        print('DEBUG: Virtual try-on switch toggled to: $value');
                       },
                       activeColor: Colors.deepPurple,
                       secondary: const Icon(
@@ -431,15 +455,25 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                       TextButton(
                         onPressed: () {
                           setModalState(() {
+                            localHasVirtualTryOn = false;
+                          });
+                          // Update the main state immediately
+                          setState(() {
                             hasVirtualTryOn = false;
                           });
+                          Navigator.pop(context);
+                          _performSearch();
                         },
                         child: const Text('Clear'),
                       ),
                       ElevatedButton(
                         onPressed: () {
+                          // Update the main state with the local state
+                          setState(() {
+                            hasVirtualTryOn = localHasVirtualTryOn;
+                          });
+                          print('DEBUG: Applying virtual try-on filter: $localHasVirtualTryOn');
                           Navigator.pop(context);
-                          setState(() {}); // Update main UI
                           _performSearch();
                         },
                         child: const Text('Apply'),

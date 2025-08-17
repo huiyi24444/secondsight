@@ -269,6 +269,16 @@ class _AdminLoginViewState extends State<AdminLoginView> {
                           ),
                           const SizedBox(height: 24),
 
+                          SizedBox(
+                            height: 100, // bigger height
+                            child: Image.asset(
+                              'assets/images/secondsight_logo.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
                           // Title
                           Text(
                             'Admin Portal',

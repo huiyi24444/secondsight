@@ -36,6 +36,28 @@ class AddAddressController extends ChangeNotifier {
 
   AddAddressController({required this.userId});
 
+  // Phone number validation method
+  String? validatePhoneNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Phone number is required';
+    }
+
+    // Remove any spaces or special characters, keep only digits
+    String cleanValue = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+    // Check if it has exactly 11 digits
+    if (cleanValue.length != 11) {
+      return 'Phone number must be exactly 11 digits';
+    }
+
+    // Check if it starts with 60
+    if (!cleanValue.startsWith('60')) {
+      return 'Phone number must start with 60';
+    }
+
+    return null; // Valid
+  }
+
   Future<void> saveAddress(BuildContext context) async {
     if (!formKey.currentState!.validate()) return;
 
