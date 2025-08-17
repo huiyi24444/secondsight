@@ -23,31 +23,19 @@ class _IntroDecisionScreenState extends State<IntroDecisionScreen> {
   }
 
   Future<void> _checkIntroSeen() async {
-    final prefs = await SharedPreferences.getInstance();
-    final seen = prefs.getBool('seen_intro') ?? false;
-
+    // Remove the SharedPreferences check and always show intro
     setState(() {
-      _seenIntro = seen;
+      _seenIntro = false; // Always set to false to show intro
       _isLoading = false;
     });
 
-    if (!seen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => IntroScreen()),
-        );
-      });
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const AuthWrapper(authenticatedWidget: MyHomePage()),
-          ),
-        );
-      });
-    }
+    // Always navigate to intro screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => IntroScreen()),
+      );
+    });
   }
-
 
   @override
   Widget build(BuildContext context) {

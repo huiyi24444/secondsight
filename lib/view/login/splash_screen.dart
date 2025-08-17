@@ -48,16 +48,8 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateToNext() async {
     await Future.delayed(const Duration(seconds: 3));
 
-    final prefs = await SharedPreferences.getInstance();
-    final isFirstTime = prefs.getBool('first_time') ?? true;
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (isFirstTime) {
-        await prefs.setBool('first_time', false);
-        if (mounted) Navigator.of(context).pushReplacementNamed('/intro');
-      } else {
-        if (mounted) Navigator.of(context).pushReplacementNamed('/home');
-      }
+      if (mounted) Navigator.of(context).pushReplacementNamed('/intro');
     });
   }
 
