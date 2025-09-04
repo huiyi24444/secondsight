@@ -6,7 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:secondsight/view/widgets/custom_back_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../model/product_model.dart';
-import '../widgets/virtual_try_on_view.dart';
+import '../widgets/camera_overlay_widget.dart';
 
 class VirtualTryOnScreen extends StatefulWidget {
   final String productId;
@@ -39,29 +39,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    print('[DEBUG] VirtualTryOnScreen initialized.');
-    print('[DEBUG] _showGuide: $_showGuide, _hasSeenGuide: $_hasSeenGuide');
-
     _initializeApp();
   }
 
   Future<void> _initializeApp() async {
-    // Load product first
     if (widget.product != null) {
       _product = widget.product;
     } else {
       _loadProduct();
     }
-
-    // Then initialize camera
     await _initializeCamera();
     setState(() => _isLoading = false);
 
-
-    // Show guide dialog after everything is loaded
     if (_showGuide && !_hasSeenGuide && mounted) {
-      // Add a small delay to ensure the camera preview is ready
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
           _showGuideDialog();
@@ -70,13 +60,6 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     }
   }
 
-  // Method to dismiss guide
-  void _dismissGuide() {
-    setState(() {
-      _showGuide = false;
-      _hasSeenGuide = true;
-    });
-  }
 
   Future<void> _loadProduct() async {
     try {
@@ -96,22 +79,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     }
   }
 
-  // Check user preference for showing guide
-  Future<void> _checkGuidePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final shouldShowGuide = prefs.getBool(_showGuideKey) ?? true;
-      setState(() {
-        _showGuide = shouldShowGuide;
-        _hasSeenGuide = !shouldShowGuide;
-      });
-    } catch (e) {
-      print('Error checking guide preference: $e');
-      // Default to showing guide if there's an error
-    }
-  }
 
-  // Save user preference to not show guide again
   Future<void> _saveGuidePreference(bool showGuide) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -121,7 +89,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
     }
   }
 
-  // Show guide dialog over camera
+  // Method to dismiss guide
+  void _dismissGuide() {
+    setState(() {
+      _showGuide = false;
+      _hasSeenGuide = true;
+    });
+  }
+
+
+
   void _showGuideDialog() {
     showDialog(
       context: context,
@@ -153,7 +130,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
 
                 // Guide Text
                 Text(
-                  'Place your phone upright at a 90° angle\nand position it slightly farther away for the best experience.',
+                  'Place your phone upright at a 90° angle\n'
+                      'and position it slightly farther away for the best experience.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -239,10 +217,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
         });
         return;
       }
-
       _hasPermission = true;
 
-      // Get available cameras
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         setState(() {
@@ -251,13 +227,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
         return;
       }
 
-      // Find front camera
       final frontCamera = cameras.firstWhere(
             (camera) => camera.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
       );
 
-      // Initialize camera controller
       _cameraController = CameraController(
         frontCamera,
         ResolutionPreset.medium,
@@ -284,7 +258,6 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final CameraController? cameraController = _cameraController;
 
-    // App state changed before we got the chance to initialize.
     if (cameraController == null || !cameraController.value.isInitialized) {
       return;
     }
@@ -315,7 +288,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
         return AlertDialog(
           title: Text('Camera Permission Required'),
           content: Text(
-            'Virtual try-on requires camera access. Please enable camera permission in your device settings.',
+            'Virtual try-on requires camera access.'
+                ' Please enable camera permission in your device settings.',
           ),
           actions: [
             TextButton(
@@ -512,7 +486,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> with WidgetsBin
       body: Stack(
         children: [
           // Virtual Try-On View
-          VirtualTryOnView(
+          cameraOverlayWidget(
             clothingImageUrl: tryOnImageUrl,
             cameraSize: _cameraController!.value.previewSize!,
             cameraController: _cameraController!,

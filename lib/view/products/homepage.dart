@@ -214,52 +214,50 @@ class _MyHomePageState extends State<MyHomePage> {
               },
               child: isLoggedIn
                   ? FutureBuilder<DocumentSnapshot>(
-                      future: _profileFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.grey,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          );
-                        }
-                        if (snapshot.hasError ||
-                            !snapshot.hasData ||
-                            !snapshot.data!.exists) {
-                          return const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.grey,
-                            child: Icon(Icons.person, size: 20),
-                          );
-                        }
-                        final data =
-                            snapshot.data!.data() as Map<String, dynamic>;
-                        final imageUrl = data['profilePic'] ?? '';
-                        return CircleAvatar(
-                          radius: 20,
-                          backgroundImage: imageUrl.isNotEmpty
-                              ? NetworkImage(imageUrl)
-                              : NetworkImage(
-                                  'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/temp_profile_icon.jpg?alt=media&token=6ba2703e-e802-4738-bcb5-eaa796488294',
-                                ),
-                          backgroundColor: Colors.grey,
-                        );
-                      },
-                    )
-                  : const CircleAvatar(
+                future: _profileFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircleAvatar(
                       radius: 20,
-                      backgroundColor: Color(0xFF8E6CEF),
-                      child: Icon(
-                        Icons.person_outline,
-                        size: 20,
-                        color: Colors.white,
-                      ),
+                      backgroundColor: Colors.grey,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  }
+                  if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      !snapshot.data!.exists) {
+                    return const CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey,
+                      child: Icon(Icons.person, size: 20),
+                    );
+                  }
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final imageUrl = data['profilePic'] ?? '';
+                  return CircleAvatar(
+                    radius: 20,
+                    backgroundImage: imageUrl.isNotEmpty
+                        ? NetworkImage(imageUrl)
+                        : NetworkImage(
+                      'https://firebasestorage.googleapis.com/v0/b/secondsight-5cba4.firebasestorage.app/o/temp_profile_icon.jpg?alt=media&token=6ba2703e-e802-4738-bcb5-eaa796488294',
                     ),
+                    backgroundColor: Colors.grey,
+                  );
+                },
+              )
+                  : const CircleAvatar(
+                radius: 20,
+                backgroundColor: Color(0xFF8E6CEF),
+                child: Icon(
+                  Icons.person_outline,
+                  size: 20,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
           title: Padding(
-            padding: const EdgeInsets.only(top: 10, left: 30),
+            padding: const EdgeInsets.only(top: 10),
             child: SizedBox(
               height: 61,
               child: Image.asset(
@@ -271,7 +269,7 @@ class _MyHomePageState extends State<MyHomePage> {
           centerTitle: true,
           actions: [
             Padding(
-              padding: const EdgeInsets.only(top: 12.0), // example padding
+              padding: const EdgeInsets.only(top: 12.0),
               child: isLoggedIn
                   ? StreamBuilder<int>(
                 stream: ChatSupportController(context).getUnreadMessagesCount(),
@@ -320,20 +318,19 @@ class _MyHomePageState extends State<MyHomePage> {
                   );
                 },
               )
-                  : const SizedBox(), // empty widget when not logged in
+                  : const SizedBox(),
             ),
-
             Padding(
               padding: const EdgeInsets.only(right: 14.0, top: 13),
               child: isLoggedIn
                   ? CartIconWithBadge()
                   : IconButton(
-                      onPressed: () {
-                        _showLoginPrompt(context, 'shopping cart');
-                      },
-                      icon: const Icon(Icons.shopping_cart_outlined),
-                      color: Colors.black,
-                    ),
+                onPressed: () {
+                  _showLoginPrompt(context, 'shopping cart');
+                },
+                icon: const Icon(Icons.shopping_cart_outlined),
+                color: Colors.black,
+              ),
             ),
           ],
         ),

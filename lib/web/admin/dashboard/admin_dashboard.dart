@@ -270,6 +270,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               icon: Icons.shopping_bag,
               color: Colors.blue,
               change: data!.orderChange,
+              isPercentage: true,
             ),
             const SizedBox(width: 16),
             _buildMetricCard(

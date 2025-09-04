@@ -140,14 +140,13 @@ class ClothingOverlayPainter extends CustomPainter {
     }
   }
 
-  // New method for lower body clothing (pants, skirts)
+
   void _drawLowerClothing(Canvas canvas, Size size) {
     if (pose!.leftHip == null || pose!.rightHip == null) return;
 
     final leftHip = transformLandmarkForDisplay(pose!.leftHip!.x, pose!.leftHip!.y, size);
     final rightHip = transformLandmarkForDisplay(pose!.rightHip!.x, pose!.rightHip!.y, size);
 
-    // Optional knees for length reference
     final leftKnee = pose!.landmarks['left_knee'] != null
         ? transformLandmarkForDisplay(pose!.landmarks['left_knee']!.x, pose!.landmarks['left_knee']!.y, size)
         : null;
@@ -157,9 +156,7 @@ class ClothingOverlayPainter extends CustomPainter {
 
     final hipWidth = (rightHip.dx - leftHip.dx).abs();
 
-    // IMPORTANT: Increase the scale factor to make bottoms appear wider
-    // Instead of 2.0, use 2.5 or 3.0 to extend beyond hip landmarks
-    final widthMultiplier = 2.0; // Adjust this value to control how much wider the bottoms appear
+    final widthMultiplier = 2.0; // adjust this
     final baseScale = hipWidth / clothingImage!.width * widthMultiplier;
 
     final centerX = (leftHip.dx + rightHip.dx) / 2;
@@ -171,7 +168,6 @@ class ClothingOverlayPainter extends CustomPainter {
       rightHip.dx - leftHip.dx,
     );
 
-    // Adjust Y position - you can tweak this multiplier too
     final adjustedY = centerY - (hipWidth * 0.7); // Reduced from 0.75 to position it better
 
     canvas.save();
@@ -187,7 +183,6 @@ class ClothingOverlayPainter extends CustomPainter {
 
     canvas.restore();
 
-    // Optional: Add debug info for bottoms
     if (true) { // Set to true to see debug info
       final textPainter = TextPainter(
         text: TextSpan(
@@ -204,7 +199,7 @@ class ClothingOverlayPainter extends CustomPainter {
     }
   }
 
-  // New method for full body clothing (dresses, jumpsuits)
+
   void _drawFullClothing(Canvas canvas, Size size) {
     if (pose!.leftShoulder == null || pose!.rightShoulder == null ||
         pose!.leftHip == null || pose!.rightHip == null) return;
@@ -219,7 +214,6 @@ class ClothingOverlayPainter extends CustomPainter {
     final hipCenterY = (leftHip.dy + rightHip.dy) / 2;
     final torsoLength = hipCenterY - shoulderCenterY;
 
-    // Scale based on torso length for full body coverage
     final baseScale = torsoLength / clothingImage!.height * 10.8;
 
     final centerX = (leftShoulder.dx + rightShoulder.dx) / 2;
@@ -259,10 +253,7 @@ class ClothingOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    //canvas.drawRect(Rect.fromLTWH(10, 10, 100, 100), Paint()..color = Colors.purple);
-
     if (pose == null) return;
-
     // Draw clothing first (behind skeleton)
     if (clothingImage != null) {
       _drawClothingOverlay(canvas, size);
@@ -275,13 +266,10 @@ class ClothingOverlayPainter extends CustomPainter {
         final landmarkName = entry.key;
         final point = entry.value;
 
-        // Skip drawing red dots for face landmarks
         if (faceLandmarks.contains(landmarkName)) {
-          continue; // Skip this landmark
+          continue;
         }
-
         final rotated = transformLandmarkForDisplay(point.x, point.y, size);
-
         if (_isInBounds(rotated.dx, rotated.dy, size)) {
           canvas.drawCircle(rotated, 5, dotPaint);
         }

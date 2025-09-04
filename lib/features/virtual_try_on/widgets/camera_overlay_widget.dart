@@ -19,13 +19,13 @@ import '../models/pose_landmarks.dart';
 import '../services/pose_detection_service.dart';
 import 'clothing_overlay_painter.dart';
 
-class VirtualTryOnView extends StatefulWidget {
+class cameraOverlayWidget extends StatefulWidget {
   final String clothingImageUrl;
   final Size cameraSize;
   final CameraController cameraController;
   final String clothingType;
 
-  const VirtualTryOnView({
+  const cameraOverlayWidget({
     Key? key,
     required this.clothingImageUrl,
     required this.cameraSize,
@@ -34,10 +34,10 @@ class VirtualTryOnView extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _VirtualTryOnViewState createState() => _VirtualTryOnViewState();
+  _cameraOverlayWidgetState createState() => _cameraOverlayWidgetState();
 }
 
-class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProviderStateMixin {
+class _cameraOverlayWidgetState extends State<cameraOverlayWidget> with TickerProviderStateMixin {
   static const MethodChannel _methodChannel =
   MethodChannel('edu.tar.my.secondsight/pose_methods');
 
@@ -106,20 +106,12 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
   }
 
   Future<void> _initializeVirtualTryOn() async {
-    print('Initializing Virtual Try-On...');
-
-    // Load clothing image first
     await _loadClothingImage();
-
-    // Set up pose detection
     _setupPoseDetection();
-
-    // Start image stream with delay to ensure everything is ready
-    await Future.delayed(Duration(milliseconds: 1000)); // Increased delay
+    await Future.delayed(Duration(milliseconds: 1000));
     await _startImageStream();
   }
 
-  // Load recent images from app's directory
   Future<void> _loadRecentImages() async {
     try {
       final tempDir = await getTemporaryDirectory();
@@ -142,7 +134,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
   }
 
   void _setupPoseDetection() {
-    // Cancel any existing subscription
     _poseSubscription?.cancel();
 
     _poseSubscription = _poseService.poseStream.listen((poseData) {
@@ -178,7 +169,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
     if (_isDisposed || _isImageStreamActive) return;
 
     try {
-      print('Starting image stream...');
       _frameCount = 0;
 
       await widget.cameraController.startImageStream((CameraImage image) async {
@@ -199,9 +189,7 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
       });
 
       _isImageStreamActive = true;
-      print('Image stream started successfully');
     } catch (e) {
-      print('Error starting image stream: $e');
       _isImageStreamActive = false;
     }
   }
@@ -210,18 +198,14 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
     if (!_isImageStreamActive || widget.cameraController == null) return;
 
     try {
-      print('Stopping image stream...');
       _isImageStreamActive = false;
       await widget.cameraController.stopImageStream();
-      print('Image stream stopped');
     } catch (e) {
-      print('Error stopping image stream: $e');
     }
   }
 
   @override
   void dispose() {
-    print('Disposing VirtualTryOnView...');
     _isDisposed = true;
 
 
@@ -310,7 +294,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
         throw Exception('Invalid image URL format');
       }
     } catch (e) {
-      print('Error loading clothing image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load clothing image')),
@@ -325,7 +308,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
 
   Future<void> _loadNetworkImage() async {
     try {
-      print('Loading network image from: ${widget.clothingImageUrl}');
       // Download image from Firebase Storage URL
       final response = await http.get(Uri.parse(widget.clothingImageUrl));
       if (response.statusCode == 200) {
@@ -337,21 +319,18 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
         if (mounted && !_isDisposed) {
           setState(() {
             _clothingImage = frameInfo.image;
-            print('Network image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
           });
         }
       } else {
         throw Exception('Failed to load image: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error loading network image: $e');
       rethrow;
     }
   }
 
   Future<void> _loadAssetImage() async {
     try {
-      print('Loading asset image from: ${widget.clothingImageUrl}');
       final ByteData data = await rootBundle.load(widget.clothingImageUrl);
       final Uint8List bytes = data.buffer.asUint8List();
       final ui.Codec codec = await ui.instantiateImageCodec(bytes);
@@ -360,11 +339,9 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
       if (mounted && !_isDisposed) {
         setState(() {
           _clothingImage = frameInfo.image;
-          print('Asset image loaded: ${_clothingImage!.width}x${_clothingImage!.height}');
         });
       }
     } catch (e) {
-      print('Error loading asset image: $e');
       rethrow;
     }
   }
@@ -380,7 +357,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
         'height': image.height,
       });
     } catch (e) {
-      print('Error processing frame: $e');
     }
   }
 
@@ -394,20 +370,15 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
 
   Future<void> _capturePhoto() async {
     if (_isCapturing || !mounted) return;
-
     setState(() => _isCapturing = true);
-
     try {
-      // Request storage permission first
       final status = await _requestStoragePermission();
       if (!status) {
         throw Exception('Storage permission denied');
       }
 
-      // Method 1: Capture the camera feed + overlay
       await _captureWithOverlay();
 
-      // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -431,9 +402,6 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
         );
       }
     } catch (e, stackTrace) {
-      print('[CAPTURE ERROR] Error capturing photo: $e');
-      print('[CAPTURE ERROR] Stack trace: $stackTrace');
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -458,26 +426,11 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
     }
   }
 
-// Replace the _captureWithOverlay method with this:
   Future<void> _captureWithOverlay() async {
     try {
-      print('[OVERLAY] Starting capture with overlay...');
-
-      // Stop image stream temporarily to take photo
-      print('[OVERLAY] Stopping image stream...');
       await _stopImageStream();
-
-      // Take the photo from camera
-      print('[OVERLAY] Taking photo with camera controller...');
       final XFile photo = await widget.cameraController.takePicture();
-      print('[OVERLAY] Photo taken: ${photo.path}');
-
-      // Read the photo as bytes
-      print('[OVERLAY] Reading photo bytes...');
       final Uint8List photoBytes = await photo.readAsBytes();
-      print('[OVERLAY] Photo bytes length: ${photoBytes.length}');
-
-      // Decode the photo
       img.Image? cameraImage = img.decodeImage(photoBytes);
       if (cameraImage == null) throw Exception('Failed to decode camera image');
 
@@ -509,13 +462,8 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
       // Convert to bytes and save
       final byteData = await finalImage.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) throw Exception('Failed to convert image to bytes');
-
       final buffer = byteData.buffer.asUint8List();
-
-      print('[OVERLAY] Getting temp directory...');
       final tempDir = await getTemporaryDirectory();
-      print('[OVERLAY] Temp directory: ${tempDir.path}');
-
       final tryOnDir = Directory('${tempDir.path}/tryon_images');
       if (!await tryOnDir.exists()) {
         await tryOnDir.create(recursive: true);
@@ -523,37 +471,26 @@ class _VirtualTryOnViewState extends State<VirtualTryOnView> with TickerProvider
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final tempPath = '${tryOnDir.path}/tryon_$timestamp.png';
-      print('[OVERLAY] Temp file path: $tempPath');
-
       final tempFile = File(tempPath);
       await tempFile.writeAsBytes(buffer);
 
-      // Save to gallery using gal
-      print('[OVERLAY] Saving to gallery using gal...');
       await Gal.putImage(
         tempPath,
-        album: 'SecondSight', // Optional: create a specific album
+        album: 'SecondSight',
       );
-
-      print('[OVERLAY] Successfully saved to gallery');
       _lastCapturedImagePath = tempPath;
 
       if (mounted) {
         setState(() {
           _recentImages.insert(0, tempFile);
-          // Keep only the last 10 images
           if (_recentImages.length > 10) {
             _recentImages.removeLast();
           }
         });
       }
-
-      // Restart image stream
       await _startImageStream();
 
     } catch (e) {
-      print('Error in _captureWithOverlay: $e');
-      // Ensure image stream is restarted even if there's an error
       await _startImageStream();
       rethrow;
     }
